@@ -1,0 +1,46 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "AksesBogor API",
+    "version": "0.1.0",
+    "description": "API AksesBogor. Dibuat otomatis dari skema Zod di setiap route."
+  },
+  "components": {
+    "schemas": {}
+  },
+  "paths": {
+    "/healthz": {
+      "get": {
+        "summary": "Cek server hidup",
+        "tags": [
+          "Sistem"
+        ],
+        "description": "Dipakai health check Azure App Service. Tidak menyentuh database.",
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ok"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
