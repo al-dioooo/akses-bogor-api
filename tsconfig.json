@@ -12,5 +12,5 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["src", "scripts", "test", "drizzle.config.ts", "eslint.config.js"]
+  "include": ["src", "scripts", "test", "drizzle.config.ts"]
 }
