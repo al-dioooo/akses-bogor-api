@@ -61,6 +61,20 @@ Contoh lengkap ada di [.env.example](.env.example). Jangan commit `.env`.
 | `DATABASE_URL` | Ya | Koneksi pooled Neon untuk aplikasi |
 | `DATABASE_URL_UNPOOLED` | Untuk migrasi | Koneksi langsung Neon untuk `pnpm db:migrate` |
 | `FRONTEND_ORIGINS` | Di production | Origin web yang boleh memanggil API, dipisah koma. Di luar production, `http://localhost:*` selalu diizinkan |
+| `PHOTO_PUBLIC_URL` | Tidak | Alamat publik bucket foto Cloudflare R2. Kosong berarti `url` foto di respons bernilai `null` |
+
+## Endpoint
+
+| Endpoint | Isi | Kebutuhan |
+| --- | --- | --- |
+| `GET /healthz` | Cek server hidup | |
+| `GET /districts` | Enam kecamatan dengan jumlah lokasi | FR-03 |
+| `GET /places` | Daftar lokasi: pencarian `q`, filter `category`, `district`, `facility`, `status` (dipisah koma), `limit`, `offset` | FR-02 sampai FR-04 |
+| `GET /places/map` | GeoJSON untuk Mapbox dengan filter yang sama dan `bbox` | FR-05 |
+| `GET /places/stats` | Jumlah per kategori, pintu masuk tanpa tangga, dan kontributor | FR-01 |
+| `GET /places/{id}` | Detail: jawaban, alasan, catatan, ringkasan X dari Y, fasilitas penentu status, foto, `needsRecheck` | FR-06, FR-07, FR-38 |
+
+Status lokasi dan ringkasannya dihitung dengan aturan "pintu masuk dulu" di `src/domain/status.ts` (ADR-0018) dan disimpan di tabel `places`; panggil `refreshPlaceStatus` setiap kali jawaban fasilitas berubah. Respons memakai nilai enum produk (mis. `sebagian`, `tidak_tersedia`); teks untuk pengguna disusun di web.
 
 ## API Spec
 
