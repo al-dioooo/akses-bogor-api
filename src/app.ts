@@ -20,7 +20,8 @@ declare module "fastify" {
   }
 }
 
-export async function buildApp(env: Env) {
+/** `deps.db` dipakai tes (PGlite); tanpa itu aplikasi membuka pool ke `DATABASE_URL`. */
+export async function buildApp(env: Env, deps: { db?: Db } = {}) {
   const app = Fastify({
     logger:
       env.NODE_ENV === "test"
@@ -36,13 +37,17 @@ export async function buildApp(env: Env) {
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
 
-  const { db, pool } = createDb(env.DATABASE_URL, (error) =>
-    app.log.warn({ err: error }, "koneksi database terputus; dibuka ulang saat dibutuhkan"),
-  );
-  app.decorate("db", db);
-  app.addHook("onClose", async () => {
-    await pool.end();
-  });
+  if (deps.db) {
+    app.decorate("db", deps.db);
+  } else {
+    const { db, pool } = createDb(env.DATABASE_URL, (error) =>
+      app.log.warn({ err: error }, "koneksi database terputus; dibuka ulang saat dibutuhkan"),
+    );
+    app.decorate("db", db);
+    app.addHook("onClose", async () => {
+      await pool.end();
+    });
+  }
 
   await app.register(swagger, {
     openapi: {
