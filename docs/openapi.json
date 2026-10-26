@@ -15,7 +15,7 @@
         "tags": [
           "Sistem"
         ],
-        "description": "Dipakai health check Azure App Service. Tidak menyentuh database.",
+        "description": "Dipakai untuk memantau server dan mengecek deploy. Tidak menyentuh database.",
         "responses": {
           "200": {
             "description": "Default Response",

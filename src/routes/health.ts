@@ -8,7 +8,7 @@ export const healthRoutes: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ["Sistem"],
         summary: "Cek server hidup",
-        description: "Dipakai health check Azure App Service. Tidak menyentuh database.",
+        description: "Dipakai untuk memantau server dan mengecek deploy. Tidak menyentuh database.",
         response: { 200: z.object({ status: z.literal("ok") }) },
       },
     },
