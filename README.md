@@ -38,6 +38,7 @@ pnpm dev               # http://localhost:8080/healthz
 | `pnpm openapi` | Menulis ulang `docs/openapi.json` dari skema route |
 | `pnpm db:generate` | Membuat migrasi Drizzle dari `src/db/schema.ts` |
 | `pnpm db:migrate` | Menjalankan migrasi ke database di `DATABASE_URL_UNPOOLED` |
+| `pnpm db:seed` | Mengosongkan data lokasi dan laporan, lalu mengisi enam kecamatan dan tujuh lokasi contoh; ditolak di production |
 
 ## Database
 
@@ -45,6 +46,7 @@ Neon Postgres dengan PostGIS dan `pg_trgm`. Skema ada di `src/db/schema.ts` dan 
 
 - Setelah mengubah skema, jalankan `pnpm db:generate` lalu commit berkas baru di `drizzle/`. Periksa SQL-nya: drizzle-kit tidak menulis SRID untuk kolom titik, jadi tambahkan `4326` sendiri.
 - `pnpm db:migrate` menjalankan migrasi ke database di `DATABASE_URL_UNPOOLED`.
+- `pnpm db:seed` mengisi data contoh untuk pengembangan: nama fiktif ("… contoh") di kecamatan nyata, mencakup keempat status.
 - Tes database tidak butuh Docker atau Postgres lokal: `test/helpers/db.ts` menjalankan PGlite dengan PostGIS di dalam proses dan menerapkan migrasi yang sama.
 
 ## Environment Variables
