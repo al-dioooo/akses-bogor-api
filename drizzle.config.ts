@@ -12,4 +12,6 @@ export default defineConfig({
   schema: "./src/db/schema.ts",
   out: "./drizzle",
   dbCredentials: { url: process.env.DATABASE_URL_UNPOOLED ?? process.env.DATABASE_URL ?? "" },
+  // Tabel milik PostGIS (spatial_ref_sys) bukan bagian dari skema aplikasi.
+  extensionsFilters: ["postgis"],
 });
