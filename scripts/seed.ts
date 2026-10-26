@@ -8,7 +8,7 @@ if (env.NODE_ENV === "production") {
   console.error("db:seed menghapus data lokasi dan laporan, jadi tidak boleh dijalankan di production.");
   process.exit(1);
 }
-const { db, pool } = createDb(env.DATABASE_URL_UNPOOLED ?? env.DATABASE_URL);
+const { db, pool } = createDb(env.DATABASE_URL);
 const result = await seedSampleData(db);
 await pool.end();
 console.log(`Selesai: ${result.districts} kecamatan, ${result.places} lokasi contoh.`);

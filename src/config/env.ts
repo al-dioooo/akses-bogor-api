@@ -15,10 +15,8 @@ const schema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   PORT: z.coerce.number().int().default(8080),
   HOST: z.string().default("0.0.0.0"),
-  /** Neon Postgres, koneksi pooled untuk aplikasi. */
+  /** PostgreSQL dengan PostGIS, dipakai aplikasi, migrasi, dan seed. */
   DATABASE_URL: z.url(),
-  /** Koneksi langsung (unpooled) untuk migrasi Drizzle. */
-  DATABASE_URL_UNPOOLED: z.url().optional(),
   /** Origin web yang boleh memanggil API, dipisah koma. */
   FRONTEND_ORIGINS: csv(),
   /** Alamat publik bucket foto di Cloudflare R2. Kosong berarti URL foto di respons bernilai null. */
