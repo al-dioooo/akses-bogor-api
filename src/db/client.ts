@@ -1,8 +1,10 @@
 import pg from "pg";
-import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
+import { drizzle } from "drizzle-orm/node-postgres";
+import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import * as schema from "./schema.js";
 
-export type Db = NodePgDatabase<typeof schema>;
+/** Berlaku untuk node-postgres (Neon) di produksi dan PGlite di tes. */
+export type Db = PgDatabase<PgQueryResultHKT, typeof schema>;
 
 export function createDb(connectionString: string, onPoolError?: (error: Error) => void) {
   const pool = new pg.Pool({
@@ -16,6 +18,6 @@ export function createDb(connectionString: string, onPoolError?: (error: Error) 
   // re-emits that as an unhandled 'error' event and the process exits. The pool drops the broken
   // client by itself and opens a new one on the next query.
   pool.on("error", (error) => onPoolError?.(error));
-  const db = drizzle(pool, { schema });
+  const db: Db = drizzle(pool, { schema });
   return { db, pool };
 }

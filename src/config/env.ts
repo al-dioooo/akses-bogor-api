@@ -21,6 +21,8 @@ const schema = z.object({
   DATABASE_URL_UNPOOLED: z.url().optional(),
   /** Origin web yang boleh memanggil API, dipisah koma. */
   FRONTEND_ORIGINS: csv(),
+  /** Alamat publik bucket foto di Cloudflare R2. Kosong berarti URL foto di respons bernilai null. */
+  PHOTO_PUBLIC_URL: z.preprocess((value) => (value === "" ? undefined : value), z.url().optional()),
 });
 
 export type Env = z.infer<typeof schema>;

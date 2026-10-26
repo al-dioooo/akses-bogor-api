@@ -12,7 +12,9 @@ import {
 import type { Env } from "./config/env.js";
 import { createDb, type Db } from "./db/client.js";
 import { HttpError } from "./http/errors.js";
+import { districtRoutes } from "./routes/districts.js";
 import { healthRoutes } from "./routes/health.js";
+import { placeRoutes } from "./routes/places.js";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -20,7 +22,8 @@ declare module "fastify" {
   }
 }
 
-export async function buildApp(env: Env) {
+/** `deps` dipakai tes: `db` (PGlite) dan `now` (jam tetap). Tanpa `db`, aplikasi membuka pool ke `DATABASE_URL`. */
+export async function buildApp(env: Env, deps: { db?: Db; now?: () => Date } = {}) {
   const app = Fastify({
     logger:
       env.NODE_ENV === "test"
@@ -36,13 +39,17 @@ export async function buildApp(env: Env) {
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
 
-  const { db, pool } = createDb(env.DATABASE_URL, (error) =>
-    app.log.warn({ err: error }, "koneksi database terputus; dibuka ulang saat dibutuhkan"),
-  );
-  app.decorate("db", db);
-  app.addHook("onClose", async () => {
-    await pool.end();
-  });
+  if (deps.db) {
+    app.decorate("db", deps.db);
+  } else {
+    const { db, pool } = createDb(env.DATABASE_URL, (error) =>
+      app.log.warn({ err: error }, "koneksi database terputus; dibuka ulang saat dibutuhkan"),
+    );
+    app.decorate("db", db);
+    app.addHook("onClose", async () => {
+      await pool.end();
+    });
+  }
 
   await app.register(swagger, {
     openapi: {
@@ -90,6 +97,8 @@ export async function buildApp(env: Env) {
 
   app.get("/openapi.json", { schema: { hide: true } }, async () => app.swagger());
   await app.register(healthRoutes);
+  await app.register(districtRoutes);
+  await app.register(placeRoutes, { photoBaseUrl: env.PHOTO_PUBLIC_URL, now: deps.now ?? (() => new Date()) });
 
   return app;
 }
