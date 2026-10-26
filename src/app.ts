@@ -12,7 +12,9 @@ import {
 import type { Env } from "./config/env.js";
 import { createDb, type Db } from "./db/client.js";
 import { HttpError } from "./http/errors.js";
+import { districtRoutes } from "./routes/districts.js";
 import { healthRoutes } from "./routes/health.js";
+import { placeRoutes } from "./routes/places.js";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -20,8 +22,8 @@ declare module "fastify" {
   }
 }
 
-/** `deps.db` dipakai tes (PGlite); tanpa itu aplikasi membuka pool ke `DATABASE_URL`. */
-export async function buildApp(env: Env, deps: { db?: Db } = {}) {
+/** `deps` dipakai tes: `db` (PGlite) dan `now` (jam tetap). Tanpa `db`, aplikasi membuka pool ke `DATABASE_URL`. */
+export async function buildApp(env: Env, deps: { db?: Db; now?: () => Date } = {}) {
   const app = Fastify({
     logger:
       env.NODE_ENV === "test"
@@ -95,6 +97,8 @@ export async function buildApp(env: Env, deps: { db?: Db } = {}) {
 
   app.get("/openapi.json", { schema: { hide: true } }, async () => app.swagger());
   await app.register(healthRoutes);
+  await app.register(districtRoutes);
+  await app.register(placeRoutes, { photoBaseUrl: env.PHOTO_PUBLIC_URL, now: deps.now ?? (() => new Date()) });
 
   return app;
 }
