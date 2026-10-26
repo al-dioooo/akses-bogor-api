@@ -14,4 +14,9 @@ describe("loadEnv", () => {
     expect(env.FRONTEND_ORIGINS).toEqual(["https://aksesbogor.id", "http://localhost:3000"]);
     expect(env.PORT).toBe(8080);
   });
+
+  it("treats an empty PHOTO_PUBLIC_URL as unset, as in .env.example", () => {
+    const env = loadEnv({ DATABASE_URL: "postgresql://test:test@localhost:5432/test", PHOTO_PUBLIC_URL: "" });
+    expect(env.PHOTO_PUBLIC_URL).toBeUndefined();
+  });
 });
