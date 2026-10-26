@@ -16,7 +16,8 @@
     "test": "vitest run",
     "openapi": "tsx scripts/openapi.ts",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "db:seed": "tsx --env-file=.env scripts/seed.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.3.1",
