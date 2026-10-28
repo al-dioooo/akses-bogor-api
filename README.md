@@ -100,8 +100,8 @@ Diagram dan struktur folder ada di [docs/arsitektur.md](docs/arsitektur.md).
 
 Belum di-deploy. Rencananya, sesuai [ADR-0025](https://github.com/al-dioooo/akses-bogor-docs/blob/main/decisions/0025-api-dan-postgresql-di-vps-sendiri.md):
 
-- API berjalan di VPS milik tim sebagai service systemd dengan user sistem sendiri: Node 22 LTS, `node dist/server.js`, dan `HOST=127.0.0.1`.
-- Cloudflare Tunnel meneruskan hostname API ke `localhost:8080`; TLS diurus Cloudflare. Health check di `/healthz`.
+- API berjalan di VPS milik tim sebagai service systemd dengan user sistem sendiri: Node 22 LTS, `node dist/server.js`, dan `HOST=127.0.0.1`. Port `8080` sudah dipakai layanan lain di VPS, jadi `PORT` diisi port lain.
+- Cloudflare Tunnel meneruskan hostname API ke port lokal itu; TLS diurus Cloudflare. Health check di `/healthz`.
 - PostgreSQL 17 + PostGIS di VPS yang sama, hanya menerima koneksi dari localhost.
 - Environment variable disimpan di berkas environment service systemd, bukan di repo.
 - Migrasi dijalankan dengan `pnpm db:migrate` sebelum versi baru menerima trafik.
