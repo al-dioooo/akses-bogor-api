@@ -1,13 +1,13 @@
 # Arsitektur
 
-Sumber keputusan: [ADR-0013](https://github.com/al-dioooo/akses-bogor-docs/blob/main/decisions/0013-tech-stack-nextjs-fastify.md). Diagram di bawah memuat bagian yang sudah ada dan yang direncanakan; yang direncanakan ditandai garis putus-putus.
+Sumber keputusan: [ADR-0013](https://github.com/al-dioooo/akses-bogor-docs/blob/main/decisions/0013-tech-stack-nextjs-fastify.md) dan [ADR-0025](https://github.com/al-dioooo/akses-bogor-docs/blob/main/decisions/0025-api-dan-postgresql-di-vps-sendiri.md). Diagram di bawah memuat bagian yang sudah ada dan yang direncanakan; yang direncanakan ditandai garis putus-putus.
 
 ```mermaid
 flowchart LR
   B[Browser / PWA] -->|halaman| W[akses-bogor-web<br/>Next.js di Vercel]
-  B -->|API + sesi| F[akses-bogor-api<br/>Fastify di Azure App Service B1]
+  B -->|API + sesi| F[akses-bogor-api<br/>Fastify di VPS, lewat Cloudflare Tunnel]
   W -->|render di server| F
-  F --> DB[(Neon Postgres + PostGIS)]
+  F --> DB[(PostgreSQL 17 + PostGIS di VPS)]
   F -.-> R2[(Cloudflare R2: foto)]
   F -.-> E[Penyedia email]
   F -.-> G[Google: verifikasi ID token]
@@ -15,7 +15,7 @@ flowchart LR
 ```
 
 - Browser tidak pernah terhubung langsung ke database atau R2. Setiap request yang menyentuh data diperiksa sesi dan perannya di API.
-- Aplikasi memakai koneksi pooled Neon (`DATABASE_URL`); migrasi memakai koneksi langsung (`DATABASE_URL_UNPOOLED`).
+- Aplikasi, migrasi, dan seed memakai satu koneksi (`DATABASE_URL`) ke PostgreSQL di VPS yang sama, yang hanya menerima koneksi dari localhost.
 - Foto diperkecil di browser, lalu diperiksa ulang, disandikan ulang, dan dihapus metadata EXIF-nya di API sebelum disimpan ke R2 ([ADR-0023](https://github.com/al-dioooo/akses-bogor-docs/blob/main/decisions/0023-hingga-sepuluh-foto-bertag-per-laporan.md)).
 
 ## Alur Request
@@ -24,7 +24,7 @@ flowchart LR
 sequenceDiagram
   participant K as Klien
   participant F as Fastify
-  participant DB as Neon
+  participant DB as PostgreSQL
   K->>F: Request
   F->>F: CORS, rate limit, validasi skema Zod
   F->>DB: Query lewat Drizzle

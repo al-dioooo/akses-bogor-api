@@ -11,19 +11,21 @@ Keputusan produk dan teknis ada di [akses-bogor-docs](https://github.com/al-dioo
 | Runtime | Node.js 22 LTS |
 | Framework | Fastify 5, TypeScript 6 |
 | Validasi dan API spec | Zod lewat `fastify-type-provider-zod`, OpenAPI dari `@fastify/swagger` |
-| Database | Neon Postgres + PostGIS, Drizzle ORM |
+| Database | PostgreSQL 17 + PostGIS dan `pg_trgm`, Drizzle ORM |
 | Tes dan lint | Vitest, ESLint dengan typescript-eslint |
-| Hosting | Azure App Service Linux B1, Southeast Asia |
+| Hosting | VPS milik tim: systemd di balik Cloudflare Tunnel |
 
-Alasan pilihan ini ada di [ADR-0013](https://github.com/al-dioooo/akses-bogor-docs/blob/main/decisions/0013-tech-stack-nextjs-fastify.md).
+Alasan pilihan ini ada di [ADR-0013](https://github.com/al-dioooo/akses-bogor-docs/blob/main/decisions/0013-tech-stack-nextjs-fastify.md) dan [ADR-0025](https://github.com/al-dioooo/akses-bogor-docs/blob/main/decisions/0025-api-dan-postgresql-di-vps-sendiri.md).
 
 ## Menjalankan di Lokal
 
-Butuh Node.js 22 atau lebih baru dan pnpm 12 (`corepack enable` memakai versi di `package.json`).
+Butuh Node.js 22 atau lebih baru, pnpm 12 (`corepack enable` memakai versi di `package.json`), dan PostgreSQL 17 dengan PostGIS (lihat [Database](#database)).
 
 ```bash
 pnpm install
-cp .env.example .env   # lalu isi DATABASE_URL dengan branch Neon untuk pengembangan
+cp .env.example .env   # lalu isi DATABASE_URL ke PostgreSQL lokal
+pnpm db:migrate
+pnpm db:seed
 pnpm dev               # http://localhost:8080/healthz
 ```
 
@@ -37,17 +39,26 @@ pnpm dev               # http://localhost:8080/healthz
 | `pnpm start` | Menjalankan `dist/server.js` |
 | `pnpm openapi` | Menulis ulang `docs/openapi.json` dari skema route |
 | `pnpm db:generate` | Membuat migrasi Drizzle dari `src/db/schema.ts` |
-| `pnpm db:migrate` | Menjalankan migrasi ke database di `DATABASE_URL_UNPOOLED` |
+| `pnpm db:migrate` | Menjalankan migrasi ke database di `DATABASE_URL` |
 | `pnpm db:seed` | Mengosongkan data lokasi dan laporan, lalu mengisi enam kecamatan dan tujuh lokasi contoh; ditolak di production |
 
 ## Database
 
-Neon Postgres dengan PostGIS dan `pg_trgm`. Skema ada di `src/db/schema.ts` dan diagramnya di [docs/arsitektur.md](docs/arsitektur.md#model-data).
+PostgreSQL 17 dengan PostGIS dan `pg_trgm`. Skema ada di `src/db/schema.ts` dan diagramnya di [docs/arsitektur.md](docs/arsitektur.md#model-data).
 
 - Setelah mengubah skema, jalankan `pnpm db:generate` lalu commit berkas baru di `drizzle/`. Periksa SQL-nya: drizzle-kit tidak menulis SRID untuk kolom titik, jadi tambahkan `4326` sendiri.
-- `pnpm db:migrate` menjalankan migrasi ke database di `DATABASE_URL_UNPOOLED`.
+- `pnpm db:migrate` menjalankan migrasi ke database di `DATABASE_URL`.
 - `pnpm db:seed` mengisi data contoh untuk pengembangan: nama fiktif ("… contoh") di kecamatan nyata, mencakup keempat status.
 - Tes database tidak butuh Docker atau Postgres lokal: `test/helpers/db.ts` menjalankan PGlite dengan PostGIS di dalam proses dan menerapkan migrasi yang sama.
+
+Menyiapkan PostgreSQL di Debian 13. `pg_trgm` sudah ikut paket `postgresql-17`. PostGIS hanya bisa diaktifkan superuser, jadi buat ekstensinya sebelum `pnpm db:migrate`:
+
+```bash
+sudo apt install postgresql-17 postgresql-17-postgis-3
+sudo -u postgres createuser --pwprompt aksesbogor
+sudo -u postgres createdb --owner aksesbogor aksesbogor
+sudo -u postgres psql -d aksesbogor -c 'CREATE EXTENSION IF NOT EXISTS postgis'
+```
 
 ## Environment Variables
 
@@ -58,8 +69,7 @@ Contoh lengkap ada di [.env.example](.env.example). Jangan commit `.env`.
 | `NODE_ENV` | Tidak | `development` (bawaan), `production`, atau `test` |
 | `PORT` | Tidak | Port server, bawaan `8080` |
 | `HOST` | Tidak | Alamat bind, bawaan `0.0.0.0` |
-| `DATABASE_URL` | Ya | Koneksi pooled Neon untuk aplikasi |
-| `DATABASE_URL_UNPOOLED` | Untuk migrasi | Koneksi langsung Neon untuk `pnpm db:migrate` |
+| `DATABASE_URL` | Ya | Koneksi PostgreSQL untuk aplikasi, `pnpm db:migrate`, dan `pnpm db:seed` |
 | `FRONTEND_ORIGINS` | Di production | Origin web yang boleh memanggil API, dipisah koma. Di luar production, `http://localhost:*` selalu diizinkan |
 | `PHOTO_PUBLIC_URL` | Tidak | Alamat publik bucket foto Cloudflare R2. Kosong berarti `url` foto di respons bernilai `null` |
 
@@ -88,14 +98,16 @@ Diagram dan struktur folder ada di [docs/arsitektur.md](docs/arsitektur.md).
 
 ## Deployment
 
-Belum di-deploy. Rencananya, sesuai ADR-0013:
+Belum di-deploy. Rencananya, sesuai [ADR-0025](https://github.com/al-dioooo/akses-bogor-docs/blob/main/decisions/0025-api-dan-postgresql-di-vps-sendiri.md):
 
-- Azure App Service Linux B1 di Southeast Asia, Node 22 LTS, Always On aktif, terpisah dari aplikasi lain.
-- Perintah startup `node dist/server.js`, health check di `/healthz`.
-- Environment variable diisi di Configuration App Service, bukan di repo.
+- API berjalan di VPS milik tim sebagai service systemd dengan user sistem sendiri: Node 22 LTS, `node dist/server.js`, dan `HOST=127.0.0.1`. Port `8080` sudah dipakai layanan lain di VPS, jadi `PORT` diisi port lain.
+- Cloudflare Tunnel meneruskan hostname API ke port lokal itu; TLS diurus Cloudflare. Health check di `/healthz`.
+- PostgreSQL 17 + PostGIS di VPS yang sama, hanya menerima koneksi dari localhost.
+- Environment variable disimpan di berkas environment service systemd, bukan di repo.
 - Migrasi dijalankan dengan `pnpm db:migrate` sebelum versi baru menerima trafik.
+- Timer systemd menjalankan `pg_dump -Fc` setiap malam: tujuh dump disimpan di VPS dan salinannya di bucket R2 privat selama 30 hari.
 
-Workflow deploy ditambahkan setelah App Service dibuat.
+Workflow deploy ditambahkan terpisah.
 
 ## Kontribusi
 
