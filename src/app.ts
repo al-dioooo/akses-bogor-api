@@ -12,6 +12,7 @@ import {
 import type { Env } from "./config/env.js";
 import { createDb, type Db } from "./db/client.js";
 import { HttpError } from "./http/errors.js";
+import { rateLimitKey } from "./http/rate-limit.js";
 import { districtRoutes } from "./routes/districts.js";
 import { healthRoutes } from "./routes/health.js";
 import { placeRoutes } from "./routes/places.js";
@@ -73,6 +74,7 @@ export async function buildApp(env: Env, deps: { db?: Db; now?: () => Date } = {
   await app.register(rateLimit, {
     max: 120,
     timeWindow: "1 minute",
+    keyGenerator: rateLimitKey,
     allowList: (request) => request.url === "/healthz",
   });
 
