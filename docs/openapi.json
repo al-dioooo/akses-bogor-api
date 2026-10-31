@@ -1,0 +1,1027 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "AksesBogor API",
+    "version": "0.1.0",
+    "description": "API AksesBogor. Dibuat otomatis dari skema Zod di setiap route."
+  },
+  "components": {
+    "schemas": {}
+  },
+  "paths": {
+    "/healthz": {
+      "get": {
+        "summary": "Cek server hidup",
+        "tags": [
+          "Sistem"
+        ],
+        "description": "Dipakai untuk memantau server dan mengecek deploy. Tidak menyentuh database.",
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ok"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/districts": {
+      "get": {
+        "summary": "Daftar kecamatan",
+        "tags": [
+          "Lokasi"
+        ],
+        "description": "Enam kecamatan Kota Bogor (ADR-0010) dengan jumlah lokasi terbit, untuk filter kecamatan.",
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "slug": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "city": {
+                        "type": "string"
+                      },
+                      "places": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "slug",
+                      "name",
+                      "city",
+                      "places"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/places": {
+      "get": {
+        "summary": "Daftar lokasi untuk Jelajahi",
+        "tags": [
+          "Lokasi"
+        ],
+        "description": "Pencarian nama sebagian kata (FR-02) dan filter kategori, kecamatan, fasilitas, status (FR-03). Urut nama.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "description": "Cari nama tempat, cocok sebagian kata dan tanpa membedakan huruf besar"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "category",
+            "required": false,
+            "description": "Kategori, dipisah koma"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "district",
+            "required": false,
+            "description": "Slug kecamatan, dipisah koma, mis. bogor-tengah"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "facility",
+            "required": false,
+            "description": "Fasilitas yang harus Tersedia, dipisah koma; semua harus terpenuhi"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "description": "Status, dipisah koma"
+          },
+          {
+            "schema": {
+              "default": 20,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            },
+            "in": "query",
+            "name": "limit",
+            "required": false
+          },
+          {
+            "schema": {
+              "default": 0,
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "offset",
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "total": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Jumlah semua hasil yang cocok dengan filter"
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "offset": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "category": {
+                            "type": "string",
+                            "enum": [
+                              "kampus",
+                              "masjid",
+                              "halte",
+                              "rumah_sakit"
+                            ]
+                          },
+                          "district": {
+                            "type": "object",
+                            "properties": {
+                              "slug": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "slug",
+                              "name"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "aksesibel",
+                              "sebagian",
+                              "tidak_aksesibel",
+                              "belum_diketahui"
+                            ]
+                          },
+                          "summary": {
+                            "type": "object",
+                            "properties": {
+                              "available": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "X: fasilitas relevan yang Tersedia"
+                              },
+                              "relevant": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Y: fasilitas selain Tidak perlu"
+                              },
+                              "unknown": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Fasilitas relevan yang Belum tahu"
+                              }
+                            },
+                            "required": [
+                              "available",
+                              "relevant",
+                              "unknown"
+                            ],
+                            "additionalProperties": false,
+                            "description": "Ringkasan X dari Y fasilitas (ADR-0018)"
+                          },
+                          "location": {
+                            "type": "object",
+                            "properties": {
+                              "lat": {
+                                "type": "number"
+                              },
+                              "lng": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "lat",
+                              "lng"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "lastVerifiedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                          },
+                          "coverPhoto": {
+                            "nullable": true,
+                            "description": "Foto tayang pertama, mendahulukan tag pintu_masuk",
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              },
+                              "url": {
+                                "nullable": true,
+                                "description": "Kosong bila PHOTO_PUBLIC_URL belum diatur",
+                                "type": "string",
+                                "format": "uri"
+                              },
+                              "alt": {
+                                "type": "string"
+                              },
+                              "caption": {
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "tag": {
+                                "type": "string",
+                                "enum": [
+                                  "pintu_masuk",
+                                  "toilet_difabel",
+                                  "guiding_block",
+                                  "lift",
+                                  "lainnya"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "url",
+                              "alt",
+                              "caption",
+                              "tag"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "category",
+                          "district",
+                          "status",
+                          "summary",
+                          "location",
+                          "lastVerifiedAt",
+                          "coverPhoto"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "total",
+                    "limit",
+                    "offset",
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/places/map": {
+      "get": {
+        "summary": "Titik lokasi untuk peta",
+        "tags": [
+          "Lokasi"
+        ],
+        "description": "GeoJSON FeatureCollection untuk sumber Mapbox, dengan filter yang sama seperti daftar (FR-05). Maksimal 2000 titik.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "description": "Cari nama tempat, cocok sebagian kata dan tanpa membedakan huruf besar"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "category",
+            "required": false,
+            "description": "Kategori, dipisah koma"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "district",
+            "required": false,
+            "description": "Slug kecamatan, dipisah koma, mis. bogor-tengah"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "facility",
+            "required": false,
+            "description": "Fasilitas yang harus Tersedia, dipisah koma; semua harus terpenuhi"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "description": "Status, dipisah koma"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "bbox",
+            "required": false,
+            "description": "Batas tampilan peta: barat,selatan,timur,utara (derajat)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "FeatureCollection"
+                      ]
+                    },
+                    "features": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "Feature"
+                            ]
+                          },
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "geometry": {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "Point"
+                                ]
+                              },
+                              "coordinates": {
+                                "type": "array",
+                                "items": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "number"
+                                    }
+                                  ]
+                                },
+                                "minItems": 2,
+                                "maxItems": 2,
+                                "description": "[lng, lat]"
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "coordinates"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "properties": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "category": {
+                                "type": "string",
+                                "enum": [
+                                  "kampus",
+                                  "masjid",
+                                  "halte",
+                                  "rumah_sakit"
+                                ]
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "aksesibel",
+                                  "sebagian",
+                                  "tidak_aksesibel",
+                                  "belum_diketahui"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "category",
+                              "status"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "id",
+                          "geometry",
+                          "properties"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "features"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/places/stats": {
+      "get": {
+        "summary": "Angka untuk Beranda",
+        "tags": [
+          "Lokasi"
+        ],
+        "description": "Jumlah lokasi per kategori dan statistik dampak, dihitung dari data (FR-01).",
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "places": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Lokasi yang sudah terbit"
+                    },
+                    "byCategory": {
+                      "type": "object",
+                      "properties": {
+                        "kampus": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "masjid": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "halte": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "rumah_sakit": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": [
+                        "kampus",
+                        "masjid",
+                        "halte",
+                        "rumah_sakit"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "stepFreeEntrance": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Lokasi dengan ramp Tersedia atau pintu masuk rata (Tidak perlu)"
+                    },
+                    "contributors": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Pelapor berbeda yang laporannya sudah terbit"
+                    }
+                  },
+                  "required": [
+                    "places",
+                    "byCategory",
+                    "stepFreeEntrance",
+                    "contributors"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/places/{id}": {
+      "get": {
+        "summary": "Detail lokasi",
+        "tags": [
+          "Lokasi"
+        ],
+        "description": "Fasilitas dengan alasan dan catatan, ringkasan X dari Y, fasilitas penentu status, foto, dan tanda perlu dicek ulang (FR-06, FR-07, FR-38).",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "category": {
+                      "type": "string",
+                      "enum": [
+                        "kampus",
+                        "masjid",
+                        "halte",
+                        "rumah_sakit"
+                      ]
+                    },
+                    "district": {
+                      "type": "object",
+                      "properties": {
+                        "slug": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "slug",
+                        "name"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "aksesibel",
+                        "sebagian",
+                        "tidak_aksesibel",
+                        "belum_diketahui"
+                      ]
+                    },
+                    "summary": {
+                      "type": "object",
+                      "properties": {
+                        "available": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "X: fasilitas relevan yang Tersedia"
+                        },
+                        "relevant": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Y: fasilitas selain Tidak perlu"
+                        },
+                        "unknown": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Fasilitas relevan yang Belum tahu"
+                        }
+                      },
+                      "required": [
+                        "available",
+                        "relevant",
+                        "unknown"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Ringkasan X dari Y fasilitas (ADR-0018)"
+                    },
+                    "location": {
+                      "type": "object",
+                      "properties": {
+                        "lat": {
+                          "type": "number"
+                        },
+                        "lng": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "lat",
+                        "lng"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "lastVerifiedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                    },
+                    "landmark": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "description": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "facilities": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "facility": {
+                            "type": "string",
+                            "enum": [
+                              "ramp",
+                              "toilet_difabel",
+                              "guiding_block",
+                              "lift"
+                            ]
+                          },
+                          "answer": {
+                            "type": "string",
+                            "enum": [
+                              "tersedia",
+                              "tidak_tersedia",
+                              "tidak_perlu",
+                              "belum_tahu"
+                            ]
+                          },
+                          "reason": {
+                            "nullable": true,
+                            "type": "string",
+                            "enum": [
+                              "tidak_ada",
+                              "rusak",
+                              "terhalang",
+                              "terbatas",
+                              "tidak_sesuai"
+                            ]
+                          },
+                          "note": {
+                            "nullable": true,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "facility",
+                          "answer",
+                          "reason",
+                          "note"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Keempat fasilitas, urut ramp, toilet, guiding block, lift"
+                    },
+                    "because": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "facility": {
+                            "type": "string",
+                            "enum": [
+                              "ramp",
+                              "toilet_difabel",
+                              "guiding_block",
+                              "lift"
+                            ]
+                          },
+                          "answer": {
+                            "type": "string",
+                            "enum": [
+                              "tersedia",
+                              "tidak_tersedia",
+                              "tidak_perlu",
+                              "belum_tahu"
+                            ]
+                          },
+                          "reason": {
+                            "nullable": true,
+                            "type": "string",
+                            "enum": [
+                              "tidak_ada",
+                              "rusak",
+                              "terhalang",
+                              "terbatas",
+                              "tidak_sesuai"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "facility",
+                          "answer",
+                          "reason"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Fasilitas yang menentukan status, untuk kalimat alasan; kosong bila Aksesibel"
+                    },
+                    "photos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "url": {
+                            "nullable": true,
+                            "description": "Kosong bila PHOTO_PUBLIC_URL belum diatur",
+                            "type": "string",
+                            "format": "uri"
+                          },
+                          "alt": {
+                            "type": "string"
+                          },
+                          "caption": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "tag": {
+                            "type": "string",
+                            "enum": [
+                              "pintu_masuk",
+                              "toilet_difabel",
+                              "guiding_block",
+                              "lift",
+                              "lainnya"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "url",
+                          "alt",
+                          "caption",
+                          "tag"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Foto yang lolos moderasi, dikelompokkan menurut tag"
+                    },
+                    "needsRecheck": {
+                      "type": "boolean",
+                      "description": "Terakhir diverifikasi lebih dari 12 bulan lalu (FR-38)"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "category",
+                    "district",
+                    "status",
+                    "summary",
+                    "location",
+                    "lastVerifiedAt",
+                    "landmark",
+                    "description",
+                    "facilities",
+                    "because",
+                    "photos",
+                    "needsRecheck"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
