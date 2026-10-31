@@ -12,7 +12,7 @@ import {
 import type { Env } from "./config/env.js";
 import { createDb, type Db } from "./db/client.js";
 import { HttpError } from "./http/errors.js";
-import { rateLimitKey } from "./http/rate-limit.js";
+import { createRateLimitKey, WEB_SERVER_SECRET_HEADER } from "./http/rate-limit.js";
 import { districtRoutes } from "./routes/districts.js";
 import { healthRoutes } from "./routes/health.js";
 import { placeRoutes } from "./routes/places.js";
@@ -31,7 +31,7 @@ export async function buildApp(env: Env, deps: { db?: Db; now?: () => Date } = {
         ? false
         : {
             level: env.NODE_ENV === "production" ? "info" : "debug",
-            redact: ["req.headers.authorization", "req.headers.cookie"],
+            redact: ["req.headers.authorization", "req.headers.cookie", `req.headers["${WEB_SERVER_SECRET_HEADER}"]`],
           },
     trustProxy: true,
     bodyLimit: 1024 * 1024,
@@ -74,7 +74,7 @@ export async function buildApp(env: Env, deps: { db?: Db; now?: () => Date } = {
   await app.register(rateLimit, {
     max: 120,
     timeWindow: "1 minute",
-    keyGenerator: rateLimitKey,
+    keyGenerator: createRateLimitKey(env.WEB_SERVER_SECRET),
     allowList: (request) => request.url === "/healthz",
   });
 
