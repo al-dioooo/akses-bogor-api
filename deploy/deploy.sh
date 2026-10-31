@@ -28,17 +28,18 @@ git --git-dir="$repo" fetch --quiet --prune origin '+refs/heads/*:refs/heads/*'
 sha=$(git --git-dir="$repo" rev-parse --verify "$ref^{commit}")
 active=$(basename "$(readlink -f "$root/current" 2>/dev/null || echo none)")
 
+# Mis. release yang belum pernah di-merge dari main. Dengan --check, unit dilewati, bukan gagal.
+if ! git --git-dir="$repo" cat-file -e "$sha:package.json" 2>/dev/null; then
+  echo "$ref ($sha) tidak berisi aplikasi; deploy dibatalkan" >&2
+  exit 1
+fi
+
 if $check; then
   if [[ $sha == "$active" ]]; then
     echo "$ref masih $sha, sama dengan rilis aktif"
     exit 1
   fi
   exit 0
-fi
-
-if ! git --git-dir="$repo" cat-file -e "$sha:package.json" 2>/dev/null; then
-  echo "$ref ($sha) tidak berisi aplikasi; deploy dibatalkan" >&2
-  exit 1
 fi
 
 dir=$root/releases/$sha
