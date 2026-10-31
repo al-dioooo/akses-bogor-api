@@ -1,13 +1,14 @@
 # Arsitektur
 
-Sumber keputusan: [ADR-0013](https://github.com/al-dioooo/akses-bogor-docs/blob/main/decisions/0013-tech-stack-nextjs-fastify.md) dan [ADR-0025](https://github.com/al-dioooo/akses-bogor-docs/blob/main/decisions/0025-api-dan-postgresql-di-vps-sendiri.md). Diagram di bawah memuat bagian yang sudah ada dan yang direncanakan; yang direncanakan ditandai garis putus-putus.
+Sumber keputusan: [ADR-0013](https://github.com/al-dioooo/akses-bogor-docs/blob/main/decisions/0013-tech-stack-nextjs-fastify.md), [ADR-0025](https://github.com/al-dioooo/akses-bogor-docs/blob/main/decisions/0025-api-dan-postgresql-di-vps-sendiri.md), dan [ADR-0026](https://github.com/al-dioooo/akses-bogor-docs/blob/main/decisions/0026-api-dan-postgresql-di-evergarden-oci.md). Diagram di bawah memuat bagian yang sudah ada dan yang direncanakan; yang direncanakan ditandai garis putus-putus.
 
 ```mermaid
 flowchart LR
   B[Browser / PWA] -->|halaman| W[akses-bogor-web<br/>Next.js di Vercel]
-  B -->|API + sesi| F[akses-bogor-api<br/>Fastify di VPS, lewat Cloudflare Tunnel]
+  B -->|API + sesi| F[akses-bogor-api<br/>Fastify di Evergarden, lewat Cloudflare Tunnel]
   W -->|render di server| F
-  F --> DB[(PostgreSQL 17 + PostGIS di VPS)]
+  F --> DB[(PostgreSQL 17 + PostGIS di Evergarden)]
+  DB -.->|pg_dump tiap malam| BK[(R2 privat: cadangan)]
   F -.-> R2[(Cloudflare R2: foto)]
   F -.-> E[Penyedia email]
   F -.-> G[Google: verifikasi ID token]
@@ -15,7 +16,7 @@ flowchart LR
 ```
 
 - Browser tidak pernah terhubung langsung ke database atau R2. Setiap request yang menyentuh data diperiksa sesi dan perannya di API.
-- Aplikasi, migrasi, dan seed memakai satu koneksi (`DATABASE_URL`) ke PostgreSQL di VPS yang sama, yang hanya menerima koneksi dari localhost.
+- Aplikasi, migrasi, dan seed memakai satu koneksi (`DATABASE_URL`) ke PostgreSQL di mesin yang sama, lewat Unix socket dengan autentikasi peer. Produksi berjalan di Evergarden, VM OCI region Batam; cara deploy ada di [README](../README.md#deployment).
 - Foto diperkecil di browser, lalu diperiksa ulang, disandikan ulang, dan dihapus metadata EXIF-nya di API sebelum disimpan ke R2 ([ADR-0023](https://github.com/al-dioooo/akses-bogor-docs/blob/main/decisions/0023-hingga-sepuluh-foto-bertag-per-laporan.md)).
 
 ## Alur Request

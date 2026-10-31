@@ -1,0 +1,11 @@
+# Cadangan setiap malam pukul 02.30 WIB (ADR-0025).
+[Unit]
+Description=Cadangan malam database AksesBogor
+
+[Timer]
+OnCalendar=*-*-* 02:30 Asia/Jakarta
+RandomizedDelaySec=10min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

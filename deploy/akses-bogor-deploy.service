@@ -1,0 +1,24 @@
+# Men-deploy API bila branch release berisi commit baru (ADR-0026). Dipicu akses-bogor-deploy.timer,
+# atau langsung dengan `sudo systemctl start akses-bogor-deploy`.
+[Unit]
+Description=Deploy AksesBogor API dari branch release
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=aksesbogor
+Group=aksesbogor
+Environment=DEPLOY_REF=release
+# Keluar 1 bila release belum berubah, sehingga unit dilewati, bukan gagal.
+ExecCondition=/usr/local/lib/akses-bogor/deploy.sh --check
+ExecStart=/usr/local/lib/akses-bogor/deploy.sh
+# Awalan + menjalankan restart sebagai root; langkah lain tetap sebagai aksesbogor.
+ExecStartPost=+/usr/bin/systemctl restart akses-bogor-api.service
+TimeoutStartSec=15min
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/akses-bogor
