@@ -8,7 +8,7 @@ Keputusan produk dan teknis ada di [akses-bogor-docs](https://github.com/al-dioo
 
 | Bagian | Pilihan |
 | --- | --- |
-| Runtime | Node.js 22 LTS di CI, Node.js 24 LTS di produksi |
+| Runtime | Node.js 24 LTS di CI, lokal, dan produksi |
 | Framework | Fastify 5, TypeScript 6 |
 | Validasi dan API spec | Zod lewat `fastify-type-provider-zod`, OpenAPI dari `@fastify/swagger` |
 | Database | PostgreSQL 17 + PostGIS dan `pg_trgm`, Drizzle ORM |
@@ -19,7 +19,7 @@ Alasan pilihan ini ada di [ADR-0013](https://github.com/al-dioooo/akses-bogor-do
 
 ## Menjalankan di Lokal
 
-Butuh Node.js 22 atau lebih baru, pnpm 12 (`corepack enable` memakai versi di `package.json`), dan PostgreSQL 17 dengan PostGIS (lihat [Database](#database)).
+Butuh Node.js 24 atau lebih baru, pnpm 12 (`corepack enable` memakai versi di `package.json`), dan PostgreSQL 17 dengan PostGIS (lihat [Database](#database)).
 
 ```bash
 pnpm install
