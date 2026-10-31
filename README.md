@@ -8,14 +8,14 @@ Keputusan produk dan teknis ada di [akses-bogor-docs](https://github.com/al-dioo
 
 | Bagian | Pilihan |
 | --- | --- |
-| Runtime | Node.js 22 LTS |
+| Runtime | Node.js 22 LTS di CI, Node.js 24 LTS di produksi |
 | Framework | Fastify 5, TypeScript 6 |
 | Validasi dan API spec | Zod lewat `fastify-type-provider-zod`, OpenAPI dari `@fastify/swagger` |
 | Database | PostgreSQL 17 + PostGIS dan `pg_trgm`, Drizzle ORM |
 | Tes dan lint | Vitest, ESLint dengan typescript-eslint |
-| Hosting | VPS milik tim: systemd di balik Cloudflare Tunnel |
+| Hosting | Evergarden (VM OCI region Batam): systemd di balik Cloudflare Tunnel |
 
-Alasan pilihan ini ada di [ADR-0013](https://github.com/al-dioooo/akses-bogor-docs/blob/main/decisions/0013-tech-stack-nextjs-fastify.md) dan [ADR-0025](https://github.com/al-dioooo/akses-bogor-docs/blob/main/decisions/0025-api-dan-postgresql-di-vps-sendiri.md).
+Alasan pilihan ini ada di [ADR-0013](https://github.com/al-dioooo/akses-bogor-docs/blob/main/decisions/0013-tech-stack-nextjs-fastify.md), [ADR-0025](https://github.com/al-dioooo/akses-bogor-docs/blob/main/decisions/0025-api-dan-postgresql-di-vps-sendiri.md), dan [ADR-0026](https://github.com/al-dioooo/akses-bogor-docs/blob/main/decisions/0026-api-dan-postgresql-di-evergarden-oci.md).
 
 ## Menjalankan di Lokal
 
