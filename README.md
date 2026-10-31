@@ -98,16 +98,101 @@ Diagram dan struktur folder ada di [docs/arsitektur.md](docs/arsitektur.md).
 
 ## Deployment
 
-Belum di-deploy. Rencananya, sesuai [ADR-0025](https://github.com/al-dioooo/akses-bogor-docs/blob/main/decisions/0025-api-dan-postgresql-di-vps-sendiri.md):
+Produksi berjalan di Evergarden, VM Ubuntu 24.04 di OCI region Batam, dan dibuka di `https://akses-bogor-api.yorhagarden.xyz` lewat Cloudflare Tunnel ([ADR-0026](https://github.com/al-dioooo/akses-bogor-docs/blob/main/decisions/0026-api-dan-postgresql-di-evergarden-oci.md)). Berkasnya ada di [deploy/](deploy/).
 
-- API berjalan di VPS milik tim sebagai service systemd dengan user sistem sendiri: Node 22 LTS, `node dist/server.js`, dan `HOST=127.0.0.1`. Port `8080` sudah dipakai layanan lain di VPS, jadi `PORT` diisi port lain.
-- Cloudflare Tunnel meneruskan hostname API ke port lokal itu; TLS diurus Cloudflare. Health check di `/healthz`.
-- PostgreSQL 17 + PostGIS di VPS yang sama, hanya menerima koneksi dari localhost.
-- Environment variable disimpan di berkas environment service systemd, bukan di repo.
-- Migrasi dijalankan dengan `pnpm db:migrate` sebelum versi baru menerima trafik.
-- Timer systemd menjalankan `pg_dump -Fc` setiap malam: tujuh dump disimpan di VPS dan salinannya di bucket R2 privat selama 30 hari.
+| Bagian | Di Evergarden |
+| --- | --- |
+| API | `akses-bogor-api.service`: user `aksesbogor`, `node dist/server.js` di `127.0.0.1:8090`, Node 24 |
+| Environment | `/etc/akses-bogor/api.env`, contohnya [deploy/api.env.example](deploy/api.env.example) |
+| Rilis | `/srv/akses-bogor/releases/<sha>`; rilis aktif ditunjuk tautan `/srv/akses-bogor/current` |
+| Deploy | `akses-bogor-deploy.timer` memeriksa branch `release` setiap 5 menit dan menjalankan [deploy/deploy.sh](deploy/deploy.sh) |
+| Database | PostgreSQL 17 + PostGIS dari PGDG, cluster `17/main` di port 5433, koneksi lewat Unix socket dengan autentikasi peer |
+| Cadangan | `akses-bogor-backup.timer` pukul 02.30 WIB menjalankan [deploy/backup.sh](deploy/backup.sh); dump di `/var/backups/akses-bogor` |
+| Tunnel | Public hostname di dashboard Cloudflare Zero Trust, diarahkan ke `http://127.0.0.1:8090` |
 
-Workflow deploy ditambahkan terpisah.
+### Rilis
+
+Merge `main` ke `release` lewat PR. Paling lama lima menit kemudian, timer mengekspor commit itu ke `releases/<sha>`, menjalankan `pnpm install --frozen-lockfile`, `pnpm build`, dan `pnpm db:migrate`, memindahkan `current`, lalu me-restart API. Tiga rilis terakhir disimpan.
+
+```bash
+journalctl -u akses-bogor-deploy -n 50     # hasil deploy terakhir
+sudo systemctl start akses-bogor-deploy    # deploy sekarang tanpa menunggu timer
+curl https://akses-bogor-api.yorhagarden.xyz/healthz
+```
+
+Rollback dilakukan dengan revert di `release`. Bila perlu kembali sebelum revert itu masuk, hentikan timer supaya tidak men-deploy ulang, lalu pindahkan tautan ke rilis sebelumnya:
+
+```bash
+sudo systemctl stop akses-bogor-deploy.timer
+sudo -u aksesbogor ln -sfn releases/<sha-lama> /srv/akses-bogor/current
+sudo systemctl restart akses-bogor-api
+```
+
+Migrasi tidak ikut dibatalkan, jadi rilis lama harus tetap cocok dengan skema yang sekarang. Nyalakan lagi timer setelah revert masuk ke `release`.
+
+Unit systemd dan skrip di `deploy/` dipasang dengan tangan, jadi perubahan pada berkas itu baru berlaku setelah dipasang ulang dengan perintah `install` di bawah dan `sudo systemctl daemon-reload`.
+
+### Menyiapkan Server
+
+Sekali saja, sebagai admin, dari checkout repo ini:
+
+```bash
+# PostgreSQL 17 + PostGIS dari PGDG, dan rclone untuk salinan cadangan ke R2
+sudo apt install -y postgresql-common
+sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+sudo apt install -y postgresql-17 postgresql-17-postgis-3 rclone
+pg_lsclusters   # 17/main harus di port 5433; ubah dengan pg_conftool bila tidak
+
+# User sistem dan database. Role aksesbogor masuk lewat peer, tanpa password.
+sudo useradd --system --home-dir /srv/akses-bogor --shell /usr/sbin/nologin aksesbogor
+sudo install -d -m 0750 -o aksesbogor -g aksesbogor /srv/akses-bogor
+sudo -u postgres createuser -p 5433 aksesbogor
+sudo -u postgres createdb -p 5433 --owner aksesbogor aksesbogor
+sudo -u postgres psql -p 5433 -d aksesbogor -c 'CREATE EXTENSION IF NOT EXISTS postgis'
+
+# Skrip, unit, environment, dan folder cadangan
+sudo install -d -m 0755 /usr/local/lib/akses-bogor
+sudo install -m 0755 deploy/deploy.sh deploy/backup.sh /usr/local/lib/akses-bogor/
+sudo install -m 0644 deploy/*.service deploy/*.timer /etc/systemd/system/
+sudo install -d -m 0750 -g aksesbogor /etc/akses-bogor
+sudo install -m 0640 -g aksesbogor deploy/api.env.example /etc/akses-bogor/api.env   # lalu sesuaikan
+sudo install -d -m 0700 -o postgres -g postgres /var/backups/akses-bogor
+sudo systemctl daemon-reload
+
+# Rilis pertama, lalu nyalakan semuanya
+sudo -u aksesbogor -H git clone --bare https://github.com/al-dioooo/akses-bogor-api.git /srv/akses-bogor/repo.git
+sudo -u aksesbogor -H /usr/local/lib/akses-bogor/deploy.sh release
+sudo systemctl enable --now akses-bogor-api akses-bogor-deploy.timer akses-bogor-backup.timer
+```
+
+Terakhir, tambahkan public hostname `akses-bogor-api.yorhagarden.xyz` di tunnel Evergarden (Zero Trust → Networks → Tunnels), dengan service `http://127.0.0.1:8090`. Hostname lain di tunnel itu jangan diubah.
+
+### Data Preview
+
+Sampai data lapangan pertama masuk, database produksi berisi data contoh dari `pnpm db:seed` (ADR-0026). Seed menolak `NODE_ENV=production`, jadi untuk preview dijalankan sekali dengan `NODE_ENV=development`, yang menang atas nilai di berkas environment:
+
+```bash
+sudo -u aksesbogor -H sh -c 'cd /srv/akses-bogor/current && NODE_ENV=development COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
+  corepack pnpm exec tsx --env-file=/etc/akses-bogor/api.env scripts/seed.ts'
+```
+
+Seed mengosongkan data lokasi dan laporan. Jangan jalankan lagi setelah ada data nyata.
+
+### Cadangan dan Pemulihan
+
+- Tujuh dump terakhir ada di `/var/backups/akses-bogor/aksesbogor-<waktu UTC>.dump`, hanya bisa dibaca user `postgres`.
+- Salinan R2: buat bucket privat yang terpisah dari bucket foto, dengan lifecycle rule yang menghapus objek setelah 30 hari, dan token R2 khusus bucket itu. Salin [deploy/backup.env.example](deploy/backup.env.example) ke `/etc/akses-bogor/backup.env` (root, mode `0600`) dan isi kredensialnya.
+- Menjalankan cadangan sekarang: `sudo systemctl start akses-bogor-backup`, lalu `journalctl -u akses-bogor-backup -n 20`.
+
+Memulihkan dump ke database baru:
+
+```bash
+sudo systemctl stop akses-bogor-deploy.timer akses-bogor-api
+sudo -u postgres dropdb -p 5433 aksesbogor
+sudo -u postgres createdb -p 5433 --owner aksesbogor aksesbogor
+sudo -u postgres pg_restore -p 5433 -d aksesbogor /var/backups/akses-bogor/<dump>
+sudo systemctl start akses-bogor-api akses-bogor-deploy.timer
+```
 
 ## Kontribusi
 
