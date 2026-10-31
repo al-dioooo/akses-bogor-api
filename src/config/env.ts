@@ -21,6 +21,8 @@ const schema = z.object({
   FRONTEND_ORIGINS: csv(),
   /** Alamat publik bucket foto di Cloudflare R2. Kosong berarti URL foto di respons bernilai null. */
   PHOTO_PUBLIC_URL: z.preprocess((value) => (value === "" ? undefined : value), z.url().optional()),
+  /** Rahasia bersama dengan server Next.js, minimal 32 karakter. Kosong berarti header IP pengunjung diabaikan. */
+  WEB_SERVER_SECRET: z.preprocess((value) => (value === "" ? undefined : value), z.string().min(32).optional()),
 });
 
 export type Env = z.infer<typeof schema>;

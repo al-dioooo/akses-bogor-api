@@ -72,6 +72,7 @@ Contoh lengkap ada di [.env.example](.env.example). Jangan commit `.env`.
 | `DATABASE_URL` | Ya | Koneksi PostgreSQL untuk aplikasi, `pnpm db:migrate`, dan `pnpm db:seed` |
 | `FRONTEND_ORIGINS` | Di production | Origin web yang boleh memanggil API, dipisah koma. Di luar production, `http://localhost:*` selalu diizinkan |
 | `PHOTO_PUBLIC_URL` | Tidak | Alamat publik bucket foto Cloudflare R2. Kosong berarti `url` foto di respons bernilai `null` |
+| `WEB_SERVER_SECRET` | Di production | Rahasia bersama dengan server Next.js, minimal 32 karakter. Bila cocok, rate limit dihitung per IP pengunjung yang dikirim web, bukan per IP Vercel |
 
 ## Endpoint
 
@@ -91,6 +92,8 @@ Status lokasi dan ringkasannya dihitung dengan aturan "pintu masuk dulu" di `src
 [docs/openapi.json](docs/openapi.json) dibuat dari skema Zod di setiap route dan juga tersedia di `GET /openapi.json`. Setelah mengubah route, jalankan `pnpm openapi` dan commit hasilnya; CI gagal bila berkas itu tidak sesuai kode.
 
 Semua galat memakai bentuk `{ "galat": "kode_snake_case", "pesan": "Pesan untuk pengguna" }`.
+
+Setiap klien mendapat 120 permintaan per menit (selain `/healthz`); lewat dari itu API menjawab 429 `terlalu_sering`. Klien dikenali dari header `cf-connecting-ip` yang ditulis Cloudflare, bukan dari `X-Forwarded-For` yang bisa diisi klien. Server Next.js mengirim `x-web-server-secret` dan `x-visitor-ip`; bila rahasianya sama dengan `WEB_SERVER_SECRET`, kuota dihitung per IP pengunjung itu.
 
 ## Arsitektur
 
