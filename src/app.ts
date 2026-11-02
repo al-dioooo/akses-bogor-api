@@ -12,8 +12,10 @@ import {
 import type { Env } from "./config/env.js";
 import { createDb, type Db } from "./db/client.js";
 import { HttpError } from "./http/errors.js";
+import { mapTokenSource } from "./map/token.js";
 import { districtRoutes } from "./routes/districts.js";
 import { healthRoutes } from "./routes/health.js";
+import { mapRoutes } from "./routes/map.js";
 import { placeRoutes } from "./routes/places.js";
 
 declare module "fastify" {
@@ -22,8 +24,12 @@ declare module "fastify" {
   }
 }
 
-/** `deps` dipakai tes: `db` (PGlite) dan `now` (jam tetap). Tanpa `db`, aplikasi membuka pool ke `DATABASE_URL`. */
-export async function buildApp(env: Env, deps: { db?: Db; now?: () => Date } = {}) {
+/**
+ * `deps` dipakai tes: `db` (PGlite), `now` (jam tetap), dan `fetch` (Mapbox tiruan). Tanpa `db`, aplikasi membuka
+ * pool ke `DATABASE_URL`.
+ */
+export async function buildApp(env: Env, deps: { db?: Db; now?: () => Date; fetch?: typeof fetch } = {}) {
+  const now = deps.now ?? (() => new Date());
   const app = Fastify({
     logger:
       env.NODE_ENV === "test"
@@ -98,7 +104,11 @@ export async function buildApp(env: Env, deps: { db?: Db; now?: () => Date } = {
   app.get("/openapi.json", { schema: { hide: true } }, async () => app.swagger());
   await app.register(healthRoutes);
   await app.register(districtRoutes);
-  await app.register(placeRoutes, { photoBaseUrl: env.PHOTO_PUBLIC_URL, now: deps.now ?? (() => new Date()) });
+  await app.register(placeRoutes, { photoBaseUrl: env.PHOTO_PUBLIC_URL, now });
+  const { MAPBOX_SECRET_TOKEN: secretToken, MAPBOX_USERNAME: username } = env;
+  await app.register(mapRoutes, {
+    mapToken: secretToken && username ? mapTokenSource({ secretToken, username, now, fetch: deps.fetch }) : undefined,
+  });
 
   return app;
 }

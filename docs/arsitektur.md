@@ -12,7 +12,7 @@ flowchart LR
   F -.-> R2[(Cloudflare R2: foto)]
   F -.-> E[Penyedia email]
   F -.-> G[Google: verifikasi ID token]
-  F -.-> M[Mapbox: pencarian tempat]
+  F -->|token peta sementara| M[Mapbox: token peta, nanti pencarian tempat]
 ```
 
 - Browser tidak pernah terhubung langsung ke database atau R2. Setiap request yang menyentuh data diperiksa sesi dan perannya di API.
@@ -70,6 +70,7 @@ Saat akun dihapus, `reporter_id` di laporan menjadi kosong (`ON DELETE SET NULL`
 | `src/http` | Kelas galat dan skema respons galat |
 | `src/domain` | Aturan bisnis tanpa HTTP, mis. aturan status lokasi |
 | `src/places` | Skema Zod dan query baca lokasi |
+| `src/map` | Token Mapbox sementara untuk browser (ADR-0016) |
 | `src/routes` | Route Fastify, satu berkas per kelompok |
 | `scripts` | Skrip pendukung, mis. pembuat `docs/openapi.json` |
 | `test` | Tes Vitest dengan `app.inject`; tes database memakai PGlite + PostGIS di dalam proses |

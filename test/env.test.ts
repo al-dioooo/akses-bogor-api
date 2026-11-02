@@ -19,4 +19,22 @@ describe("loadEnv", () => {
     const env = loadEnv({ DATABASE_URL: "postgresql://test:test@localhost:5432/test", PHOTO_PUBLIC_URL: "" });
     expect(env.PHOTO_PUBLIC_URL).toBeUndefined();
   });
+
+  it("treats empty Mapbox settings as unset", () => {
+    const env = loadEnv({ DATABASE_URL: "postgresql://test:test@localhost:5432/test", MAPBOX_SECRET_TOKEN: "", MAPBOX_USERNAME: "" });
+    expect(env.MAPBOX_SECRET_TOKEN).toBeUndefined();
+    expect(env.MAPBOX_USERNAME).toBeUndefined();
+  });
+
+  it("needs the Mapbox token and username together", () => {
+    expect(() => loadEnv({ DATABASE_URL: "postgresql://test:test@localhost:5432/test", MAPBOX_SECRET_TOKEN: "sk.rahasia" })).toThrow(
+      /MAPBOX_USERNAME/,
+    );
+  });
+
+  it("rejects a public token where the secret one belongs", () => {
+    expect(() =>
+      loadEnv({ DATABASE_URL: "postgresql://test:test@localhost:5432/test", MAPBOX_SECRET_TOKEN: "pk.publik", MAPBOX_USERNAME: "aksesbogor" }),
+    ).toThrow(/MAPBOX_SECRET_TOKEN/);
+  });
 });
