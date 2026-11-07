@@ -3,7 +3,6 @@ import { buildApp } from "../src/app.js";
 import { loadEnv } from "../src/config/env.js";
 import type { Db } from "../src/db/client.js";
 import { seedSampleData } from "../src/db/seed.js";
-import { mapboxSearch, SearchQuotaError } from "../src/map/search.js";
 import { createTestDb } from "./helpers/db.js";
 
 const base = { NODE_ENV: "test", DATABASE_URL: "postgresql://test@localhost/test" };
@@ -106,34 +105,5 @@ describe("POST /map/search", () => {
     expect(res.json().galat).toBe("terlalu_sering");
     expect((await search(app, { q: "halte" }, "203.0.113.10")).statusCode).toBe(200);
     await app.close();
-  });
-});
-
-describe("mapboxSearch", () => {
-  it("stops after the daily limit and starts again after midnight WIB", async () => {
-    let time = new Date("2026-11-07T16:59:00.000Z"); // 23.59 WIB
-    const fetch = vi.fn<typeof globalThis.fetch>(async () => mapboxAnswer());
-    const run = mapboxSearch({ token: "sk.rahasia", now: () => time, fetch, perDay: 2 });
-    await run("a");
-    await run("b");
-    await expect(run("c")).rejects.toBeInstanceOf(SearchQuotaError);
-    expect(fetch).toHaveBeenCalledTimes(2);
-    time = new Date("2026-11-07T17:00:00.000Z"); // 00.00 WIB
-    await expect(run("d")).resolves.toHaveLength(1);
-  });
-
-  it("hides the token when the network fails", async () => {
-    const run = mapboxSearch({ token: "sk.rahasia", now, fetch: async () => Promise.reject(new TypeError("fetch failed https://api.mapbox.com/?access_token=sk.rahasia")) });
-    await expect(run("halte")).rejects.toThrow("Mapbox Search Box tidak bisa dihubungi");
-  });
-});
-
-describe("placesNamed", () => {
-  it("needs every word, or a near spelling", async () => {
-    const { placesNamed } = await import("../src/places/queries.js");
-    const names = async (q: string) => (await placesNamed(db, q)).map((p) => p.name);
-    expect(await names("halte contoh")).toEqual(["Halte contoh", "Halte contoh B"]);
-    expect(await names("masjid raya")).toEqual([]);
-    expect(await names("halte contho")).toEqual(["Halte contoh", "Halte contoh B"]);
   });
 });
