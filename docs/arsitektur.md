@@ -56,9 +56,10 @@ erDiagram
 | `photos` | Berkas di R2, tag objek, teks alternatif, keterangan, dan status moderasi | ADR-0023 |
 | `users` | Nama tampilan, email (unik tanpa membedakan huruf besar), peran, waktu dan versi persetujuan Kebijakan Privasi | ADR-0011, ADR-0014, ADR-0029 |
 | `sessions`, `accounts`, `verifications` | Milik Better Auth: sesi (token tanpa tanda tangan), tautan akun Google, dan kode email (HMAC). Kolom token Google, IP, dan user agent selalu kosong | ADR-0029 |
+| `photo_deletions` | Berkas foto di R2 yang menunggu dihapus, mis. foto laporan belum terbit milik akun yang dihapus | ADR-0024 |
 | `audit_log` | Siapa mengubah apa dan kapan; pengubah kosong berarti akunnya sudah dihapus | FR-35, ADR-0024 |
 
-Saat akun dihapus, `reporter_id` di laporan menjadi kosong (`ON DELETE SET NULL`); penghapusan laporan yang belum terbit dijalankan oleh aplikasi (ADR-0024).
+Saat akun dihapus, `reporter_id` di laporan menjadi kosong (`ON DELETE SET NULL`); penghapusan laporan yang belum terbit dan foto yang tidak tayang dijalankan `src/auth/delete-account.ts` dalam satu transaksi (ADR-0024).
 
 ## Struktur Folder
 
@@ -70,6 +71,7 @@ Saat akun dihapus, `reporter_id` di laporan menjadi kosong (`ON DELETE SET NULL`
 | `src/http` | Kelas galat dan skema respons galat |
 | `src/domain` | Aturan bisnis tanpa HTTP, mis. aturan status lokasi |
 | `src/places` | Skema Zod dan query baca lokasi |
+| `src/reports` | Query laporan, mis. Laporan saya |
 | `src/map` | Token Mapbox sementara untuk browser (ADR-0016) |
 | `src/auth` | Konfigurasi Better Auth, pemeriksaan sesi, dan aturan akun (ADR-0029) |
 | `src/email` | Isi email dan pengirim Resend atau log (ADR-0030) |
