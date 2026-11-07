@@ -96,8 +96,12 @@ Contoh lengkap ada di [.env.example](.env.example). Jangan commit `.env`.
 | `POST /auth/google` | Masuk dengan ID token dari tombol Google Identity Services | FR-10 |
 | `POST /auth/logout` | Keluar: mencabut sesi | FR-10 |
 | `GET /me` | Akun yang sedang masuk, dengan `needsCompletion` untuk Lengkapi Akun | FR-11, FR-12 |
+| `POST /me/complete` | Lengkapi Akun: nama tampilan dan persetujuan Kebijakan Privasi beserta versinya | FR-11, FR-12 |
+| `PATCH /me` | Ubah nama tampilan | FR-12 |
+| `GET /me/reports` | Laporan saya dengan status, alasan penolakan, dan pertanyaan klarifikasi | FR-14 |
+| `DELETE /me` | Hapus akun: data pribadi dan laporan yang belum terbit hilang, laporan terbit tetap tanpa pelapor | FR-13 |
 
-Route akun dipanggil server Next.js, bukan browser. Masuk menjawab token sesi bertanda tangan; web menyimpannya di cookie `HttpOnly` miliknya dan mengirimnya balik sebagai `Authorization: Bearer` (ADR-0029). Batas kode: 60 detik dan 5 kode per email per jam, 10 permintaan dan 30 percobaan kode per klien per 15 menit. Sesi berakhir 30 hari setelah terakhir dipakai, atau 90 hari setelah masuk. Di development tanpa `RESEND_API_KEY`, kode masuk dicetak ke log API.
+Route akun dipanggil server Next.js, bukan browser. Masuk menjawab token sesi bertanda tangan; web menyimpannya di cookie `HttpOnly` miliknya dan mengirimnya balik sebagai `Authorization: Bearer` (ADR-0029). Batas kode: 60 detik dan 5 kode per email per jam, 10 permintaan dan 30 percobaan kode per klien per 15 menit. Sesi berakhir 30 hari setelah terakhir dipakai, atau 90 hari setelah masuk. Setiap jam API menghapus akun yang tidak dilengkapi dalam 24 jam (dan tidak punya laporan), sesi kedaluwarsa, dan kode kedaluwarsa. Saat akun dihapus, berkas foto yang ikut terhapus dicatat di tabel `photo_deletions` untuk dihapus dari R2 oleh kode foto. Di development tanpa `RESEND_API_KEY`, kode masuk dicetak ke log API.
 
 Status lokasi dan ringkasannya dihitung dengan aturan "pintu masuk dulu" di `src/domain/status.ts` (ADR-0018) dan disimpan di tabel `places`; panggil `refreshPlaceStatus` setiap kali jawaban fasilitas berubah. Respons memakai nilai enum produk (mis. `sebagian`, `tidak_tersedia`); teks untuk pengguna disusun di web.
 

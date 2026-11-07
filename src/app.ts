@@ -10,6 +10,7 @@ import {
   type ZodTypeProvider,
 } from "fastify-type-provider-zod";
 import { createAuth } from "./auth/auth.js";
+import { scheduleCleanup } from "./auth/cleanup.js";
 import type { Env } from "./config/env.js";
 import { createDb, type Db } from "./db/client.js";
 import { logMailer, resendMailer, type Mailer } from "./email/mailer.js";
@@ -136,7 +137,11 @@ export async function buildApp(env: Env, deps: { db?: Db; now?: () => Date; fetc
       })
     : undefined;
   await app.register(authRoutes, { auth, mailer, googleEnabled: Boolean(env.GOOGLE_CLIENT_ID), now });
-  await app.register(meRoutes, { auth, now });
+  await app.register(meRoutes, { auth, mailer, now });
+  if (auth && env.NODE_ENV !== "test") {
+    const stop = scheduleCleanup(app.db, now, app.log);
+    app.addHook("onClose", async () => stop());
+  }
 
   return app;
 }
