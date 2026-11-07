@@ -40,7 +40,7 @@ pnpm dev               # http://localhost:8080/healthz
 | `pnpm openapi` | Menulis ulang `docs/openapi.json` dari skema route |
 | `pnpm db:generate` | Membuat migrasi Drizzle dari `src/db/schema.ts` |
 | `pnpm db:migrate` | Menjalankan migrasi ke database di `DATABASE_URL` |
-| `pnpm db:seed` | Mengosongkan data lokasi dan laporan, lalu mengisi enam kecamatan dan tujuh lokasi contoh; ditolak di production |
+| `pnpm db:seed` | Mengosongkan data lokasi dan laporan, lalu mengisi tujuh lokasi contoh; kecamatan dan batasnya tidak dihapus; ditolak di production |
 
 ## Database
 
@@ -59,6 +59,23 @@ sudo -u postgres createuser --pwprompt aksesbogor
 sudo -u postgres createdb --owner aksesbogor aksesbogor
 sudo -u postgres psql -d aksesbogor -c 'CREATE EXTENSION IF NOT EXISTS postgis'
 ```
+
+### Batas Kecamatan
+
+Kecamatan laporan dihitung dari batas enam kecamatan di `districts.boundary` (FR-22, ADR-0034). Batasnya diisi migrasi `drizzle/0004_laporkan.sql`.
+
+- Sumber: OpenStreetMap, relasi 14745927 (Kota Bogor) dan relasi `admin_level=6` di dalamnya, diunduh 2026-11-07. Batas kecamatan © kontributor OpenStreetMap, berlisensi [ODbL](https://opendatacommons.org/licenses/odbl/); data batas di repo ini tetap berlisensi ODbL.
+- Kueri Overpass yang dipakai:
+
+  ```text
+  [out:json][timeout:120];
+  rel(14745927)->.kota;.kota out geom;
+  .kota map_to_area->.a;
+  rel(area.a)["boundary"="administrative"]["admin_level"="6"];out geom;
+  ```
+
+- Poligon dibangun dari garis anggota setiap relasi dengan `ST_MakeValid(ST_BuildArea(ST_Collect(...)))`, tanpa penyederhanaan, lalu ditulis dengan `ST_AsText(..., 6)`. Sebelum dipakai, periksa bahwa keenam poligon valid, tidak saling bertumpuk, dan gabungannya sama dengan batas kota.
+- Untuk memperbarui, buat migrasi baru yang menimpa `boundary` dengan `ON CONFLICT ("slug") DO UPDATE`, dan bandingkan dulu dengan batas lama.
 
 ## Environment Variables
 
