@@ -96,6 +96,11 @@ Contoh lengkap ada di [.env.example](.env.example). Jangan commit `.env`.
 | `GOOGLE_CLIENT_ID` | Tidak | Client ID OAuth Google untuk memeriksa ID token dari tombol Google. Kosong berarti masuk dengan Google mati |
 | `RESEND_API_KEY` | Di production | API key Resend untuk email kode dan konfirmasi akun dihapus (ADR-0030). Kosong di development berarti email dicetak ke log API |
 | `EMAIL_FROM` | Bersama `RESEND_API_KEY` | Pengirim pada domain yang sudah diverifikasi di Resend, mis. `AksesBogor <masuk@kirim.contoh.id>` |
+| `R2_ACCOUNT_ID` | Untuk foto di production | ID akun Cloudflare (32 karakter heksadesimal) untuk endpoint R2 (ADR-0031). Kelima variabel R2 diisi bersama |
+| `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | Untuk foto di production | Token R2 ber-izin "Object Read & Write" untuk dua bucket foto saja. Rahasia |
+| `R2_BUCKET_LAPORAN` | Untuk foto di production | Bucket privat untuk foto laporan yang belum terbit |
+| `R2_BUCKET_PUBLIK` | Untuk foto di production | Bucket publik di balik `PHOTO_PUBLIC_URL` untuk foto yang sudah terbit |
+| `PHOTO_STORAGE_DIR` | Tidak | Folder foto di development tanpa R2, bawaan `.data/foto`. Di production tanpa R2, unggah foto menjawab 503 |
 
 ## Endpoint
 

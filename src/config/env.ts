@@ -13,6 +13,8 @@ const csv = (fallback = "") =>
 
 const optional = <T extends z.ZodType>(type: T) => z.preprocess((value) => (value === "" ? undefined : value), type.optional());
 
+const R2_KEYS = ["R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET_LAPORAN", "R2_BUCKET_PUBLIK"] as const;
+
 const schema = z
   .object({
     NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
@@ -41,6 +43,17 @@ const schema = z
     RESEND_API_KEY: optional(z.string().startsWith("re_")),
     /** Pengirim email pada domain yang sudah diverifikasi di Resend, mis. "AksesBogor <masuk@kirim.contoh.id>". */
     EMAIL_FROM: optional(z.string().min(3)),
+    /** ID akun Cloudflare untuk endpoint R2 (ADR-0031). Kelima variabel R2 diisi bersama. */
+    R2_ACCOUNT_ID: optional(z.string().regex(/^[a-f0-9]{32}$/)),
+    /** Access key token R2 ber-izin Object Read & Write untuk dua bucket foto saja. */
+    R2_ACCESS_KEY_ID: optional(z.string().min(1)),
+    R2_SECRET_ACCESS_KEY: optional(z.string().min(1)),
+    /** Bucket privat untuk foto laporan yang belum terbit. */
+    R2_BUCKET_LAPORAN: optional(z.string().min(3)),
+    /** Bucket publik di balik PHOTO_PUBLIC_URL untuk foto yang sudah terbit. */
+    R2_BUCKET_PUBLIK: optional(z.string().min(3)),
+    /** Folder foto di development tanpa R2. Bawaan `.data/foto`. */
+    PHOTO_STORAGE_DIR: optional(z.string().min(1)),
   })
   .refine((env) => !env.MAPBOX_SECRET_TOKEN === !env.MAPBOX_USERNAME, {
     message: "MAPBOX_SECRET_TOKEN dan MAPBOX_USERNAME harus diisi bersama",
@@ -49,6 +62,10 @@ const schema = z
   .refine((env) => !env.RESEND_API_KEY === !env.EMAIL_FROM, {
     message: "RESEND_API_KEY dan EMAIL_FROM harus diisi bersama",
     path: ["EMAIL_FROM"],
+  })
+  .refine((env) => new Set(R2_KEYS.map((key) => !env[key])).size === 1, {
+    message: "Kelima variabel R2 harus diisi bersama",
+    path: ["R2_ACCOUNT_ID"],
   });
 
 export type Env = z.infer<typeof schema>;
