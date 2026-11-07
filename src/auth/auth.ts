@@ -4,7 +4,6 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { bearer, emailOTP } from "better-auth/plugins";
 import type { Db } from "../db/client.js";
 import { accounts, sessions, users, verifications } from "../db/schema.js";
-import { codeEmail, type Mailer } from "../email/mailer.js";
 import { CODE_ATTEMPTS, CODE_TTL_MINUTES, SESSION_IDLE_DAYS } from "./rules.js";
 
 const DAY = 24 * 60 * 60;
@@ -25,15 +24,13 @@ export type AuthOptions = {
   /** Alamat publik API. */
   baseURL: string;
   googleClientId?: string;
-  /** Kosong berarti kode email tidak bisa diminta (503 di route). */
-  mailer?: Mailer;
 };
 
 /**
  * Better Auth untuk akun AksesBogor (ADR-0029). Route bawaannya tidak dibuka; route Fastify di `routes/auth.ts`
  * memanggil `auth.api.*`. Rate limiter bawaan dimatikan karena batasnya diatur `@fastify/rate-limit`.
  */
-export function createAuth({ db, secret, baseURL, googleClientId, mailer }: AuthOptions) {
+export function createAuth({ db, secret, baseURL, googleClientId }: AuthOptions) {
   // Kode 6 digit mudah ditebak dari SHA-256 biasa, jadi hash-nya memakai kunci rahasia.
   const hashCode = async (code: string) => createHmac("sha256", secret).update(code).digest("base64url");
 
@@ -98,10 +95,10 @@ export function createAuth({ db, secret, baseURL, googleClientId, mailer }: Auth
         expiresIn: CODE_TTL_MINUTES * 60,
         allowedAttempts: CODE_ATTEMPTS,
         storeOTP: { hash: hashCode },
-        async sendVerificationOTP({ email, otp, type }) {
-          if (type !== "sign-in") return;
-          if (!mailer) throw new Error("pengirim email belum diatur");
-          await mailer(codeEmail(email, otp));
+        // Route `/auth/code` membuat kode dengan `createVerificationOTP` dan mengirim emailnya sendiri, karena Better
+        // Auth menelan galat dari callback ini sehingga route tidak bisa menjawab 502 saat email gagal terkirim.
+        async sendVerificationOTP() {
+          throw new Error("kode masuk dikirim lewat route /auth/code");
         },
       }),
       bearer({ requireSignature: true }),
