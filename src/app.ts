@@ -9,14 +9,21 @@ import {
   validatorCompiler,
   type ZodTypeProvider,
 } from "fastify-type-provider-zod";
+import { createAuth } from "./auth/auth.js";
 import type { Env } from "./config/env.js";
 import { createDb, type Db } from "./db/client.js";
+import { logMailer, resendMailer, type Mailer } from "./email/mailer.js";
 import { HttpError } from "./http/errors.js";
 import { mapTokenSource } from "./map/token.js";
+import { authRoutes } from "./routes/auth.js";
 import { districtRoutes } from "./routes/districts.js";
 import { healthRoutes } from "./routes/health.js";
 import { mapRoutes } from "./routes/map.js";
+import { meRoutes } from "./routes/me.js";
 import { placeRoutes } from "./routes/places.js";
+
+// Hanya untuk pengembangan lokal tanpa BETTER_AUTH_SECRET. Production tanpa secret mematikan route akun (503).
+const DEVELOPMENT_AUTH_SECRET = "rahasia-pengembangan-lokal-aksesbogor-jangan-dipakai-di-production";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -25,10 +32,10 @@ declare module "fastify" {
 }
 
 /**
- * `deps` dipakai tes: `db` (PGlite), `now` (jam tetap), dan `fetch` (Mapbox tiruan). Tanpa `db`, aplikasi membuka
- * pool ke `DATABASE_URL`.
+ * `deps` dipakai tes: `db` (PGlite), `now` (jam tetap), `fetch` (Mapbox tiruan), dan `mailer` (email ditampung). Tanpa
+ * `db`, aplikasi membuka pool ke `DATABASE_URL`.
  */
-export async function buildApp(env: Env, deps: { db?: Db; now?: () => Date; fetch?: typeof fetch } = {}) {
+export async function buildApp(env: Env, deps: { db?: Db; now?: () => Date; fetch?: typeof fetch; mailer?: Mailer } = {}) {
   const now = deps.now ?? (() => new Date());
   const app = Fastify({
     logger:
@@ -109,6 +116,27 @@ export async function buildApp(env: Env, deps: { db?: Db; now?: () => Date; fetc
   await app.register(mapRoutes, {
     mapToken: secretToken && username ? mapTokenSource({ secretToken, username, now, fetch: deps.fetch }) : undefined,
   });
+
+  // Akun (ADR-0029) dan email (ADR-0030).
+  const development = env.NODE_ENV === "development";
+  const mailer =
+    deps.mailer ??
+    (env.RESEND_API_KEY && env.EMAIL_FROM
+      ? resendMailer({ apiKey: env.RESEND_API_KEY, from: env.EMAIL_FROM })
+      : development
+        ? logMailer((message) => app.log.info(message))
+        : undefined);
+  const authSecret = env.BETTER_AUTH_SECRET ?? (development ? DEVELOPMENT_AUTH_SECRET : undefined);
+  const auth = authSecret
+    ? createAuth({
+        db: app.db,
+        secret: authSecret,
+        baseURL: env.BETTER_AUTH_URL ?? `http://localhost:${env.PORT}`,
+        googleClientId: env.GOOGLE_CLIENT_ID,
+      })
+    : undefined;
+  await app.register(authRoutes, { auth, mailer, googleEnabled: Boolean(env.GOOGLE_CLIENT_ID), now });
+  await app.register(meRoutes, { auth, now });
 
   return app;
 }
