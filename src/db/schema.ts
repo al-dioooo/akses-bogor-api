@@ -222,6 +222,15 @@ export const photos = pgTable(
 );
 
 /**
+ * Berkas foto di R2 yang harus dihapus, mis. foto laporan yang belum terbit milik akun yang dihapus (ADR-0024). Baris
+ * foto dihapus di transaksi yang sama; berkasnya dihapus dari R2 oleh kode foto (Laporkan), lalu barisnya dibuang.
+ */
+export const photoDeletions = pgTable("photo_deletions", {
+  storageKey: varchar("storage_key", { length: 200 }).primaryKey(),
+  requestedAt: timestamp("requested_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
  * Log audit perubahan data (FR-35). `actorId` kosong dengan `actorLabel` "sistem" untuk tindakan otomatis
  * (mis. penolakan R6); kosong tanpa label berarti akunnya sudah dihapus (ADR-0024).
  */

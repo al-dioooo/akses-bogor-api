@@ -34,6 +34,7 @@ describe("migrations", () => {
       "accounts",
       "audit_log",
       "districts",
+      "photo_deletions",
       "photos",
       "place_facilities",
       "places",
