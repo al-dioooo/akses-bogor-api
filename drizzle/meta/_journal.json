@@ -15,6 +15,13 @@
       "when": 1792998964802,
       "tag": "0001_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794084318555,
+      "tag": "0002_akun",
+      "breakpoints": true
     }
   ]
 }

@@ -74,6 +74,11 @@ Contoh lengkap ada di [.env.example](.env.example). Jangan commit `.env`.
 | `PHOTO_PUBLIC_URL` | Tidak | Alamat publik bucket foto Cloudflare R2. Kosong berarti `url` foto di respons bernilai `null` |
 | `MAPBOX_SECRET_TOKEN` | Tidak | Token rahasia Mapbox (`sk.`) ber-scope `tokens:write`, `styles:read`, `styles:tiles`, dan `fonts:read`, untuk `GET /map/token` (ADR-0016). Diisi bersama `MAPBOX_USERNAME` |
 | `MAPBOX_USERNAME` | Tidak | Username akun Mapbox pemilik token rahasia |
+| `BETTER_AUTH_SECRET` | Di production | Rahasia Better Auth, minimal 32 karakter: tanda tangan token sesi dan kunci HMAC kode email (ADR-0029). Kosong di development berarti memakai rahasia tetap khusus lokal; kosong di production berarti route akun menjawab 503. Mengganti nilainya mengakhiri semua sesi |
+| `BETTER_AUTH_URL` | Di production | Alamat publik API |
+| `GOOGLE_CLIENT_ID` | Tidak | Client ID OAuth Google untuk memeriksa ID token dari tombol Google. Kosong berarti masuk dengan Google mati |
+| `RESEND_API_KEY` | Di production | API key Resend untuk email kode dan konfirmasi akun dihapus (ADR-0030). Kosong di development berarti email dicetak ke log API |
+| `EMAIL_FROM` | Bersama `RESEND_API_KEY` | Pengirim pada domain yang sudah diverifikasi di Resend, mis. `AksesBogor <masuk@kirim.contoh.id>` |
 
 ## Endpoint
 

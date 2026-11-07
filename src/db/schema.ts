@@ -1,7 +1,7 @@
 // Skema Drizzle untuk model data PRD bagian 9. Nama tabel dan kolom dalam bahasa Inggris; nilai enum
 // memakai istilah produk (ADR di akses-bogor-docs) supaya sama dengan yang dibaca tim dan pengguna.
 import { sql } from "drizzle-orm";
-import { bigserial, check, customType, geometry, index, integer, jsonb, pgEnum, pgTable, primaryKey, smallint, text, timestamp, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
+import { bigserial, boolean, check, customType, geometry, index, integer, jsonb, pgEnum, pgTable, primaryKey, smallint, text, timestamp, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
 
 // ADR-0004
 export const placeCategory = pgEnum("place_category", ["kampus", "masjid", "halte", "rumah_sakit"]);
@@ -91,18 +91,84 @@ export const placeFacilities = pgTable(
   ],
 );
 
-/** Akun dibuat saat login pertama (ADR-0014). Email disimpan huruf kecil. */
+/**
+ * Akun dibuat saat login pertama (ADR-0014) dan juga tabel pengguna Better Auth (ADR-0029). Email disimpan huruf
+ * kecil. Nama tampilan kosong dan `privacyConsentAt` null sampai pengguna mengisi Lengkapi Akun. `image` wajib ada
+ * untuk Better Auth, tetapi selalu kosong karena foto profil Google tidak disimpan.
+ */
 export const users = pgTable(
   "users",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     displayName: varchar("display_name", { length: 60 }).notNull(),
     email: varchar("email", { length: 254 }).notNull(),
+    emailVerified: boolean("email_verified").notNull().default(false),
+    image: text("image"),
     role: userRole("role").notNull().default("pengguna"),
     privacyConsentAt: timestamp("privacy_consent_at", { withTimezone: true }),
+    /** Versi Kebijakan Privasi yang disetujui, mis. "2026-11-07". */
+    privacyPolicyVersion: varchar("privacy_policy_version", { length: 20 }),
     ...timestamps,
   },
   (t) => [uniqueIndex("users_email_idx").on(sql`lower(${t.email})`)],
+);
+
+/**
+ * Sesi Better Auth. `token` dikirim ke web bersama tanda tangan HMAC; tanpa tanda tangan itu token di tabel ini tidak
+ * bisa dipakai (ADR-0029). `ipAddress` dan `userAgent` wajib ada untuk Better Auth, tetapi selalu kosong.
+ */
+export const sessions = pgTable(
+  "sessions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    token: varchar("token", { length: 64 }).notNull().unique(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    ipAddress: text("ip_address"),
+    userAgent: text("user_agent"),
+    ...timestamps,
+  },
+  (t) => [index("sessions_user_idx").on(t.userId)],
+);
+
+/**
+ * Tautan akun ke penyedia login, mis. Google (`accountId` = `sub` Google). Kolom token dan kata sandi wajib ada untuk
+ * Better Auth, tetapi selalu kosong: token Google dibuang sebelum disimpan dan tidak ada login dengan kata sandi.
+ */
+export const accounts = pgTable(
+  "accounts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    providerId: varchar("provider_id", { length: 40 }).notNull(),
+    accountId: varchar("account_id", { length: 255 }).notNull(),
+    accessToken: text("access_token"),
+    refreshToken: text("refresh_token"),
+    idToken: text("id_token"),
+    accessTokenExpiresAt: timestamp("access_token_expires_at", { withTimezone: true }),
+    refreshTokenExpiresAt: timestamp("refresh_token_expires_at", { withTimezone: true }),
+    scope: text("scope"),
+    password: text("password"),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("accounts_provider_account_idx").on(t.providerId, t.accountId), index("accounts_user_idx").on(t.userId)],
+);
+
+/** Kode email sekali pakai milik Better Auth. `value` berisi HMAC kode dan jumlah percobaan, bukan kodenya. */
+export const verifications = pgTable(
+  "verifications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    identifier: varchar("identifier", { length: 320 }).notNull(),
+    value: text("value").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    ...timestamps,
+  },
+  (t) => [index("verifications_identifier_idx").on(t.identifier)],
 );
 
 /**

@@ -30,7 +30,18 @@ describe("migrations", () => {
     const { rows } = await client.query<{ table_name: string }>(
       `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE' AND table_name <> 'spatial_ref_sys' ORDER BY table_name`,
     );
-    expect(rows.map((r) => r.table_name)).toEqual(["audit_log", "districts", "photos", "place_facilities", "places", "reports", "users"]);
+    expect(rows.map((r) => r.table_name)).toEqual([
+      "accounts",
+      "audit_log",
+      "districts",
+      "photos",
+      "place_facilities",
+      "places",
+      "reports",
+      "sessions",
+      "users",
+      "verifications",
+    ]);
   });
 });
 
