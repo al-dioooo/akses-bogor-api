@@ -44,16 +44,18 @@ erDiagram
   places ||--o{ photos : "foto terbit"
   reports ||--o{ photos : "foto laporan"
   users |o--o{ reports : "pelapor, verifikator"
+  users |o--o{ photos : "unggahan belum terpasang"
+  districts |o--o{ reports : "kecamatan hasil hitung"
   users |o--o{ audit_log : "pengubah"
 ```
 
 | Tabel | Isi | Keputusan |
 | --- | --- | --- |
-| `districts` | Enam kecamatan Kota Bogor; batas wilayah (MultiPolygon) diimpor terpisah | ADR-0010 |
+| `districts` | Enam kecamatan Kota Bogor dengan batas wilayah (MultiPolygon) dari OpenStreetMap, diisi migrasi | ADR-0010, ADR-0034 |
 | `places` | Lokasi yang sudah terbit: kategori, titik (SRID 4326), patokan, deskripsi, status dan ringkasan fasilitas yang disimpan, tanggal verifikasi terakhir | ADR-0004, ADR-0015, ADR-0018 |
 | `place_facilities` | Jawaban, alasan, dan catatan untuk setiap fasilitas; alasan hanya boleh ada saat Tidak tersedia | ADR-0017, ADR-0022 |
-| `reports` | Laporan baru, perubahan, dan kekurangan dengan isian apa adanya, status verifikasi, alasan baku R1–R6, dan pertanyaan klarifikasi | ADR-0006, ADR-0019 |
-| `photos` | Berkas di R2, tag objek, teks alternatif, keterangan, dan status moderasi | ADR-0023 |
+| `reports` | Laporan baru, perubahan, dan kekurangan dengan isian apa adanya, titik dan kecamatan hasil hitung, kunci draf, status verifikasi, alasan baku R1–R6, dan pertanyaan klarifikasi | ADR-0006, ADR-0019, ADR-0033 |
+| `photos` | Berkas di R2, tag objek, teks alternatif, keterangan, dan status moderasi. Foto yang baru diunggah mencatat pengunggahnya sampai dipasang ke laporan | ADR-0023, ADR-0031 |
 | `users` | Nama tampilan, email (unik tanpa membedakan huruf besar), peran, waktu dan versi persetujuan Kebijakan Privasi | ADR-0011, ADR-0014, ADR-0029 |
 | `sessions`, `accounts`, `verifications` | Milik Better Auth: sesi (token tanpa tanda tangan), tautan akun Google, dan kode email (HMAC). Kolom token Google, IP, dan user agent selalu kosong | ADR-0029 |
 | `photo_deletions` | Berkas foto di R2 yang menunggu dihapus, mis. foto laporan belum terbit milik akun yang dihapus | ADR-0024 |
