@@ -22,6 +22,7 @@ import { healthRoutes } from "./routes/health.js";
 import { mapRoutes } from "./routes/map.js";
 import { meRoutes } from "./routes/me.js";
 import { placeRoutes } from "./routes/places.js";
+import { reportRoutes } from "./routes/reports.js";
 
 // Hanya untuk pengembangan lokal tanpa BETTER_AUTH_SECRET. Production tanpa secret mematikan route akun (503).
 const DEVELOPMENT_AUTH_SECRET = "rahasia-pengembangan-lokal-aksesbogor-jangan-dipakai-di-production";
@@ -138,6 +139,7 @@ export async function buildApp(env: Env, deps: { db?: Db; now?: () => Date; fetc
     : undefined;
   await app.register(authRoutes, { auth, mailer, googleEnabled: Boolean(env.GOOGLE_CLIENT_ID), now });
   await app.register(meRoutes, { auth, mailer, now });
+  await app.register(reportRoutes);
   if (auth && env.NODE_ENV !== "test") {
     const stop = scheduleCleanup(app.db, now, app.log);
     app.addHook("onClose", async () => stop());
