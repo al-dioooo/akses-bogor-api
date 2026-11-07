@@ -94,11 +94,14 @@ export const SAMPLE_PLACES: SamplePlace[] = [
   },
 ];
 
-/** Mengosongkan data lokasi dan laporan, lalu mengisi kecamatan dan lokasi contoh. Hanya untuk pengembangan dan tes. */
+/**
+ * Mengosongkan data lokasi dan laporan, lalu mengisi lokasi contoh. Hanya untuk pengembangan dan tes. Kecamatan tidak
+ * dihapus karena batasnya diisi migrasi (ADR-0034); yang belum ada ditambahkan tanpa batas.
+ */
 export async function seedSampleData(db: Db) {
   await db.transaction(async (tx) => {
-    for (const table of [auditLog, photos, reports, placeFacilities, places, districts]) await tx.delete(table);
-    await tx.insert(districts).values([...DISTRICTS]);
+    for (const table of [auditLog, photos, reports, placeFacilities, places]) await tx.delete(table);
+    await tx.insert(districts).values([...DISTRICTS]).onConflictDoNothing();
     for (const p of SAMPLE_PLACES) {
       const s = computeStatus(p.facilities);
       const [row] = await tx
