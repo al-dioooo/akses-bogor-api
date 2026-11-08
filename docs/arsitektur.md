@@ -8,7 +8,7 @@ flowchart LR
   W -->|render di server, Bearer sesi| F[akses-bogor-api<br/>Fastify + Better Auth di Evergarden, lewat Cloudflare Tunnel]
   F --> DB[(PostgreSQL 17 + PostGIS di Evergarden)]
   DB -.->|pg_dump tiap malam| BK[(R2 privat: cadangan)]
-  F -.-> R2[(Cloudflare R2: foto)]
+  F -->|foto laporan, WebP tanpa metadata| R2[(Cloudflare R2: bucket foto privat dan publik)]
   F -->|kode masuk| E[Resend: email]
   F -->|kunci publik| G[Google: verifikasi ID token]
   F -->|token peta sementara, pencarian tempat| M[Mapbox: Tokens API, Search Box]
@@ -16,7 +16,7 @@ flowchart LR
 
 - Browser tidak pernah terhubung langsung ke API, database, atau R2. Server web menyimpan token sesi di cookie miliknya dan mengirimnya ke API sebagai `Authorization: Bearer`; setiap request yang menyentuh data akun diperiksa sesi dan perannya di API ([ADR-0029](https://github.com/al-dioooo/akses-bogor-docs/blob/main/decisions/0029-akun-better-auth-dan-sesi-lewat-server-web.md)).
 - Aplikasi, migrasi, dan seed memakai satu koneksi (`DATABASE_URL`) ke PostgreSQL di mesin yang sama, lewat Unix socket dengan autentikasi peer. Produksi berjalan di Evergarden, VM OCI region Batam; cara deploy ada di [README](../README.md#deployment).
-- Foto diperkecil di browser, lalu diperiksa ulang, disandikan ulang, dan dihapus metadata EXIF-nya di API sebelum disimpan ke R2 ([ADR-0023](https://github.com/al-dioooo/akses-bogor-docs/blob/main/decisions/0023-hingga-sepuluh-foto-bertag-per-laporan.md)).
+- Foto diperkecil di browser, lalu diperiksa ulang, disandikan ulang dengan sharp, dan dihapus metadata EXIF-nya di API sebelum disimpan ke bucket R2 privat ([ADR-0023](https://github.com/al-dioooo/akses-bogor-docs/blob/main/decisions/0023-hingga-sepuluh-foto-bertag-per-laporan.md), [ADR-0031](https://github.com/al-dioooo/akses-bogor-docs/blob/main/decisions/0031-foto-laporan-di-bucket-r2-privat.md)). Di development tanpa R2, foto disimpan di folder `.data/foto`.
 
 ## Alur Request
 
@@ -73,7 +73,8 @@ Saat akun dihapus, `reporter_id` di laporan menjadi kosong (`ON DELETE SET NULL`
 | `src/http` | Kelas galat dan skema respons galat |
 | `src/domain` | Aturan bisnis tanpa HTTP, mis. aturan status lokasi |
 | `src/places` | Skema Zod dan query baca lokasi |
-| `src/reports` | Query laporan, mis. Laporan saya |
+| `src/reports` | Query dan skema laporan: Laporan saya, cek kecamatan dan lokasi mirip |
+| `src/photos` | Pemeriksaan dan pemrosesan foto (sharp), penyimpanan R2 atau folder lokal, dan pembersihan berkas (ADR-0031) |
 | `src/map` | Token Mapbox sementara untuk browser (ADR-0016) dan pencarian tempat lewat Search Box (ADR-0032) |
 | `src/auth` | Konfigurasi Better Auth, pemeriksaan sesi, dan aturan akun (ADR-0029) |
 | `src/email` | Isi email dan pengirim Resend atau log (ADR-0030) |

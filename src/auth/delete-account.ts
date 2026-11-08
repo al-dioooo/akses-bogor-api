@@ -6,6 +6,7 @@ import { photoDeletions, photos, reports, users, verifications } from "../db/sch
  * Menghapus akun beserta data pribadinya dalam satu transaksi (FR-13, ADR-0024):
  * - laporan yang belum terbit (menunggu, klarifikasi, ditolak) beserta fotonya;
  * - foto dari laporan terbit yang tidak lolos moderasi;
+ * - foto yang sudah diunggah tetapi belum dipasang ke laporan (ADR-0031);
  * - akun, semua sesi, tautan Google, dan kode email yang tersisa.
  *
  * Laporan terbit dan fotonya yang tayang tetap ada; `reporter_id`, `reviewer_id`, dan pengubah di log audit menjadi
@@ -23,6 +24,7 @@ export async function deleteAccount(db: Db, userId: string): Promise<{ email: st
       .from(photos)
       .innerJoin(reports, eq(photos.reportId, reports.id))
       .where(and(eq(reports.reporterId, userId), or(ne(reports.status, "diterbitkan"), ne(photos.moderation, "tayang"))));
+    removedPhotos.push(...(await tx.select({ id: photos.id, storageKey: photos.storageKey }).from(photos).where(eq(photos.uploaderId, userId))));
     if (removedPhotos.length > 0) {
       await tx
         .insert(photoDeletions)

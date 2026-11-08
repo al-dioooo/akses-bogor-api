@@ -17,6 +17,8 @@ import { logMailer, resendMailer, type Mailer } from "./email/mailer.js";
 import { HttpError } from "./http/errors.js";
 import { mapboxSearch } from "./map/search.js";
 import { mapTokenSource } from "./map/token.js";
+import { schedulePhotoCleanup } from "./photos/cleanup.js";
+import { localStore, r2Store, type PhotoStore } from "./photos/storage.js";
 import { authRoutes } from "./routes/auth.js";
 import { districtRoutes } from "./routes/districts.js";
 import { healthRoutes } from "./routes/health.js";
@@ -35,10 +37,10 @@ declare module "fastify" {
 }
 
 /**
- * `deps` dipakai tes: `db` (PGlite), `now` (jam tetap), `fetch` (Mapbox tiruan), dan `mailer` (email ditampung). Tanpa
- * `db`, aplikasi membuka pool ke `DATABASE_URL`.
+ * `deps` dipakai tes: `db` (PGlite), `now` (jam tetap), `fetch` (Mapbox tiruan), `mailer` (email ditampung), dan
+ * `photoStore` (penyimpanan foto tiruan). Tanpa `db`, aplikasi membuka pool ke `DATABASE_URL`.
  */
-export async function buildApp(env: Env, deps: { db?: Db; now?: () => Date; fetch?: typeof fetch; mailer?: Mailer } = {}) {
+export async function buildApp(env: Env, deps: { db?: Db; now?: () => Date; fetch?: typeof fetch; mailer?: Mailer; photoStore?: PhotoStore } = {}) {
   const now = deps.now ?? (() => new Date());
   const app = Fastify({
     logger:
@@ -141,7 +143,20 @@ export async function buildApp(env: Env, deps: { db?: Db; now?: () => Date; fetc
     : undefined;
   await app.register(authRoutes, { auth, mailer, googleEnabled: Boolean(env.GOOGLE_CLIENT_ID), now });
   await app.register(meRoutes, { auth, mailer, now });
+  // Foto laporan (ADR-0031): R2 bila diatur, folder lokal di development, dan tidak ada di production tanpa R2.
+  const { R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_LAPORAN, R2_BUCKET_PUBLIK } = env;
+  const photoStore =
+    deps.photoStore ??
+    (R2_ACCOUNT_ID && R2_ACCESS_KEY_ID && R2_SECRET_ACCESS_KEY && R2_BUCKET_LAPORAN && R2_BUCKET_PUBLIK
+      ? r2Store({ accountId: R2_ACCOUNT_ID, accessKeyId: R2_ACCESS_KEY_ID, secretAccessKey: R2_SECRET_ACCESS_KEY, privateBucket: R2_BUCKET_LAPORAN, publicBucket: R2_BUCKET_PUBLIK })
+      : development
+        ? localStore(env.PHOTO_STORAGE_DIR ?? ".data/foto")
+        : undefined);
   await app.register(reportRoutes);
+  if (env.NODE_ENV !== "test") {
+    const stop = schedulePhotoCleanup(app.db, photoStore, now, app.log);
+    app.addHook("onClose", async () => stop());
+  }
   if (auth && env.NODE_ENV !== "test") {
     const stop = scheduleCleanup(app.db, now, app.log);
     app.addHook("onClose", async () => stop());
