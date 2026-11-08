@@ -6,9 +6,10 @@ import { HttpError, errorSchema } from "../http/errors.js";
 import { blurPhoto } from "../photos/blur.js";
 import type { PhotoStore } from "../photos/storage.js";
 import { rejectReport, requestClarification } from "../verification/decide.js";
+import { publishReport } from "../verification/publish.js";
 import { moderatePhoto, photoForReview } from "../verification/photos.js";
 import { getReview, listQueue, listRecheck } from "../verification/queue.js";
-import { clarifyBody, decision, moderationBody, photoIdParams, rejectBody, photoVersionQuery, queue, queueQuery, recheckList, reportIdParams, reportPhotoParams, review, reviewPhoto } from "../verification/schemas.js";
+import { clarifyBody, decision, moderationBody, photoIdParams, publishBody, rejectBody, photoVersionQuery, queue, queueQuery, recheckList, reportIdParams, reportPhotoParams, review, reviewPhoto } from "../verification/schemas.js";
 
 export type VerifierRouteOptions = {
   auth?: Auth;
@@ -117,6 +118,26 @@ export const verifierRoutes: FastifyPluginAsyncZod<VerifierRouteOptions> = async
     async (request) => {
       const user = await verifier(request);
       return moderatePhoto(app.db, user.id, request.params.id, request.params.photoId, request.body, opts.now());
+    },
+  );
+
+  app.post(
+    "/verifier/reports/:id/publish",
+    {
+      schema: {
+        tags: [TAG],
+        summary: "Terbitkan laporan",
+        description:
+          "Membuat lokasi baru, atau memperbarui lokasi yang sama untuk perubahan dan kekurangan (FR-27, FR-32, FR-33, ADR-0036). Jawaban tanpa bukti menjadi Belum tahu, dan status dihitung dengan aturan pintu masuk dulu. Foto yang tidak disembunyikan disalin ke bucket publik dengan area kabur; foto asli dan foto tersembunyi dihapus (ADR-0037). Galat: 400 `alasan_wajib` atau `isian_wajib`, 409 `sudah_diputuskan` atau `lokasi_berubah`, 422 `di_luar_kota_bogor`, 502 `foto_gagal_diterbitkan`. Pelapor mendapat email (FR-40).",
+        params: reportIdParams,
+        body: publishBody,
+        response: { 200: decision, 400: errorSchema, 404: errorSchema, 409: errorSchema, 422: errorSchema, 502: errorSchema, ...guarded },
+      },
+    },
+    async (request) => {
+      const user = await verifier(request);
+      const result = await publishReport(app.db, opts.store, user.id, request.params.id, request.body, opts.now(), request.log);
+      return { status: "diterbitkan" as const, placeId: result.placeId };
     },
   );
 
