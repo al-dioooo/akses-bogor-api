@@ -2,7 +2,8 @@
 import { z } from "zod";
 import { facilityAnswer, facilityKind, photoTag, placeCategory, placeStatus, rejectionReason, reportKind, reportStatus, unavailableReason } from "../db/schema.js";
 import { photo as publishedPhoto } from "../places/schemas.js";
-import { nearbyPlace } from "../reports/schemas.js";
+import { MAX_BLUR_REGIONS } from "../photos/blur.js";
+import { line, nearbyPlace } from "../reports/schemas.js";
 
 const category = z.enum(placeCategory.enumValues);
 const district = z.object({ slug: z.string(), name: z.string() });
@@ -48,6 +49,21 @@ export const blurRegion = z
   })
   .refine((r) => r.x + r.w <= 1.0001 && r.y + r.h <= 1.0001, "Area harus di dalam foto")
   .describe("Area kabur dalam pecahan 0 sampai 1 dari lebar dan tinggi foto (ADR-0037)");
+
+export const photoIdParams = z.object({ id: z.uuid() });
+export const reportPhotoParams = z.object({ id: z.uuid(), photoId: z.uuid() });
+export const photoVersionQuery = z.object({
+  versi: z.enum(["asli", "kabur"]).default("asli").describe("asli: foto apa adanya; kabur: pratinjau dengan area kabur yang tersimpan, sama dengan hasil terbit"),
+});
+
+export const moderationBody = z
+  .object({
+    hidden: z.boolean().optional().describe("Sembunyikan foto; foto tersembunyi dihapus saat laporan terbit"),
+    tag: z.enum(photoTag.enumValues).optional().describe("Perbaiki tag (ADR-0023)"),
+    caption: line(200).nullable().optional().describe("Keterangan yang tayang; null menghapusnya"),
+    blur: z.array(blurRegion).max(MAX_BLUR_REGIONS).optional().describe("Menggantikan semua area kabur; kosong berarti tanpa area"),
+  })
+  .refine((body) => Object.keys(body).length > 0, "Tidak ada yang diubah");
 
 export const reviewPhoto = z.object({
   id: z.uuid(),
