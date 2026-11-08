@@ -1,12 +1,14 @@
 // Penyimpanan berkas foto (ADR-0031): Cloudflare R2 di production, folder lokal di development. Foto laporan ada di
 // bucket privat dengan kunci `laporan/…`; foto yang sudah terbit ada di bucket publik dengan kunci `lokasi/…`.
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { AwsClient } from "aws4fetch";
 
 export type PhotoStore = {
   /** Menyimpan berkas; galat bila gagal. */
   put(key: string, data: Uint8Array, contentType: string): Promise<void>;
+  /** Membaca berkas; galat bila tidak ada atau gagal (ADR-0037). */
+  get(key: string): Promise<Uint8Array>;
   /** Menghapus berkas; berkas yang sudah tidak ada dianggap berhasil. */
   remove(key: string): Promise<void>;
 };
@@ -48,12 +50,17 @@ export function r2Store({ accountId, accessKeyId, secretAccessKey, privateBucket
       throw new Error("R2 tidak bisa dihubungi");
     }
     if (!ok(response.status)) throw new Error(`R2 menjawab ${response.status} untuk ${init.method} ${key}`);
+    return response;
   }
 
   return {
-    put: (key, data, contentType) =>
-      send(key, { method: "PUT", body: data as Uint8Array<ArrayBuffer>, headers: { "content-type": contentType } }, (status) => status >= 200 && status < 300),
-    remove: (key) => send(key, { method: "DELETE" }, (status) => (status >= 200 && status < 300) || status === 404),
+    put: async (key, data, contentType) => {
+      await send(key, { method: "PUT", body: data as Uint8Array<ArrayBuffer>, headers: { "content-type": contentType } }, (status) => status >= 200 && status < 300);
+    },
+    get: async (key) => new Uint8Array(await (await send(key, { method: "GET" }, (status) => status === 200)).arrayBuffer()),
+    remove: async (key) => {
+      await send(key, { method: "DELETE" }, (status) => (status >= 200 && status < 300) || status === 404);
+    },
   };
 }
 
@@ -65,6 +72,9 @@ export function localStore(dir: string): PhotoStore {
       const target = file(key);
       await mkdir(path.dirname(target), { recursive: true });
       await writeFile(target, data);
+    },
+    async get(key) {
+      return new Uint8Array(await readFile(file(key)));
     },
     async remove(key) {
       await rm(file(key), { force: true });

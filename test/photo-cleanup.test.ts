@@ -17,6 +17,9 @@ const store: PhotoStore = {
   async put(key) {
     files.add(key);
   },
+  async get() {
+    return new Uint8Array();
+  },
   async remove(key) {
     if (failing.remove) throw new Error("R2 menjawab 500");
     files.delete(key);

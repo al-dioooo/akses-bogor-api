@@ -97,6 +97,7 @@ describe("localStore", () => {
     expect(await readFile(path.join(dir, "privat", key), "utf8")).toBe("isi");
     await store.put("lokasi/tempat/foto.webp", Buffer.from("publik"), "image/webp");
     expect(await readFile(path.join(dir, "publik", "lokasi/tempat/foto.webp"), "utf8")).toBe("publik");
+    expect(Buffer.from(await store.get(key)).toString()).toBe("isi");
     await store.remove(key);
     await store.remove(key);
     await expect(stat(path.join(dir, "privat", key))).rejects.toThrow();
@@ -131,6 +132,16 @@ describe("r2Store", () => {
     expect(put!.headers.get("content-type")).toBe("image/webp");
     expect(del!.method).toBe("DELETE");
     expect(del!.url).toContain("/foto-publik/lokasi/tempat/abc.webp");
+  });
+
+  it("reads a file back with a signed GET", async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>(async () => new Response("isi", { status: 200 }));
+    const data = await r2Store({ ...options, fetch }).get("laporan/abc.webp");
+    expect(Buffer.from(data).toString()).toBe("isi");
+    const [request] = fetch.mock.calls[0]!;
+    expect((request as Request).method).toBe("GET");
+    expect((request as Request).url).toContain("/foto-laporan/laporan/abc.webp");
+    await expect(r2Store({ ...options, fetch: async () => new Response(null, { status: 404 }) }).get("laporan/abc.webp")).rejects.toThrow("R2 menjawab 404 untuk GET");
   });
 
   it("treats a missing file as deleted and other answers as errors", async () => {

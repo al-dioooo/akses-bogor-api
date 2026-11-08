@@ -25,6 +25,9 @@ function memoryStore() {
       if (failing.put) throw new Error("R2 menjawab 500");
       files.set(key, { data, contentType });
     },
+    async get(key) {
+      return files.get(key)!.data;
+    },
     async remove(key) {
       files.delete(key);
     },
