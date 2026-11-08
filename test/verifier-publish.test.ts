@@ -90,7 +90,7 @@ describe("publishing a new place (FR-32, FR-33)", () => {
   it("records the decision, the audit entries, the email, and the status in Laporan saya", async () => {
     const [report] = await rig.db.select().from(reports).where(eq(reports.id, id));
     expect(report).toMatchObject({ status: "diterbitkan", placeId, reviewerId: verifier.user.id, reviewerNote: "Ramp terlihat di foto 1", decidedAt: rig.clock.now });
-    const actions = (await rig.db.select({ entity: auditLog.entityType, action: auditLog.action, changes: auditLog.changes }).from(auditLog).where(eq(auditLog.actorId, verifier.user.id))).filter(
+    const actions = (await rig.db.select({ entity: auditLog.entityType, action: auditLog.action, changes: auditLog.changes }).from(auditLog).where(eq(auditLog.actorId, verifier.user.id)).orderBy(auditLog.id)).filter(
       (e) => e.action !== "dimoderasi",
     );
     expect(actions.map((e) => `${e.entity}:${e.action}`)).toEqual(["lokasi:dibuat", "laporan:diterbitkan", "foto:diterbitkan", "foto:dihapus"]);

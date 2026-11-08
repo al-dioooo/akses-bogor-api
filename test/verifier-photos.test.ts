@@ -96,7 +96,11 @@ describe("PATCH /verifier/reports/:id/photos/:photoId (FR-34)", () => {
     expect(res.json()).toMatchObject({ id: photoId, tag: "pintu_masuk", caption: "Ramp dari parkir", hidden: false, blur });
     expect((await moderate(verifier.token, { hidden: true }, secondPhoto)).json()).toMatchObject({ hidden: true });
 
-    const entries = await rig.db.select().from(auditLog).where(and(eq(auditLog.entityType, "foto"), eq(auditLog.action, "dimoderasi")));
+    const entries = await rig.db
+      .select()
+      .from(auditLog)
+      .where(and(eq(auditLog.entityType, "foto"), eq(auditLog.action, "dimoderasi")))
+      .orderBy(auditLog.id);
     expect(entries.map((e) => e.changes)).toEqual([
       { tag: { sebelum: "lainnya", sesudah: "pintu_masuk" }, areaKabur: { sebelum: 0, sesudah: 1 }, laporan: reportId },
       { disembunyikan: { sebelum: false, sesudah: true }, laporan: reportId },
