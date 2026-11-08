@@ -10,7 +10,8 @@ import { HttpError, errorSchema } from "../http/errors.js";
 import { MAX_PHOTO_BYTES, photoTooLarge, processPhoto } from "../photos/process.js";
 import { reportPhotoKey, type PhotoStore } from "../photos/storage.js";
 import { nearbyPlaces, requireDistrict } from "../reports/location.js";
-import { locationCheck, locationCheckBody } from "../reports/schemas.js";
+import { locationCheck, locationCheckBody, reportBody, submittedReport } from "../reports/schemas.js";
+import { REPORTS_PER_DAY, WAITING_REPORTS, submitReport } from "../reports/submit.js";
 
 const TAG = "Laporkan";
 const HOUR_MS = 60 * 60 * 1000;
@@ -119,6 +120,24 @@ export const reportRoutes: FastifyPluginAsyncZod<ReportRouteOptions> = async (ap
         throw new HttpError(502, "foto_gagal_disimpan", "Foto gagal disimpan. Coba unggah lagi.");
       }
       return reply.code(201).send({ id, width: photo.width, height: photo.height, bytes: photo.bytes });
+    },
+  );
+
+  app.post(
+    "/reports",
+    {
+      schema: {
+        tags: [TAG],
+        summary: "Kirim laporan",
+        description: `Laporan baru, perubahan (Edit lokasi), atau kekurangan (Laporkan kekurangan) masuk antrean verifikasi dengan status menunggu (FR-20 sampai FR-27). Data lokasi tidak berubah sampai laporan diterbitkan. Kecamatan dihitung ulang dari titik; titik di luar Kota Bogor menjawab 422. Laporan kekurangan memakai nama, kategori, titik, dan patokan lokasi saat ini. Foto harus diunggah akun ini lewat \`POST /reports/photos\` dan belum terpasang; bila tidak, 400 \`foto_tidak_ditemukan\`. Kirim ulang dengan kunci draf yang sama menjawab 201 dengan laporan yang sudah ada, tanpa membuat laporan kedua. Per akun ${REPORTS_PER_DAY} laporan per 24 jam dan ${WAITING_REPORTS} laporan menunggu.`,
+        body: reportBody,
+        response: { 201: submittedReport, 400: errorSchema, 401: errorSchema, 403: errorSchema, 404: errorSchema, 422: errorSchema, 429: errorSchema, 503: errorSchema },
+      },
+    },
+    async (request, reply) => {
+      const user = await reporter(request);
+      const { report } = await submitReport(app.db, user.id, request.body, opts.now());
+      return reply.code(201).send(report);
     },
   );
 };
