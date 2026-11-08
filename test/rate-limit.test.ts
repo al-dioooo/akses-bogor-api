@@ -89,3 +89,55 @@ describe("web server calls", () => {
     expect(remaining(second)).toBe(remaining(first) - 1);
   });
 });
+
+// Batas per route (kode masuk, pencarian) dan unggah foto memakai kunci yang sama dengan batas global. Tanpa akun dan
+// Mapbox, route-route ini menjawab 503, tetapi hook rate limit sudah berjalan sebelumnya.
+describe("route limits for web server calls", () => {
+  const vercel = { "cf-connecting-ip": "192.0.2.10", "x-web-server-secret": secret };
+  const codeRequest = (headers: Record<string, string>, email: string) =>
+    webApp.inject({ method: "POST", url: "/auth/code", payload: { email }, headers });
+  const search = (headers: Record<string, string>) =>
+    webApp.inject({ method: "POST", url: "/map/search", payload: { q: "halte" }, headers });
+  const upload = (headers: Record<string, string>) =>
+    webApp.inject({ method: "POST", url: "/reports/photos", payload: Buffer.from("foto"), headers: { ...headers, "content-type": "image/jpeg" } });
+
+  it("count sign-in code requests per visitor", async () => {
+    const first = await codeRequest({ ...vercel, "x-visitor-ip": "198.51.100.90" }, "satu@contoh.id");
+    const second = await codeRequest({ ...vercel, "x-visitor-ip": "198.51.100.90" }, "dua@contoh.id");
+    const other = await codeRequest({ ...vercel, "x-visitor-ip": "198.51.100.91" }, "tiga@contoh.id");
+    expect(first.headers["x-ratelimit-limit"]).toBe("10");
+    expect(remaining(second)).toBe(remaining(first) - 1);
+    expect(remaining(other)).toBe(9);
+  });
+
+  it("answer 429 to one visitor while another visitor behind the same server still gets through", async () => {
+    for (let i = 0; i < 10; i++) await codeRequest({ ...vercel, "x-visitor-ip": "198.51.100.92" }, `orang${i}@contoh.id`);
+    const blocked = await codeRequest({ ...vercel, "x-visitor-ip": "198.51.100.92" }, "lagi@contoh.id");
+    const other = await codeRequest({ ...vercel, "x-visitor-ip": "198.51.100.93" }, "lain@contoh.id");
+    expect(blocked.statusCode).toBe(429);
+    expect(blocked.json()).toMatchObject({ galat: "terlalu_sering" });
+    expect(other.statusCode).not.toBe(429);
+  });
+
+  it("share the sign-in code quota of the server when the secret is wrong", async () => {
+    const forged = { "cf-connecting-ip": "192.0.2.11", "x-web-server-secret": "salah" };
+    const first = await codeRequest({ ...forged, "x-visitor-ip": "198.51.100.94" }, "empat@contoh.id");
+    const second = await codeRequest({ ...forged, "x-visitor-ip": "198.51.100.95" }, "lima@contoh.id");
+    expect(remaining(second)).toBe(remaining(first) - 1);
+  });
+
+  it("count place searches per visitor", async () => {
+    const first = await search({ ...vercel, "x-visitor-ip": "198.51.100.96" });
+    const other = await search({ ...vercel, "x-visitor-ip": "2001:db8::97" });
+    expect(first.headers["x-ratelimit-limit"]).toBe("30");
+    expect(remaining(other)).toBe(29);
+  });
+
+  it("count photo uploads per visitor", async () => {
+    const first = await upload({ ...vercel, "x-visitor-ip": "198.51.100.98" });
+    const second = await upload({ ...vercel, "x-visitor-ip": "198.51.100.98" });
+    const other = await upload({ ...vercel, "x-visitor-ip": "198.51.100.99" });
+    expect(remaining(second)).toBe(remaining(first) - 1);
+    expect(remaining(other)).toBe(119);
+  });
+});
