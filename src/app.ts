@@ -18,6 +18,7 @@ import { HttpError } from "./http/errors.js";
 import { mapboxSearch } from "./map/search.js";
 import { mapTokenSource } from "./map/token.js";
 import { schedulePhotoCleanup } from "./photos/cleanup.js";
+import { scheduleVerificationJobs } from "./verification/jobs.js";
 import { localStore, r2Store, type PhotoStore } from "./photos/storage.js";
 import { adminRoutes } from "./routes/admin.js";
 import { authRoutes } from "./routes/auth.js";
@@ -159,6 +160,10 @@ export async function buildApp(env: Env, deps: { db?: Db; now?: () => Date; fetc
   await app.register(verifierRoutes, { auth, photoBaseUrl: env.PHOTO_PUBLIC_URL, store: photoStore, now });
   if (env.NODE_ENV !== "test") {
     const stop = schedulePhotoCleanup(app.db, photoStore, now, app.log);
+    app.addHook("onClose", async () => stop());
+  }
+  if (env.NODE_ENV !== "test") {
+    const stop = scheduleVerificationJobs(app.db, photoStore, now, app.log);
     app.addHook("onClose", async () => stop());
   }
   if (auth && env.NODE_ENV !== "test") {

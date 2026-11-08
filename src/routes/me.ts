@@ -9,7 +9,8 @@ import { needsCompletion, requireSession, toUser, userSchema } from "../auth/ses
 import { users } from "../db/schema.js";
 import { accountDeletedEmail, type Mailer } from "../email/mailer.js";
 import { HttpError, errorSchema } from "../http/errors.js";
-import { listMyReports, myReports } from "../reports/mine.js";
+import { answerClarification, getMyReport } from "../reports/clarification.js";
+import { clarificationBody, listMyReports, myReport, myReports } from "../reports/mine.js";
 
 export type MeRouteOptions = { auth?: Auth; mailer?: Mailer; now: () => Date };
 
@@ -119,6 +120,44 @@ export const meRoutes: FastifyPluginAsyncZod<MeRouteOptions> = async (app, opts)
       const { user } = await session(request);
       reply.header("cache-control", "no-store");
       return listMyReports(app.db, user.id);
+    },
+  );
+
+  app.get(
+    "/me/reports/:id",
+    {
+      schema: {
+        tags: [TAG],
+        summary: "Satu laporan saya",
+        description: "Status, jumlah foto, serta pertanyaan klarifikasi dan jawaban untuk halaman jawab di Laporan saya (FR-41, ADR-0036). Laporan akun lain 404.",
+        params: z.object({ id: z.uuid() }),
+        response: { 200: myReport, 400: errorSchema, 401: errorSchema, 404: errorSchema, 503: errorSchema },
+      },
+    },
+    async (request, reply) => {
+      const { user } = await session(request);
+      reply.header("cache-control", "no-store");
+      return getMyReport(app.db, user.id, request.params.id);
+    },
+  );
+
+  app.post(
+    "/me/reports/:id/clarification",
+    {
+      schema: {
+        tags: [TAG],
+        summary: "Jawab klarifikasi",
+        description:
+          "Menjawab pertanyaan verifikator yang terbuka, sekali, sebelum tenggat 7 hari, dengan teks dan foto baru dari `POST /reports/photos` (total foto laporan paling banyak 10). Laporan kembali ke antrean di posisi aslinya. Galat: 404 laporan akun lain, 409 `tidak_menunggu_jawaban` atau `tenggat_lewat`, 400 `foto_terlalu_banyak` atau `foto_tidak_ditemukan`.",
+        params: z.object({ id: z.uuid() }),
+        body: clarificationBody,
+        response: { 200: z.object({ status: z.literal("menunggu") }), 400: errorSchema, 401: errorSchema, 403: errorSchema, 404: errorSchema, 409: errorSchema, 503: errorSchema },
+      },
+    },
+    async (request) => {
+      const { user } = await session(request);
+      if (needsCompletion(user)) throw new HttpError(403, "akun_belum_lengkap", "Lengkapi akun dulu sebelum menjawab.");
+      return answerClarification(app.db, user.id, request.params.id, request.body, opts.now());
     },
   );
 
