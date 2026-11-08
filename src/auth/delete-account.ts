@@ -9,8 +9,10 @@ import { photoDeletions, photos, reports, users, verifications } from "../db/sch
  * - foto yang sudah diunggah tetapi belum dipasang ke laporan (ADR-0031);
  * - akun, semua sesi, tautan Google, dan kode email yang tersisa.
  *
- * Laporan terbit dan fotonya yang tayang tetap ada; `reporter_id`, `reviewer_id`, dan pengubah di log audit menjadi
- * kosong lewat `ON DELETE SET NULL`. Berkas foto yang dihapus dicatat di `photo_deletions` untuk dihapus dari R2.
+ * Laporan terbit dan fotonya yang tayang tetap ada; `reporter_id`, `reviewer_id`, penanya klarifikasi, dan pengubah di
+ * log audit menjadi kosong lewat `ON DELETE SET NULL`. Klarifikasi dan antrean email laporan yang dihapus ikut terhapus
+ * lewat `ON DELETE CASCADE`, termasuk foto dari jawaban klarifikasi. Berkas foto yang dihapus dicatat di
+ * `photo_deletions` untuk dihapus dari R2.
  *
  * Mengembalikan email akun supaya email konfirmasi bisa dikirim, atau null bila akunnya sudah tidak ada.
  */

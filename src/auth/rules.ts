@@ -17,4 +17,4 @@ export const SESSION_MAX_DAYS = 90;
 export const INCOMPLETE_ACCOUNT_HOURS = 24;
 
 /** Versi Kebijakan Privasi saat ini (akses-bogor-docs, product/kebijakan-privasi.md). Naik setiap isinya berubah. */
-export const PRIVACY_POLICY_VERSION = "2026-11-08";
+export const PRIVACY_POLICY_VERSION = "2026-11-09";

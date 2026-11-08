@@ -66,7 +66,7 @@ erDiagram
 | `audit_log` | Siapa mengubah apa dan kapan, tanpa data pribadi; pengubah kosong dengan label `sistem` atau `skrip` untuk tindakan tanpa akun, dan kosong tanpa label berarti akunnya sudah dihapus | FR-35, ADR-0024, ADR-0038 |
 | `report_emails` | Email status laporan yang menunggu dikirim atau dicoba ulang: hanya id laporan dan jenis email | ADR-0039 |
 
-Saat akun dihapus, `reporter_id` di laporan menjadi kosong (`ON DELETE SET NULL`); penghapusan laporan yang belum terbit dan foto yang tidak tayang dijalankan `src/auth/delete-account.ts` dalam satu transaksi (ADR-0024).
+Saat akun dihapus, `reporter_id` di laporan, `reviewer_id`, penanya klarifikasi, dan pengubah di log audit menjadi kosong (`ON DELETE SET NULL`); penghapusan laporan yang belum terbit beserta klarifikasi, foto, dan antrean emailnya dijalankan `src/auth/delete-account.ts` dalam satu transaksi (ADR-0024). Klarifikasi pada laporan yang sudah terbit tetap tersimpan tanpa nama pelapor dan hanya dilihat verifikator.
 
 ## Struktur Folder
 

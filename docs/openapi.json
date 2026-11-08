@@ -2411,7 +2411,7 @@
         "tags": [
           "Akun"
         ],
-        "description": "Menyimpan nama tampilan dan persetujuan Kebijakan Privasi beserta waktu dan versinya (FR-11, FR-12). Versi saat ini: 2026-11-08. Versi lain menjawab 409 `versi_kebijakan_berbeda`.",
+        "description": "Menyimpan nama tampilan dan persetujuan Kebijakan Privasi beserta waktu dan versinya (FR-11, FR-12). Versi saat ini: 2026-11-09. Versi lain menjawab 409 `versi_kebijakan_berbeda`.",
         "requestBody": {
           "required": true,
           "content": {
