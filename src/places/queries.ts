@@ -12,8 +12,8 @@ export interface ReadOptions {
 
 type PhotoRow = { id: string; storageKey: string; altText: string; caption: string | null; tag: (typeof photos.tag.enumValues)[number] };
 
-const photoUrl = (key: string, base?: string) => (base ? `${base.replace(/\/+$/, "")}/${key.split("/").map(encodeURIComponent).join("/")}` : null);
-const toPhoto = (p: PhotoRow, base?: string) => ({ id: p.id, url: photoUrl(p.storageKey, base), alt: p.altText, caption: p.caption, tag: p.tag });
+export const photoUrl = (key: string, base?: string) => (base ? `${base.replace(/\/+$/, "")}/${key.split("/").map(encodeURIComponent).join("/")}` : null);
+export const toPhoto = (p: PhotoRow, base?: string) => ({ id: p.id, url: photoUrl(p.storageKey, base), alt: p.altText, caption: p.caption, tag: p.tag });
 const escapeLike = (value: string) => value.replace(/[\\%_]/g, (c) => `\\${c}`);
 
 function filterConditions(f: PlaceFilters, bbox?: [number, number, number, number]): SQL | undefined {
@@ -61,7 +61,7 @@ const toSummary = (r: SummaryRow) => ({
   lastVerifiedAt: r.lastVerifiedAt.toISOString(),
 });
 
-const publishedPhotosOf = (db: Db, placeIds: string[]) =>
+export const publishedPhotosOf = (db: Db, placeIds: string[]) =>
   db
     .select({ placeId: photos.placeId, id: photos.id, storageKey: photos.storageKey, altText: photos.altText, caption: photos.caption, tag: photos.tag })
     .from(photos)
