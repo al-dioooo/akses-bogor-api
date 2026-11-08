@@ -41,6 +41,7 @@ pnpm dev               # http://localhost:8080/healthz
 | `pnpm db:generate` | Membuat migrasi Drizzle dari `src/db/schema.ts` |
 | `pnpm db:migrate` | Menjalankan migrasi ke database di `DATABASE_URL` |
 | `pnpm db:seed` | Mengosongkan data lokasi dan laporan, lalu mengisi tujuh lokasi contoh; kecamatan dan batasnya tidak dihapus; ditolak di production |
+| `pnpm peran --email <email> --peran <admin\|verifikator\|pengguna>` | Mengganti peran akun yang sudah dilengkapi, mis. membuat admin pertama; dicatat di log audit sebagai `skrip` (ADR-0035) |
 
 ## Database
 
@@ -125,6 +126,9 @@ Contoh lengkap ada di [.env.example](.env.example). Jangan commit `.env`.
 | `DELETE /me` | Hapus akun: data pribadi dan laporan yang belum terbit hilang, laporan terbit tetap tanpa pelapor | FR-13 |
 | `POST /reports/location-check` | Kecamatan dari titik, penolakan titik di luar Kota Bogor, dan lokasi terbit bernama mirip dalam radius sekitar 50 m; tanpa akun | FR-22, FR-23 |
 | `POST /reports/photos` | Unggah satu foto mentah (JPEG, PNG, WebP, ≤3 MB); disimpan sebagai WebP ≤2048 px tanpa metadata di bucket privat sampai dipasang ke laporan; 100 per akun per jam | FR-25, ADR-0031 |
+| `GET /admin/team` | Tim verifikasi (verifikator dan admin) dengan email; khusus admin | FR-36 |
+| `POST /admin/team` | Jadikan verifikator akun yang sudah dilengkapi, dengan email yang tepat; khusus admin | FR-36 |
+| `DELETE /admin/team/{userId}` | Cabut peran verifikator; peran admin hanya lewat `pnpm peran` | FR-36 |
 | `POST /reports` | Kirim laporan baru, perubahan, atau kekurangan ke antrean verifikasi dengan foto yang sudah diunggah; kecamatan dihitung ulang; kunci draf mencegah laporan ganda; 20 laporan per 24 jam dan 30 laporan menunggu per akun | FR-20 sampai FR-27 |
 
 Route akun dipanggil server Next.js, bukan browser. Masuk menjawab token sesi bertanda tangan; web menyimpannya di cookie `HttpOnly` miliknya dan mengirimnya balik sebagai `Authorization: Bearer` (ADR-0029). Batas kode: 60 detik dan 5 kode per email per jam, 10 permintaan dan 30 percobaan kode per klien per 15 menit. Sesi berakhir 30 hari setelah terakhir dipakai, atau 90 hari setelah masuk. Setiap jam API menghapus akun yang tidak dilengkapi dalam 24 jam (dan tidak punya laporan), sesi kedaluwarsa, dan kode kedaluwarsa. Saat akun dihapus, berkas foto yang ikut terhapus, termasuk unggahan yang belum dipasang ke laporan, dicatat di tabel `photo_deletions`. Setiap jam API memindahkan unggahan yang tidak dipasang dalam 24 jam ke antrean itu, lalu menghapus berkas di antrean dari R2 (`src/photos/cleanup.ts`); berkas yang gagal dihapus dicoba lagi jam berikutnya. Di development tanpa `RESEND_API_KEY`, kode masuk dicetak ke log API.
@@ -211,6 +215,17 @@ sudo systemctl enable --now akses-bogor-api akses-bogor-deploy.timer akses-bogor
 ```
 
 Terakhir, tambahkan public hostname `akses-bogor-api.yorhagarden.xyz` di tunnel Evergarden (Zero Trust → Networks → Tunnels), dengan service `http://127.0.0.1:8090`. Hostname lain di tunnel itu jangan diubah.
+
+### Peran
+
+Admin pertama dibuat dengan skrip, karena tidak ada route API yang bisa membuat admin (ADR-0035). Akunnya harus sudah masuk dan melengkapi nama tampilan di web. Lalu, di Evergarden:
+
+```bash
+sudo -u aksesbogor -H sh -c 'cd /srv/akses-bogor/current && COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
+  corepack pnpm exec tsx --env-file=/etc/akses-bogor/api.env scripts/peran.ts --email <email> --peran admin'
+```
+
+Admin kemudian memberi dan mencabut peran verifikator di halaman Tim verifikator di web. Perintah yang sama dengan `--peran pengguna` mencabut peran admin.
 
 ### Data Preview
 

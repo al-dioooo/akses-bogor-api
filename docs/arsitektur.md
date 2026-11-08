@@ -83,6 +83,7 @@ Saat akun dihapus, `reporter_id` di laporan menjadi kosong (`ON DELETE SET NULL`
 | `src/map` | Token Mapbox sementara untuk browser (ADR-0016) dan pencarian tempat lewat Search Box (ADR-0032) |
 | `src/auth` | Konfigurasi Better Auth, pemeriksaan sesi, dan aturan akun (ADR-0029) |
 | `src/email` | Isi email dan pengirim Resend atau log (ADR-0030) |
+| `src/admin` | Peran akun: tim verifikasi, memberi dan mencabut peran (ADR-0035) |
 | `src/audit` | Penulis log audit dan pembanding nilai sebelum dan sesudah (ADR-0038) |
 | `src/routes` | Route Fastify, satu berkas per kelompok |
 | `scripts` | Skrip pendukung, mis. pembuat `docs/openapi.json` |

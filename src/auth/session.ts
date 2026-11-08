@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import type { FastifyRequest } from "fastify";
 import { z } from "zod";
 import type { Db } from "../db/client.js";
+import { canVerify } from "../admin/roles.js";
 import { sessions } from "../db/schema.js";
 import { HttpError } from "../http/errors.js";
 import type { Auth } from "./auth.js";
@@ -72,4 +73,21 @@ export async function requireSession(auth: Auth, db: Db, request: FastifyRequest
   const result = await currentSession(auth, db, request, now);
   if (!result) throw new HttpError(401, "belum_masuk", "Sesi Anda sudah berakhir. Silakan masuk lagi.");
   return result;
+}
+
+/**
+ * Akun verifikator atau admin yang sudah dilengkapi (ADR-0035). Peran dibaca dari database di setiap permintaan, jadi
+ * pencabutan peran langsung berlaku.
+ */
+export async function requireVerifier(auth: Auth, db: Db, request: FastifyRequest, now: () => Date) {
+  const { user } = await requireSession(auth, db, request, now);
+  if (needsCompletion(user)) throw new HttpError(403, "akun_belum_lengkap", "Lengkapi akun dulu.");
+  if (!canVerify(user.role)) throw new HttpError(403, "bukan_verifikator", "Halaman ini hanya untuk verifikator AksesBogor.");
+  return toUser(user);
+}
+
+export async function requireAdmin(auth: Auth, db: Db, request: FastifyRequest, now: () => Date) {
+  const user = await requireVerifier(auth, db, request, now);
+  if (user.role !== "admin") throw new HttpError(403, "bukan_admin", "Halaman ini hanya untuk admin AksesBogor.");
+  return user;
 }
