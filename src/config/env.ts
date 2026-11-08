@@ -54,6 +54,8 @@ const schema = z
     R2_BUCKET_PUBLIK: optional(z.string().min(3)),
     /** Folder foto di development tanpa R2. Bawaan `.data/foto`. */
     PHOTO_STORAGE_DIR: optional(z.string().min(1)),
+    /** Rahasia bersama dengan server Next.js, minimal 32 karakter. Kosong berarti header IP pengunjung diabaikan. */
+    WEB_SERVER_SECRET: optional(z.string().min(32)),
   })
   .refine((env) => !env.MAPBOX_SECRET_TOKEN === !env.MAPBOX_USERNAME, {
     message: "MAPBOX_SECRET_TOKEN dan MAPBOX_USERNAME harus diisi bersama",

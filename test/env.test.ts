@@ -20,6 +20,12 @@ describe("loadEnv", () => {
     expect(env.PHOTO_PUBLIC_URL).toBeUndefined();
   });
 
+  it("treats an empty WEB_SERVER_SECRET as unset and rejects a short one", () => {
+    const base = { DATABASE_URL: "postgresql://test:test@localhost:5432/test" };
+    expect(loadEnv({ ...base, WEB_SERVER_SECRET: "" }).WEB_SERVER_SECRET).toBeUndefined();
+    expect(() => loadEnv({ ...base, WEB_SERVER_SECRET: "pendek" })).toThrow(/WEB_SERVER_SECRET/);
+  });
+
   it("treats empty Mapbox settings as unset", () => {
     const env = loadEnv({ DATABASE_URL: "postgresql://test:test@localhost:5432/test", MAPBOX_SECRET_TOKEN: "", MAPBOX_USERNAME: "" });
     expect(env.MAPBOX_SECRET_TOKEN).toBeUndefined();

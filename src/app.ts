@@ -15,6 +15,7 @@ import type { Env } from "./config/env.js";
 import { createDb, type Db } from "./db/client.js";
 import { logMailer, resendMailer, type Mailer } from "./email/mailer.js";
 import { HttpError } from "./http/errors.js";
+import { createRateLimitKey, WEB_SERVER_SECRET_HEADER } from "./http/rate-limit.js";
 import { mapboxSearch } from "./map/search.js";
 import { mapTokenSource } from "./map/token.js";
 import { schedulePhotoCleanup } from "./photos/cleanup.js";
@@ -51,7 +52,7 @@ export async function buildApp(env: Env, deps: { db?: Db; now?: () => Date; fetc
         ? false
         : {
             level: env.NODE_ENV === "production" ? "info" : "debug",
-            redact: ["req.headers.authorization", "req.headers.cookie"],
+            redact: ["req.headers.authorization", "req.headers.cookie", `req.headers["${WEB_SERVER_SECRET_HEADER}"]`],
           },
     trustProxy: true,
     bodyLimit: 1024 * 1024,
@@ -94,6 +95,7 @@ export async function buildApp(env: Env, deps: { db?: Db; now?: () => Date; fetc
   await app.register(rateLimit, {
     max: 120,
     timeWindow: "1 minute",
+    keyGenerator: createRateLimitKey(env.WEB_SERVER_SECRET),
     allowList: (request) => request.url === "/healthz",
   });
 
