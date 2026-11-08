@@ -27,6 +27,7 @@ import { mapRoutes } from "./routes/map.js";
 import { meRoutes } from "./routes/me.js";
 import { placeRoutes } from "./routes/places.js";
 import { reportRoutes } from "./routes/reports.js";
+import { verifierRoutes } from "./routes/verifier.js";
 
 // Hanya untuk pengembangan lokal tanpa BETTER_AUTH_SECRET. Production tanpa secret mematikan route akun (503).
 const DEVELOPMENT_AUTH_SECRET = "rahasia-pengembangan-lokal-aksesbogor-jangan-dipakai-di-production";
@@ -155,6 +156,7 @@ export async function buildApp(env: Env, deps: { db?: Db; now?: () => Date; fetc
         ? localStore(env.PHOTO_STORAGE_DIR ?? ".data/foto")
         : undefined);
   await app.register(reportRoutes, { auth, store: photoStore, now });
+  await app.register(verifierRoutes, { auth, now });
   if (env.NODE_ENV !== "test") {
     const stop = schedulePhotoCleanup(app.db, photoStore, now, app.log);
     app.addHook("onClose", async () => stop());
