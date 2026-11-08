@@ -28,6 +28,8 @@ export const rejectionReason = pgEnum("rejection_reason", [
 // ADR-0023
 export const photoTag = pgEnum("photo_tag", ["pintu_masuk", "toilet_difabel", "guiding_block", "lift", "lainnya"]);
 export const photoModeration = pgEnum("photo_moderation", ["menunggu", "tayang", "disembunyikan"]);
+// ADR-0039
+export const reportEmailKind = pgEnum("report_email_kind", ["diterbitkan", "ditolak", "klarifikasi"]);
 
 const timestamps = {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -200,6 +202,8 @@ export const reports = pgTable(
     clarificationQuestion: text("clarification_question"),
     clarificationDueAt: timestamp("clarification_due_at", { withTimezone: true }),
     reviewerId: uuid("reviewer_id").references(() => users.id, { onDelete: "set null" }),
+    /** Catatan internal verifikator; tidak pernah dikirim ke pelapor atau tayang (ADR-0036). */
+    reviewerNote: varchar("reviewer_note", { length: 1000 }),
     submittedAt: timestamp("submitted_at", { withTimezone: true }).notNull().defaultNow(),
     decidedAt: timestamp("decided_at", { withTimezone: true }),
   },
@@ -212,6 +216,33 @@ export const reports = pgTable(
     check("reports_existing_place_for_changes", sql`${t.kind} = 'baru' OR ${t.placeId} IS NOT NULL OR ${t.status} = 'ditolak'`),
   ],
 );
+
+/**
+ * Pertanyaan klarifikasi verifikator dan jawaban pelapor, berurutan (ADR-0036). Setiap pertanyaan punya tenggat 7 hari
+ * sendiri; jawaban hanya bisa dikirim sekali. Ikut terhapus bersama laporannya.
+ */
+export const reportClarifications = pgTable(
+  "report_clarifications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    reportId: uuid("report_id")
+      .notNull()
+      .references(() => reports.id, { onDelete: "cascade" }),
+    question: varchar("question", { length: 1000 }).notNull(),
+    askedBy: uuid("asked_by").references(() => users.id, { onDelete: "set null" }),
+    askedAt: timestamp("asked_at", { withTimezone: true }).notNull().defaultNow(),
+    dueAt: timestamp("due_at", { withTimezone: true }).notNull(),
+    answer: varchar("answer", { length: 1000 }),
+    answeredAt: timestamp("answered_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("report_clarifications_report_idx").on(t.reportId, t.askedAt),
+    check("report_clarifications_answer_with_time", sql`(${t.answer} IS NULL) = (${t.answeredAt} IS NULL)`),
+  ],
+);
+
+/** Area yang dikaburkan, dalam pecahan 0 sampai 1 dari lebar dan tinggi foto (ADR-0037). */
+export type BlurRegion = { x: number; y: number; w: number; h: number };
 
 /**
  * Foto laporan (ADR-0023, ADR-0031). Foto yang baru diunggah belum punya laporan dan dicatat pengunggahnya; saat laporan
@@ -233,6 +264,10 @@ export const photos = pgTable(
     height: integer("height").notNull(),
     bytes: integer("bytes").notNull(),
     moderation: photoModeration("moderation").notNull().default("menunggu"),
+    /** Area yang dikaburkan API saat terbit (ADR-0037). Kosong berarti tidak ada. */
+    blurRegions: jsonb("blur_regions").$type<BlurRegion[]>(),
+    /** Klarifikasi yang jawabannya membawa foto ini; kosong untuk foto dari laporan awal (ADR-0036). */
+    clarificationId: uuid("clarification_id").references(() => reportClarifications.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -269,4 +304,23 @@ export const auditLog = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("audit_log_entity_idx").on(t.entityType, t.entityId)],
+);
+
+/**
+ * Email status laporan yang menunggu dikirim (ADR-0039). Hanya id laporan dan jenis email; alamat dan isi dibaca saat
+ * mengirim. Baris dihapus setelah terkirim, atau setelah 3 hari gagal.
+ */
+export const reportEmails = pgTable(
+  "report_emails",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    reportId: uuid("report_id")
+      .notNull()
+      .references(() => reports.id, { onDelete: "cascade" }),
+    kind: reportEmailKind("kind").notNull(),
+    attempts: smallint("attempts").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("report_emails_report_kind_idx").on(t.reportId, t.kind), index("report_emails_next_idx").on(t.nextAttemptAt)],
 );
