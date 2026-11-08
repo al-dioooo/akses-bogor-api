@@ -22,7 +22,7 @@ const schema = z
     HOST: z.string().default("0.0.0.0"),
     /** PostgreSQL dengan PostGIS, dipakai aplikasi, migrasi, dan seed. */
     DATABASE_URL: z.url(),
-    /** Origin web yang boleh memanggil API, dipisah koma. */
+    /** Origin web yang boleh memanggil API, dipisah koma. Origin pertama menjadi alamat tautan di email status laporan. */
     FRONTEND_ORIGINS: csv(),
     /** Alamat publik bucket foto di Cloudflare R2. Kosong berarti URL foto di respons bernilai null. */
     PHOTO_PUBLIC_URL: optional(z.url()),
