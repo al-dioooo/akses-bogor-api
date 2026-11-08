@@ -156,7 +156,7 @@ export async function buildApp(env: Env, deps: { db?: Db; now?: () => Date; fetc
         ? localStore(env.PHOTO_STORAGE_DIR ?? ".data/foto")
         : undefined);
   await app.register(reportRoutes, { auth, store: photoStore, now });
-  await app.register(verifierRoutes, { auth, photoBaseUrl: env.PHOTO_PUBLIC_URL, now });
+  await app.register(verifierRoutes, { auth, photoBaseUrl: env.PHOTO_PUBLIC_URL, store: photoStore, now });
   if (env.NODE_ENV !== "test") {
     const stop = schedulePhotoCleanup(app.db, photoStore, now, app.log);
     app.addHook("onClose", async () => stop());
