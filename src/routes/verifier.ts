@@ -3,13 +3,18 @@ import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import type { Auth } from "../auth/auth.js";
 import { requireVerifier } from "../auth/session.js";
 import { HttpError, errorSchema } from "../http/errors.js";
+import { blurPhoto } from "../photos/blur.js";
+import type { PhotoStore } from "../photos/storage.js";
+import { moderatePhoto, photoForReview } from "../verification/photos.js";
 import { getReview, listQueue, listRecheck } from "../verification/queue.js";
-import { queue, queueQuery, recheckList, review, reportIdParams } from "../verification/schemas.js";
+import { moderationBody, photoIdParams, photoVersionQuery, queue, queueQuery, recheckList, reportIdParams, reportPhotoParams, review, reviewPhoto } from "../verification/schemas.js";
 
 export type VerifierRouteOptions = {
   auth?: Auth;
   /** Alamat publik bucket foto, untuk foto lokasi yang sudah tayang. */
   photoBaseUrl?: string;
+  /** R2 atau folder lokal; kosong di production tanpa R2. */
+  store?: PhotoStore;
   now: () => Date;
 };
 
@@ -61,6 +66,56 @@ export const verifierRoutes: FastifyPluginAsyncZod<VerifierRouteOptions> = async
       const user = await verifier(request);
       reply.header("cache-control", "no-store");
       return getReview(app.db, user.id, request.params.id, { photoBaseUrl: opts.photoBaseUrl });
+    },
+  );
+
+  app.get(
+    "/verifier/photos/:id",
+    {
+      schema: {
+        tags: [TAG],
+        summary: "Foto laporan yang belum terbit",
+        description:
+          "Berkas WebP dari bucket privat, hanya untuk verifikator dan admin, dengan `Cache-Control: private, no-store` (ADR-0031, ADR-0037). `versi=kabur` memakai area kabur yang tersimpan, sama dengan hasil saat terbit. Foto laporan sendiri 403; foto yang sudah terbit 404 (pakai alamat publiknya).",
+        params: photoIdParams,
+        querystring: photoVersionQuery,
+        produces: ["image/webp"],
+        response: { 400: errorSchema, 404: errorSchema, 502: errorSchema, ...guarded },
+      },
+    },
+    async (request, reply) => {
+      const user = await verifier(request);
+      if (!opts.store) throw new HttpError(503, "foto_belum_diatur", "Penyimpanan foto belum diatur di server.");
+      const photo = await photoForReview(app.db, user.id, request.params.id);
+      let data: Uint8Array;
+      try {
+        data = await opts.store.get(photo.storageKey);
+      } catch (error) {
+        request.log.warn({ err: error }, "foto laporan gagal dibaca");
+        throw new HttpError(502, "foto_gagal_dibaca", "Foto gagal dibaca dari penyimpanan. Coba lagi.");
+      }
+      if (request.query.versi === "kabur" && photo.blur.length > 0) data = (await blurPhoto(data, photo.blur)).data;
+      // Berkas biner tanpa skema 200, jadi Fastify mengirimnya apa adanya; tipe reply hanya mengenal skema galat.
+      return reply.header("cache-control", "private, no-store").type("image/webp").send(Buffer.from(data) as never);
+    },
+  );
+
+  app.patch(
+    "/verifier/reports/:id/photos/:photoId",
+    {
+      schema: {
+        tags: [TAG],
+        summary: "Moderasi foto laporan",
+        description:
+          "Memperbaiki tag dan keterangan, menyembunyikan foto, atau mengganti area kabur (paling banyak 20, dalam pecahan 0 sampai 1) sebelum keputusan (FR-34, ADR-0037). Tersimpan langsung dan dicatat di log audit tanpa isi keterangan. Laporan yang sudah diputuskan 409 `sudah_diputuskan`.",
+        params: reportPhotoParams,
+        body: moderationBody,
+        response: { 200: reviewPhoto, 400: errorSchema, 404: errorSchema, 409: errorSchema, ...guarded },
+      },
+    },
+    async (request) => {
+      const user = await verifier(request);
+      return moderatePhoto(app.db, user.id, request.params.id, request.params.photoId, request.body, opts.now());
     },
   );
 
