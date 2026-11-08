@@ -2411,7 +2411,7 @@
         "tags": [
           "Akun"
         ],
-        "description": "Menyimpan nama tampilan dan persetujuan Kebijakan Privasi beserta waktu dan versinya (FR-11, FR-12). Versi saat ini: 2026-11-07. Versi lain menjawab 409 `versi_kebijakan_berbeda`.",
+        "description": "Menyimpan nama tampilan dan persetujuan Kebijakan Privasi beserta waktu dan versinya (FR-11, FR-12). Versi saat ini: 2026-11-08. Versi lain menjawab 409 `versi_kebijakan_berbeda`.",
         "requestBody": {
           "required": true,
           "content": {
@@ -3185,6 +3185,466 @@
             }
           },
           "502": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reports": {
+      "post": {
+        "summary": "Kirim laporan",
+        "tags": [
+          "Laporkan"
+        ],
+        "description": "Laporan baru, perubahan (Edit lokasi), atau kekurangan (Laporkan kekurangan) masuk antrean verifikasi dengan status menunggu (FR-20 sampai FR-27). Data lokasi tidak berubah sampai laporan diterbitkan. Kecamatan dihitung ulang dari titik; titik di luar Kota Bogor menjawab 422. Laporan kekurangan memakai nama, kategori, titik, dan patokan lokasi saat ini. Foto harus diunggah akun ini lewat `POST /reports/photos` dan belum terpasang; bila tidak, 400 `foto_tidak_ditemukan`. Kirim ulang dengan kunci draf yang sama menjawab 201 dengan laporan yang sudah ada, tanpa membuat laporan kedua. Per akun 20 laporan per 24 jam dan 30 laporan menunggu.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "submissionKey": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                    "description": "Kunci acak dari draf; kirim ulang dengan kunci sama mengembalikan laporan yang sudah ada (ADR-0033)"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "baru",
+                      "perubahan",
+                      "kekurangan"
+                    ],
+                    "description": "baru, perubahan (Edit lokasi), atau kekurangan (Laporkan kekurangan)"
+                  },
+                  "placeId": {
+                    "description": "Wajib untuk perubahan dan kekurangan; tidak boleh ada untuk laporan baru",
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "name": {
+                    "description": "Nama tempat; wajib untuk baru dan perubahan",
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120,
+                    "pattern": "^[^\\p{C}]+$"
+                  },
+                  "category": {
+                    "description": "Satu kategori; wajib untuk baru dan perubahan",
+                    "type": "string",
+                    "enum": [
+                      "kampus",
+                      "masjid",
+                      "halte",
+                      "rumah_sakit"
+                    ]
+                  },
+                  "location": {
+                    "description": "Pin yang dikonfirmasi; wajib untuk baru dan perubahan",
+                    "type": "object",
+                    "properties": {
+                      "lat": {
+                        "type": "number",
+                        "minimum": -90,
+                        "maximum": 90,
+                        "description": "Lintang (derajat, WGS 84)"
+                      },
+                      "lng": {
+                        "type": "number",
+                        "minimum": -180,
+                        "maximum": 180,
+                        "description": "Bujur (derajat, WGS 84)"
+                      }
+                    },
+                    "required": [
+                      "lat",
+                      "lng"
+                    ]
+                  },
+                  "landmark": {
+                    "description": "Patokan opsional",
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 140,
+                    "pattern": "^[^\\p{C}]+$"
+                  },
+                  "description": {
+                    "description": "Deskripsi tambahan",
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000,
+                    "pattern": "^(?:[^\\p{C}]|[\\n\\r\\t])+$"
+                  },
+                  "facilities": {
+                    "minItems": 4,
+                    "maxItems": 4,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "facility": {
+                          "type": "string",
+                          "enum": [
+                            "ramp",
+                            "toilet_difabel",
+                            "guiding_block",
+                            "lift"
+                          ]
+                        },
+                        "answer": {
+                          "type": "string",
+                          "enum": [
+                            "tersedia",
+                            "tidak_tersedia",
+                            "tidak_perlu",
+                            "belum_tahu"
+                          ],
+                          "description": "Bawaan di formulir: belum_tahu (ADR-0017)"
+                        },
+                        "reason": {
+                          "description": "Hanya untuk tidak_tersedia, boleh dilewati (ADR-0022)",
+                          "type": "string",
+                          "enum": [
+                            "tidak_ada",
+                            "rusak",
+                            "terhalang",
+                            "terbatas",
+                            "tidak_sesuai"
+                          ]
+                        },
+                        "note": {
+                          "description": "Catatan singkat, maksimal 200 karakter, tanpa data pribadi (ADR-0022)",
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200,
+                          "pattern": "^[^\\p{C}]+$"
+                        }
+                      },
+                      "required": [
+                        "facility",
+                        "answer"
+                      ]
+                    },
+                    "description": "Jawaban untuk keempat fasilitas (FR-24)"
+                  },
+                  "photos": {
+                    "default": [],
+                    "description": "0 sampai 10 foto yang sudah diunggah akun ini (FR-25)",
+                    "maxItems": 10,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                          "description": "Id dari `POST /reports/photos`"
+                        },
+                        "tag": {
+                          "type": "string",
+                          "enum": [
+                            "pintu_masuk",
+                            "toilet_difabel",
+                            "guiding_block",
+                            "lift",
+                            "lainnya"
+                          ],
+                          "description": "Objek di foto (ADR-0023)"
+                        },
+                        "caption": {
+                          "description": "Deskripsi tambahan untuk foto",
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200,
+                          "pattern": "^[^\\p{C}]+$"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "tag"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "submissionKey",
+                  "kind",
+                  "facilities"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Laporan masuk antrean verifikasi",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "baru",
+                        "perubahan",
+                        "kekurangan"
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "menunggu",
+                        "klarifikasi",
+                        "diterbitkan",
+                        "ditolak"
+                      ],
+                      "description": "Selalu menunggu untuk laporan baru masuk"
+                    },
+                    "placeId": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "Nama tempat yang dilaporkan"
+                    },
+                    "district": {
+                      "type": "object",
+                      "properties": {
+                        "slug": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "slug",
+                        "name"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Kecamatan hasil hitung dari titik (FR-22)"
+                    },
+                    "photos": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Jumlah foto yang terpasang"
+                    },
+                    "submittedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind",
+                    "status",
+                    "placeId",
+                    "name",
+                    "district",
+                    "photos",
+                    "submittedAt"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Laporan masuk antrean verifikasi"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          },
+          "429": {
             "description": "Galat",
             "content": {
               "application/json": {
