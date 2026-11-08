@@ -39,13 +39,20 @@ const multiPolygon = customType<{ data: string; driverData: string }>({
   dataType: () => "geometry(MultiPolygon, 4326)",
 });
 
-/** Kecamatan di Kota Bogor (ADR-0010). Batas diimpor terpisah; selama kosong, kecamatan diisi saat verifikasi. */
-export const districts = pgTable("districts", {
-  slug: varchar("slug", { length: 40 }).primaryKey(),
-  name: varchar("name", { length: 60 }).notNull().unique(),
-  city: varchar("city", { length: 60 }).notNull().default("Kota Bogor"),
-  boundary: multiPolygon("boundary"),
-});
+/**
+ * Kecamatan di Kota Bogor (ADR-0010). Batasnya dari OpenStreetMap dan diisi migrasi 0004 (ADR-0034); kecamatan laporan
+ * dihitung dari batas ini dan titik di luar semua batas ditolak (FR-22).
+ */
+export const districts = pgTable(
+  "districts",
+  {
+    slug: varchar("slug", { length: 40 }).primaryKey(),
+    name: varchar("name", { length: 60 }).notNull().unique(),
+    city: varchar("city", { length: 60 }).notNull().default("Kota Bogor"),
+    boundary: multiPolygon("boundary"),
+  },
+  (t) => [index("districts_boundary_idx").using("gist", t.boundary)],
+);
 
 /** Lokasi yang sudah terbit. Status dan ringkasan disimpan untuk filter dan dihitung ulang setiap jawaban berubah. */
 export const places = pgTable(
@@ -185,6 +192,10 @@ export const reports = pgTable(
     status: reportStatus("status").notNull().default("menunggu"),
     submission: jsonb("submission").notNull(),
     location: geometry("location", { type: "point", mode: "xy", srid: 4326 }),
+    /** Kecamatan yang dihitung API dari `location` saat laporan dikirim (FR-22). */
+    districtSlug: varchar("district_slug", { length: 40 }).references(() => districts.slug),
+    /** Kunci acak dari draf di browser; kirim ulang dengan kunci yang sama mengembalikan laporan yang sudah ada (ADR-0033). */
+    submissionKey: uuid("submission_key"),
     rejectionReason: rejectionReason("rejection_reason"),
     clarificationQuestion: text("clarification_question"),
     clarificationDueAt: timestamp("clarification_due_at", { withTimezone: true }),
@@ -196,17 +207,23 @@ export const reports = pgTable(
     index("reports_queue_idx").on(t.status, t.submittedAt),
     index("reports_reporter_idx").on(t.reporterId),
     index("reports_place_idx").on(t.placeId),
+    uniqueIndex("reports_submission_key_idx").on(t.reporterId, t.submissionKey),
     check("reports_rejection_reason_matches_status", sql`(${t.status} = 'ditolak') = (${t.rejectionReason} IS NOT NULL)`),
     check("reports_existing_place_for_changes", sql`${t.kind} = 'baru' OR ${t.placeId} IS NOT NULL OR ${t.status} = 'ditolak'`),
   ],
 );
 
-/** Foto laporan (ADR-0023). `placeId` diisi saat laporan terbit; hanya foto `tayang` yang tampil di Detail. */
+/**
+ * Foto laporan (ADR-0023, ADR-0031). Foto yang baru diunggah belum punya laporan dan dicatat pengunggahnya; saat laporan
+ * dikirim, foto dipasang ke laporan dan pengunggahnya dikosongkan, jadi tepat satu dari keduanya terisi. `placeId` diisi
+ * saat laporan terbit; hanya foto `tayang` yang tampil di Detail.
+ */
 export const photos = pgTable(
   "photos",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    reportId: uuid("report_id").notNull().references(() => reports.id, { onDelete: "cascade" }),
+    reportId: uuid("report_id").references(() => reports.id, { onDelete: "cascade" }),
+    uploaderId: uuid("uploader_id").references(() => users.id, { onDelete: "cascade" }),
     placeId: uuid("place_id").references(() => places.id, { onDelete: "set null" }),
     storageKey: varchar("storage_key", { length: 200 }).notNull().unique(),
     tag: photoTag("tag").notNull().default("lainnya"),
@@ -218,7 +235,12 @@ export const photos = pgTable(
     moderation: photoModeration("moderation").notNull().default("menunggu"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("photos_place_idx").on(t.placeId), index("photos_report_idx").on(t.reportId)],
+  (t) => [
+    index("photos_place_idx").on(t.placeId),
+    index("photos_report_idx").on(t.reportId),
+    index("photos_uploader_idx").on(t.uploaderId),
+    check("photos_report_or_uploader", sql`(${t.reportId} IS NULL) = (${t.uploaderId} IS NOT NULL)`),
+  ],
 );
 
 /**
