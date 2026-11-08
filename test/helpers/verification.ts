@@ -22,11 +22,17 @@ export const env = loadEnv({
 /** Penyimpanan di memori; `failing` membuat operasi tertentu gagal. */
 export function memoryStore() {
   const files = new Map<string, { data: Uint8Array; contentType: string }>();
-  const failing = { put: false, remove: false };
+  const failing = { put: false, get: false, remove: false };
   const store: PhotoStore = {
     async put(key, data, contentType) {
       if (failing.put) throw new Error("R2 menjawab 500");
       files.set(key, { data, contentType });
+    },
+    async get(key) {
+      if (failing.get) throw new Error("R2 menjawab 500");
+      const file = files.get(key);
+      if (!file) throw new Error(`berkas ${key} tidak ada`);
+      return file.data;
     },
     async remove(key) {
       if (failing.remove) throw new Error("R2 menjawab 500");

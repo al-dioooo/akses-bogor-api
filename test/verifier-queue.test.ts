@@ -82,6 +82,48 @@ describe("GET /verifier/reports (FR-30)", () => {
   });
 });
 
+describe("GET /verifier/reports/:id (FR-31)", () => {
+  it("shows every answer, the photos, the point, and a status preview for a new place", async () => {
+    const res = await rig.app.inject({ method: "GET", url: `/verifier/reports/${newReport}`, headers: rig.as(verifier.token) });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body).toMatchObject({
+      id: newReport,
+      kind: "baru",
+      status: "menunggu",
+      reporterName: "Warga Bogor",
+      place: null,
+      submission: { name: "Masjid Al-Ikhlas contoh", location: { lat: -6.5976, lng: 106.7991 }, district: { slug: "bogor-tengah" }, status: { status: "belum_diketahui", relevant: 4, unknown: 4 } },
+      photos: [{ tag: "pintu_masuk", hidden: false, blur: [], clarificationId: null, width: 400, height: 300 }],
+      clarifications: [],
+    });
+    expect(body.submission.facilities.map((f: { facility: string }) => f.facility)).toEqual(["ramp", "toilet_difabel", "guiding_block", "lift"]);
+    expect(res.body).not.toContain("@contoh.id");
+    expect(res.headers["cache-control"]).toBe("no-store");
+  });
+
+  it("puts the current place data next to a change report", async () => {
+    const body = (await rig.app.inject({ method: "GET", url: `/verifier/reports/${deficiency}`, headers: rig.as(verifier.token) })).json();
+    const [halte] = await rig.db.select({ updatedAt: places.updatedAt }).from(places).where(eq(places.id, halteId));
+    expect(body.place).toMatchObject({
+      id: halteId,
+      version: halte!.updatedAt.toISOString(),
+      name: "Halte contoh",
+      status: { status: "sebagian" },
+      facilities: expect.arrayContaining([{ facility: "lift", answer: "tersedia", reason: null, note: null }]),
+    });
+    expect(body.submission.facilities[3]).toEqual({ facility: "lift", answer: "tidak_tersedia", reason: "rusak", note: "Rusak sejak awal November" });
+    expect(body.submission.status).toEqual({ status: "sebagian", available: 1, relevant: 3, unknown: 0 });
+  });
+
+  it("refuses a verifier's own report and unknown ids", async () => {
+    const own = await rig.app.inject({ method: "GET", url: `/verifier/reports/${ownReport}`, headers: rig.as(reportingVerifier.token) });
+    expect([own.statusCode, own.json().galat]).toEqual([403, "laporan_sendiri"]);
+    const missing = await rig.app.inject({ method: "GET", url: `/verifier/reports/${crypto.randomUUID()}`, headers: rig.as(verifier.token) });
+    expect([missing.statusCode, missing.json().galat]).toEqual([404, "laporan_tidak_ditemukan"]);
+  });
+});
+
 describe("GET /verifier/places/recheck (FR-38)", () => {
   it("lists places verified more than 12 months ago, oldest first", async () => {
     const old = await rig.placeId("Masjid contoh B");
