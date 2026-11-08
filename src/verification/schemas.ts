@@ -3,7 +3,7 @@ import { z } from "zod";
 import { facilityAnswer, facilityKind, photoTag, placeCategory, placeStatus, rejectionReason, reportKind, reportStatus, unavailableReason } from "../db/schema.js";
 import { photo as publishedPhoto } from "../places/schemas.js";
 import { MAX_BLUR_REGIONS } from "../photos/blur.js";
-import { line, nearbyPlace, paragraph } from "../reports/schemas.js";
+import { line, nearbyPlace, paragraph, point } from "../reports/schemas.js";
 import { VERIFIER_REASONS } from "./decide.js";
 
 const category = z.enum(placeCategory.enumValues);
@@ -77,6 +77,33 @@ export const clarifyBody = z.object({
   question: paragraph(1000).describe("Pertanyaan untuk pelapor, dikirim lewat email (FR-41)"),
   note: reviewerNote,
 });
+
+const publishFacility = z
+  .object({
+    facility: z.enum(facilityKind.enumValues),
+    answer: z.enum(facilityAnswer.enumValues),
+    reason: z.enum(unavailableReason.enumValues).nullable().describe("Wajib untuk Tidak tersedia yang terbukti (ADR-0022)"),
+    note: line(200).nullable().describe("Tampil di Detail; tanpa data pribadi"),
+    evidence: z.enum(["terbukti", "tanpa_bukti"]).describe("Tanpa bukti membuat jawabannya Belum tahu (ADR-0019)"),
+  })
+  .refine((f) => !f.reason || f.answer === "tidak_tersedia", { message: "Alasan hanya untuk Tidak tersedia", path: ["reason"] });
+
+export const publishBody = z
+  .object({
+    placeVersion: z.iso.datetime().optional().describe("`place.version` dari halaman pemeriksaan; wajib untuk perubahan dan kekurangan"),
+    name: line(120).optional().describe("Wajib untuk baru dan perubahan; diabaikan untuk kekurangan"),
+    category: z.enum(placeCategory.enumValues).optional().describe("Wajib untuk baru dan perubahan; diabaikan untuk kekurangan"),
+    location: point.optional().describe("Titik akhir; wajib untuk baru dan perubahan; diabaikan untuk kekurangan"),
+    landmark: line(140).nullable().optional().describe("Diabaikan untuk kekurangan"),
+    description: paragraph(1000).nullable().describe("Deskripsi yang tayang, setelah data pribadi dihapus"),
+    facilities: z
+      .array(publishFacility)
+      .length(4)
+      .refine((items) => new Set(items.map((f) => f.facility)).size === 4, "Setiap fasilitas diperiksa tepat sekali")
+      .describe("Keempat jawaban akhir, masing-masing terbukti atau tanpa bukti (FR-33)"),
+    note: reviewerNote,
+  })
+  .describe("Keputusan terbitkan");
 
 export const decision = z
   .object({
