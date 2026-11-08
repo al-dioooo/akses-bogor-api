@@ -89,7 +89,7 @@ Contoh lengkap ada di [.env.example](.env.example). Jangan commit `.env`.
 | `DATABASE_URL` | Ya | Koneksi PostgreSQL untuk aplikasi, `pnpm db:migrate`, dan `pnpm db:seed` |
 | `FRONTEND_ORIGINS` | Di production | Origin web yang boleh memanggil API, dipisah koma. Di luar production, `http://localhost:*` selalu diizinkan |
 | `PHOTO_PUBLIC_URL` | Tidak | Alamat publik bucket foto Cloudflare R2. Kosong berarti `url` foto di respons bernilai `null` |
-| `MAPBOX_SECRET_TOKEN` | Tidak | Token rahasia Mapbox (`sk.`) ber-scope `tokens:write`, `styles:read`, `styles:tiles`, dan `fonts:read`, untuk `GET /map/token` (ADR-0016). Diisi bersama `MAPBOX_USERNAME` |
+| `MAPBOX_SECRET_TOKEN` | Tidak | Token rahasia Mapbox (`sk.`) ber-scope `tokens:write`, `styles:read`, `styles:tiles`, dan `fonts:read`, untuk `GET /map/token` (ADR-0016) dan `POST /map/search` (ADR-0032). Diisi bersama `MAPBOX_USERNAME` |
 | `MAPBOX_USERNAME` | Tidak | Username akun Mapbox pemilik token rahasia |
 | `BETTER_AUTH_SECRET` | Di production | Rahasia Better Auth, minimal 32 karakter: tanda tangan token sesi dan kunci HMAC kode email (ADR-0029). Kosong di development berarti memakai rahasia tetap khusus lokal; kosong di production berarti route akun menjawab 503. Mengganti nilainya mengakhiri semua sesi |
 | `BETTER_AUTH_URL` | Di production | Alamat publik API |
@@ -108,6 +108,7 @@ Contoh lengkap ada di [.env.example](.env.example). Jangan commit `.env`.
 | `GET /places/stats` | Jumlah per kategori, pintu masuk tanpa tangga, dan kontributor | FR-01 |
 | `GET /places/{id}` | Detail: jawaban, alasan, catatan, ringkasan X dari Y, fasilitas penentu status, foto, `needsRecheck` | FR-06, FR-07, FR-38 |
 | `GET /map/token` | Token Mapbox sementara untuk peta di browser; 503 bila `MAPBOX_SECRET_TOKEN` belum diatur | FR-05 |
+| `POST /map/search` | Cari tempat untuk pemilih lokasi: lokasi AksesBogor bernama mirip, lalu Mapbox Search Box di sekitar Kota Bogor; 30 per menit per klien, 1.500 per hari; 503 bila `MAPBOX_SECRET_TOKEN` belum diatur | FR-21, ADR-0032 |
 | `POST /auth/code` | Kirim kode masuk 6 digit ke email | FR-10 |
 | `POST /auth/code/verify` | Masuk dengan email dan kode; membuat akun bila email belum terdaftar | FR-10 |
 | `POST /auth/google` | Masuk dengan ID token dari tombol Google Identity Services | FR-10 |

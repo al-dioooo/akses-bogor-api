@@ -15,6 +15,7 @@ import type { Env } from "./config/env.js";
 import { createDb, type Db } from "./db/client.js";
 import { logMailer, resendMailer, type Mailer } from "./email/mailer.js";
 import { HttpError } from "./http/errors.js";
+import { mapboxSearch } from "./map/search.js";
 import { mapTokenSource } from "./map/token.js";
 import { authRoutes } from "./routes/auth.js";
 import { districtRoutes } from "./routes/districts.js";
@@ -117,6 +118,7 @@ export async function buildApp(env: Env, deps: { db?: Db; now?: () => Date; fetc
   const { MAPBOX_SECRET_TOKEN: secretToken, MAPBOX_USERNAME: username } = env;
   await app.register(mapRoutes, {
     mapToken: secretToken && username ? mapTokenSource({ secretToken, username, now, fetch: deps.fetch }) : undefined,
+    search: secretToken ? mapboxSearch({ token: secretToken, now, fetch: deps.fetch }) : undefined,
   });
 
   // Akun (ADR-0029) dan email (ADR-0030).
