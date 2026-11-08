@@ -14,7 +14,7 @@ function html(paragraphs: string[]) {
   return `<!doctype html><html lang="id"><body style="font-family:Arial,sans-serif;font-size:16px;line-height:1.5;color:#12131a">${body}</body></html>`;
 }
 
-function email(to: string, subject: string, paragraphs: string[]): Email {
+export function email(to: string, subject: string, paragraphs: string[]): Email {
   return { to, subject, text: paragraphs.join("\n\n"), html: html(paragraphs) };
 }
 

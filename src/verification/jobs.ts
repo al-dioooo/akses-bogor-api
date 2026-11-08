@@ -1,10 +1,12 @@
-// Tugas berkala verifikasi (ADR-0036): laporan yang tidak dijawab sampai tenggat klarifikasi ditolak dengan R6.
+// Tugas berkala verifikasi (ADR-0036, ADR-0039): laporan yang tidak dijawab sampai tenggat klarifikasi ditolak dengan
+// R6, lalu email status yang tertunda dikirim atau dicoba ulang.
 // Berjalan saat server mulai lalu setiap jam, seperti pembersihan akun dan foto.
 import { and, eq, lte } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import { reports } from "../db/schema.js";
 import type { PhotoStore } from "../photos/storage.js";
 import { lockReport, rejectLocked, removeQueuedFiles } from "./decide.js";
+import { sendReportEmails, type EmailOptions } from "./emails.js";
 
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -35,11 +37,13 @@ export async function expireClarifications(db: Db, store: PhotoStore | undefined
 }
 
 /** Menjalankan tugas berkala saat server mulai lalu setiap jam. Mengembalikan fungsi untuk menghentikannya. */
-export function scheduleVerificationJobs(db: Db, store: PhotoStore | undefined, now: () => Date, log: Log) {
+export function scheduleVerificationJobs(db: Db, store: PhotoStore | undefined, email: EmailOptions, now: () => Date, log: Log) {
   const run = async () => {
     try {
       const expired = await expireClarifications(db, store, now(), log);
       if (expired > 0) log.info({ expired }, "laporan ditolak karena klarifikasi tidak dijawab");
+      const emails = await sendReportEmails(db, email, now(), { log });
+      if (emails.sent + emails.failed + emails.dropped > 0) log.info(emails, "email status laporan");
     } catch (error) {
       log.warn({ err: error }, "tugas berkala verifikasi gagal");
     }

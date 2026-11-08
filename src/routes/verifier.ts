@@ -6,6 +6,7 @@ import { HttpError, errorSchema } from "../http/errors.js";
 import { blurPhoto } from "../photos/blur.js";
 import type { PhotoStore } from "../photos/storage.js";
 import { rejectReport, requestClarification } from "../verification/decide.js";
+import { sendReportEmails, type EmailOptions } from "../verification/emails.js";
 import { publishReport } from "../verification/publish.js";
 import { moderatePhoto, photoForReview } from "../verification/photos.js";
 import { getReview, listQueue, listRecheck } from "../verification/queue.js";
@@ -17,6 +18,8 @@ export type VerifierRouteOptions = {
   photoBaseUrl?: string;
   /** R2 atau folder lokal; kosong di production tanpa R2. */
   store?: PhotoStore;
+  /** Pengirim dan alamat web untuk email status laporan (ADR-0039). */
+  email: EmailOptions;
   now: () => Date;
 };
 
@@ -32,6 +35,14 @@ export const verifierRoutes: FastifyPluginAsyncZod<VerifierRouteOptions> = async
     return requireVerifier(opts.auth, app.db, request, opts.now);
   };
   const guarded = { 401: errorSchema, 403: errorSchema, 503: errorSchema };
+  /** Mengirim email keputusan setelah transaksi selesai; yang gagal dicoba lagi tugas berkala (ADR-0039). */
+  const notify = async (request: FastifyRequest, reportId: string) => {
+    try {
+      await sendReportEmails(app.db, opts.email, opts.now(), { reportId, log: request.log });
+    } catch (error) {
+      request.log.warn({ err: error, reportId }, "email status laporan gagal dikirim");
+    }
+  };
 
   app.get(
     "/verifier/reports",
@@ -137,6 +148,7 @@ export const verifierRoutes: FastifyPluginAsyncZod<VerifierRouteOptions> = async
     async (request) => {
       const user = await verifier(request);
       const result = await publishReport(app.db, opts.store, user.id, request.params.id, request.body, opts.now(), request.log);
+      await notify(request, request.params.id);
       return { status: "diterbitkan" as const, placeId: result.placeId };
     },
   );
@@ -157,6 +169,7 @@ export const verifierRoutes: FastifyPluginAsyncZod<VerifierRouteOptions> = async
     async (request) => {
       const user = await verifier(request);
       await rejectReport(app.db, opts.store, user.id, request.params.id, request.body, opts.now());
+      await notify(request, request.params.id);
       return { status: "ditolak" as const, rejectionReason: request.body.reason };
     },
   );
@@ -177,6 +190,7 @@ export const verifierRoutes: FastifyPluginAsyncZod<VerifierRouteOptions> = async
     async (request) => {
       const user = await verifier(request);
       const result = await requestClarification(app.db, user.id, request.params.id, request.body, opts.now());
+      await notify(request, request.params.id);
       return { status: result.status, clarificationDueAt: result.dueAt };
     },
   );
