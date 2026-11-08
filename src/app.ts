@@ -9,13 +9,30 @@ import {
   validatorCompiler,
   type ZodTypeProvider,
 } from "fastify-type-provider-zod";
+import { createAuth } from "./auth/auth.js";
+import { scheduleCleanup } from "./auth/cleanup.js";
 import type { Env } from "./config/env.js";
 import { createDb, type Db } from "./db/client.js";
+import { logMailer, resendMailer, type Mailer } from "./email/mailer.js";
 import { HttpError } from "./http/errors.js";
 import { createRateLimitKey, WEB_SERVER_SECRET_HEADER } from "./http/rate-limit.js";
+import { mapboxSearch } from "./map/search.js";
+import { mapTokenSource } from "./map/token.js";
+import { schedulePhotoCleanup } from "./photos/cleanup.js";
+import { scheduleVerificationJobs } from "./verification/jobs.js";
+import { localStore, r2Store, type PhotoStore } from "./photos/storage.js";
+import { adminRoutes } from "./routes/admin.js";
+import { authRoutes } from "./routes/auth.js";
 import { districtRoutes } from "./routes/districts.js";
 import { healthRoutes } from "./routes/health.js";
+import { mapRoutes } from "./routes/map.js";
+import { meRoutes } from "./routes/me.js";
 import { placeRoutes } from "./routes/places.js";
+import { reportRoutes } from "./routes/reports.js";
+import { verifierRoutes } from "./routes/verifier.js";
+
+// Hanya untuk pengembangan lokal tanpa BETTER_AUTH_SECRET. Production tanpa secret mematikan route akun (503).
+const DEVELOPMENT_AUTH_SECRET = "rahasia-pengembangan-lokal-aksesbogor-jangan-dipakai-di-production";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -23,8 +40,12 @@ declare module "fastify" {
   }
 }
 
-/** `deps` dipakai tes: `db` (PGlite) dan `now` (jam tetap). Tanpa `db`, aplikasi membuka pool ke `DATABASE_URL`. */
-export async function buildApp(env: Env, deps: { db?: Db; now?: () => Date } = {}) {
+/**
+ * `deps` dipakai tes: `db` (PGlite), `now` (jam tetap), `fetch` (Mapbox tiruan), `mailer` (email ditampung), dan
+ * `photoStore` (penyimpanan foto tiruan). Tanpa `db`, aplikasi membuka pool ke `DATABASE_URL`.
+ */
+export async function buildApp(env: Env, deps: { db?: Db; now?: () => Date; fetch?: typeof fetch; mailer?: Mailer; photoStore?: PhotoStore } = {}) {
+  const now = deps.now ?? (() => new Date());
   const app = Fastify({
     logger:
       env.NODE_ENV === "test"
@@ -100,7 +121,59 @@ export async function buildApp(env: Env, deps: { db?: Db; now?: () => Date } = {
   app.get("/openapi.json", { schema: { hide: true } }, async () => app.swagger());
   await app.register(healthRoutes);
   await app.register(districtRoutes);
-  await app.register(placeRoutes, { photoBaseUrl: env.PHOTO_PUBLIC_URL, now: deps.now ?? (() => new Date()) });
+  await app.register(placeRoutes, { photoBaseUrl: env.PHOTO_PUBLIC_URL, now });
+  const { MAPBOX_SECRET_TOKEN: secretToken, MAPBOX_USERNAME: username } = env;
+  await app.register(mapRoutes, {
+    mapToken: secretToken && username ? mapTokenSource({ secretToken, username, now, fetch: deps.fetch }) : undefined,
+    search: secretToken ? mapboxSearch({ token: secretToken, now, fetch: deps.fetch }) : undefined,
+  });
+
+  // Akun (ADR-0029) dan email (ADR-0030).
+  const development = env.NODE_ENV === "development";
+  const mailer =
+    deps.mailer ??
+    (env.RESEND_API_KEY && env.EMAIL_FROM
+      ? resendMailer({ apiKey: env.RESEND_API_KEY, from: env.EMAIL_FROM })
+      : development
+        ? logMailer((message) => app.log.info(message))
+        : undefined);
+  const authSecret = env.BETTER_AUTH_SECRET ?? (development ? DEVELOPMENT_AUTH_SECRET : undefined);
+  const auth = authSecret
+    ? createAuth({
+        db: app.db,
+        secret: authSecret,
+        baseURL: env.BETTER_AUTH_URL ?? `http://localhost:${env.PORT}`,
+        googleClientId: env.GOOGLE_CLIENT_ID,
+      })
+    : undefined;
+  await app.register(authRoutes, { auth, mailer, googleEnabled: Boolean(env.GOOGLE_CLIENT_ID), now });
+  await app.register(meRoutes, { auth, mailer, now });
+  await app.register(adminRoutes, { auth, now });
+  // Foto laporan (ADR-0031): R2 bila diatur, folder lokal di development, dan tidak ada di production tanpa R2.
+  const { R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_LAPORAN, R2_BUCKET_PUBLIK } = env;
+  const photoStore =
+    deps.photoStore ??
+    (R2_ACCOUNT_ID && R2_ACCESS_KEY_ID && R2_SECRET_ACCESS_KEY && R2_BUCKET_LAPORAN && R2_BUCKET_PUBLIK
+      ? r2Store({ accountId: R2_ACCOUNT_ID, accessKeyId: R2_ACCESS_KEY_ID, secretAccessKey: R2_SECRET_ACCESS_KEY, privateBucket: R2_BUCKET_LAPORAN, publicBucket: R2_BUCKET_PUBLIK })
+      : development
+        ? localStore(env.PHOTO_STORAGE_DIR ?? ".data/foto")
+        : undefined);
+  await app.register(reportRoutes, { auth, store: photoStore, now });
+  // Tautan di email status laporan memakai origin web pertama (ADR-0039).
+  const reportEmail = { mailer, webUrl: env.FRONTEND_ORIGINS[0] ?? "http://localhost:3000" };
+  await app.register(verifierRoutes, { auth, photoBaseUrl: env.PHOTO_PUBLIC_URL, store: photoStore, email: reportEmail, now });
+  if (env.NODE_ENV !== "test") {
+    const stop = schedulePhotoCleanup(app.db, photoStore, now, app.log);
+    app.addHook("onClose", async () => stop());
+  }
+  if (env.NODE_ENV !== "test") {
+    const stop = scheduleVerificationJobs(app.db, photoStore, reportEmail, now, app.log);
+    app.addHook("onClose", async () => stop());
+  }
+  if (auth && env.NODE_ENV !== "test") {
+    const stop = scheduleCleanup(app.db, now, app.log);
+    app.addHook("onClose", async () => stop());
+  }
 
   return app;
 }

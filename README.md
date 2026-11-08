@@ -8,7 +8,7 @@ Keputusan produk dan teknis ada di [akses-bogor-docs](https://github.com/al-dioo
 
 | Bagian | Pilihan |
 | --- | --- |
-| Runtime | Node.js 22 LTS di CI, Node.js 24 LTS di produksi |
+| Runtime | Node.js 24 LTS di CI, lokal, dan produksi |
 | Framework | Fastify 5, TypeScript 6 |
 | Validasi dan API spec | Zod lewat `fastify-type-provider-zod`, OpenAPI dari `@fastify/swagger` |
 | Database | PostgreSQL 17 + PostGIS dan `pg_trgm`, Drizzle ORM |
@@ -19,7 +19,7 @@ Alasan pilihan ini ada di [ADR-0013](https://github.com/al-dioooo/akses-bogor-do
 
 ## Menjalankan di Lokal
 
-Butuh Node.js 22 atau lebih baru, pnpm 12 (`corepack enable` memakai versi di `package.json`), dan PostgreSQL 17 dengan PostGIS (lihat [Database](#database)).
+Butuh Node.js 24 atau lebih baru, pnpm 12 (`corepack enable` memakai versi di `package.json`), dan PostgreSQL 17 dengan PostGIS (lihat [Database](#database)).
 
 ```bash
 pnpm install
@@ -40,7 +40,8 @@ pnpm dev               # http://localhost:8080/healthz
 | `pnpm openapi` | Menulis ulang `docs/openapi.json` dari skema route |
 | `pnpm db:generate` | Membuat migrasi Drizzle dari `src/db/schema.ts` |
 | `pnpm db:migrate` | Menjalankan migrasi ke database di `DATABASE_URL` |
-| `pnpm db:seed` | Mengosongkan data lokasi dan laporan, lalu mengisi enam kecamatan dan tujuh lokasi contoh; ditolak di production |
+| `pnpm db:seed` | Mengosongkan data lokasi dan laporan, lalu mengisi tujuh lokasi contoh; kecamatan dan batasnya tidak dihapus; ditolak di production |
+| `pnpm peran --email <email> --peran <admin\|verifikator\|pengguna>` | Mengganti peran akun yang sudah dilengkapi, mis. membuat admin pertama; dicatat di log audit sebagai `skrip` (ADR-0035) |
 
 ## Database
 
@@ -60,6 +61,23 @@ sudo -u postgres createdb --owner aksesbogor aksesbogor
 sudo -u postgres psql -d aksesbogor -c 'CREATE EXTENSION IF NOT EXISTS postgis'
 ```
 
+### Batas Kecamatan
+
+Kecamatan laporan dihitung dari batas enam kecamatan di `districts.boundary` (FR-22, ADR-0034). Batasnya diisi migrasi `drizzle/0004_laporkan.sql`.
+
+- Sumber: OpenStreetMap, relasi 14745927 (Kota Bogor) dan relasi `admin_level=6` di dalamnya, diunduh 2026-11-07. Batas kecamatan © kontributor OpenStreetMap, berlisensi [ODbL](https://opendatacommons.org/licenses/odbl/); data batas di repo ini tetap berlisensi ODbL.
+- Kueri Overpass yang dipakai:
+
+  ```text
+  [out:json][timeout:120];
+  rel(14745927)->.kota;.kota out geom;
+  .kota map_to_area->.a;
+  rel(area.a)["boundary"="administrative"]["admin_level"="6"];out geom;
+  ```
+
+- Poligon dibangun dari garis anggota setiap relasi dengan `ST_MakeValid(ST_BuildArea(ST_Collect(...)))`, tanpa penyederhanaan, lalu ditulis dengan `ST_AsText(..., 6)`. Sebelum dipakai, periksa bahwa keenam poligon valid, tidak saling bertumpuk, dan gabungannya sama dengan batas kota.
+- Untuk memperbarui, buat migrasi baru yang menimpa `boundary` dengan `ON CONFLICT ("slug") DO UPDATE`, dan bandingkan dulu dengan batas lama.
+
 ## Environment Variables
 
 Contoh lengkap ada di [.env.example](.env.example). Jangan commit `.env`.
@@ -70,8 +88,20 @@ Contoh lengkap ada di [.env.example](.env.example). Jangan commit `.env`.
 | `PORT` | Tidak | Port server, bawaan `8080` |
 | `HOST` | Tidak | Alamat bind, bawaan `0.0.0.0` |
 | `DATABASE_URL` | Ya | Koneksi PostgreSQL untuk aplikasi, `pnpm db:migrate`, dan `pnpm db:seed` |
-| `FRONTEND_ORIGINS` | Di production | Origin web yang boleh memanggil API, dipisah koma. Di luar production, `http://localhost:*` selalu diizinkan |
+| `FRONTEND_ORIGINS` | Di production | Origin web yang boleh memanggil API, dipisah koma. Origin pertama juga menjadi alamat tautan di email status laporan. Di luar production, `http://localhost:*` selalu diizinkan |
 | `PHOTO_PUBLIC_URL` | Tidak | Alamat publik bucket foto Cloudflare R2. Kosong berarti `url` foto di respons bernilai `null` |
+| `MAPBOX_SECRET_TOKEN` | Tidak | Token rahasia Mapbox (`sk.`) ber-scope `tokens:write`, `styles:read`, `styles:tiles`, dan `fonts:read`, untuk `GET /map/token` (ADR-0016) dan `POST /map/search` (ADR-0032). Diisi bersama `MAPBOX_USERNAME` |
+| `MAPBOX_USERNAME` | Tidak | Username akun Mapbox pemilik token rahasia |
+| `BETTER_AUTH_SECRET` | Di production | Rahasia Better Auth, minimal 32 karakter: tanda tangan token sesi dan kunci HMAC kode email (ADR-0029). Kosong di development berarti memakai rahasia tetap khusus lokal; kosong di production berarti route akun menjawab 503. Mengganti nilainya mengakhiri semua sesi |
+| `BETTER_AUTH_URL` | Di production | Alamat publik API |
+| `GOOGLE_CLIENT_ID` | Tidak | Client ID OAuth Google untuk memeriksa ID token dari tombol Google. Kosong berarti masuk dengan Google mati |
+| `RESEND_API_KEY` | Di production | API key Resend untuk email kode dan konfirmasi akun dihapus (ADR-0030). Kosong di development berarti email dicetak ke log API |
+| `EMAIL_FROM` | Bersama `RESEND_API_KEY` | Pengirim pada domain yang sudah diverifikasi di Resend, mis. `AksesBogor <masuk@kirim.contoh.id>` |
+| `R2_ACCOUNT_ID` | Untuk foto di production | ID akun Cloudflare (32 karakter heksadesimal) untuk endpoint R2 (ADR-0031). Kelima variabel R2 diisi bersama |
+| `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | Untuk foto di production | Token R2 ber-izin "Object Read & Write" untuk dua bucket foto saja. Rahasia |
+| `R2_BUCKET_LAPORAN` | Untuk foto di production | Bucket privat untuk foto laporan yang belum terbit |
+| `R2_BUCKET_PUBLIK` | Untuk foto di production | Bucket publik di balik `PHOTO_PUBLIC_URL` untuk foto yang sudah terbit |
+| `PHOTO_STORAGE_DIR` | Tidak | Folder foto di development tanpa R2, bawaan `.data/foto`. Di production tanpa R2, unggah foto menjawab 503 |
 | `WEB_SERVER_SECRET` | Di production | Rahasia bersama dengan server Next.js, minimal 32 karakter. Bila cocok, rate limit dihitung per IP pengunjung yang dikirim web, bukan per IP Vercel |
 
 ## Endpoint
@@ -84,6 +114,37 @@ Contoh lengkap ada di [.env.example](.env.example). Jangan commit `.env`.
 | `GET /places/map` | GeoJSON untuk Mapbox dengan filter yang sama dan `bbox` | FR-05 |
 | `GET /places/stats` | Jumlah per kategori, pintu masuk tanpa tangga, dan kontributor | FR-01 |
 | `GET /places/{id}` | Detail: jawaban, alasan, catatan, ringkasan X dari Y, fasilitas penentu status, foto, `needsRecheck` | FR-06, FR-07, FR-38 |
+| `GET /map/token` | Token Mapbox sementara untuk peta di browser; 503 bila `MAPBOX_SECRET_TOKEN` belum diatur | FR-05 |
+| `POST /map/search` | Cari tempat untuk pemilih lokasi: lokasi AksesBogor bernama mirip, lalu Mapbox Search Box di sekitar Kota Bogor; 30 per menit per klien, 1.500 per hari; 503 bila `MAPBOX_SECRET_TOKEN` belum diatur | FR-21, ADR-0032 |
+| `POST /auth/code` | Kirim kode masuk 6 digit ke email | FR-10 |
+| `POST /auth/code/verify` | Masuk dengan email dan kode; membuat akun bila email belum terdaftar | FR-10 |
+| `POST /auth/google` | Masuk dengan ID token dari tombol Google Identity Services | FR-10 |
+| `POST /auth/logout` | Keluar: mencabut sesi | FR-10 |
+| `GET /me` | Akun yang sedang masuk, dengan `needsCompletion` untuk Lengkapi Akun | FR-11, FR-12 |
+| `POST /me/complete` | Lengkapi Akun: nama tampilan dan persetujuan Kebijakan Privasi beserta versinya | FR-11, FR-12 |
+| `PATCH /me` | Ubah nama tampilan | FR-12 |
+| `GET /me/reports` | Laporan saya dengan status, alasan penolakan, dan pertanyaan klarifikasi | FR-14 |
+| `GET /me/reports/{id}` | Satu laporan saya dengan pertanyaan dan jawaban klarifikasi | FR-14, FR-41 |
+| `POST /me/reports/{id}/clarification` | Jawab klarifikasi sekali sebelum tenggat, dengan teks dan foto baru (total paling banyak 10); laporan kembali ke antrean di posisi aslinya | FR-41, ADR-0036 |
+| `DELETE /me` | Hapus akun: data pribadi dan laporan yang belum terbit hilang, laporan terbit tetap tanpa pelapor | FR-13 |
+| `POST /reports/location-check` | Kecamatan dari titik, penolakan titik di luar Kota Bogor, dan lokasi terbit bernama mirip dalam radius sekitar 50 m; tanpa akun | FR-22, FR-23 |
+| `POST /reports/photos` | Unggah satu foto mentah (JPEG, PNG, WebP, ≤3 MB); disimpan sebagai WebP ≤2048 px tanpa metadata di bucket privat sampai dipasang ke laporan; 100 per akun per jam | FR-25, ADR-0031 |
+| `GET /admin/team` | Tim verifikasi (verifikator dan admin) dengan email; khusus admin | FR-36 |
+| `POST /admin/team` | Jadikan verifikator akun yang sudah dilengkapi, dengan email yang tepat; khusus admin | FR-36 |
+| `DELETE /admin/team/{userId}` | Cabut peran verifikator; peran admin hanya lewat `pnpm peran` | FR-36 |
+| `GET /verifier/reports` | Antrean verifikasi terlama dulu, atau `status=klarifikasi` untuk yang menunggu jawaban pelapor; tanpa laporan sendiri; khusus verifikator dan admin | FR-30, FR-37 |
+| `GET /verifier/reports/{id}` | Isian, foto, titik, klarifikasi, data lokasi saat ini, dan lokasi mirip untuk dibandingkan; laporan sendiri 403 | FR-31, FR-37 |
+| `GET /verifier/photos/{id}` | Foto laporan yang belum terbit dari bucket privat, `?versi=kabur` untuk pratinjau area kabur; `Cache-Control: private, no-store` | FR-34, ADR-0031, ADR-0037 |
+| `PATCH /verifier/reports/{id}/photos/{photoId}` | Moderasi foto sebelum keputusan: tag, keterangan, sembunyikan, area kabur | FR-34, ADR-0037 |
+| `POST /verifier/reports/{id}/publish` | Terbitkan: lokasi baru, atau lokasi yang sama diperbarui untuk perubahan dan kekurangan; jawaban tanpa bukti menjadi Belum tahu; status dihitung; foto disalin ke bucket publik dengan area kabur; email ke pelapor | FR-27, FR-32, FR-33, FR-40 |
+| `POST /verifier/reports/{id}/clarify` | Minta klarifikasi dengan tenggat 7 × 24 jam; email ke pelapor | FR-32, FR-41 |
+| `POST /verifier/reports/{id}/reject` | Tolak dengan alasan R1–R5; foto laporan dihapus; email ke pelapor | FR-32, FR-40 |
+| `GET /verifier/places/recheck` | Lokasi yang terakhir diverifikasi lebih dari 12 bulan lalu, terlama dulu | FR-38 |
+| `POST /reports` | Kirim laporan baru, perubahan, atau kekurangan ke antrean verifikasi dengan foto yang sudah diunggah; kecamatan dihitung ulang; kunci draf mencegah laporan ganda; 20 laporan per 24 jam dan 30 laporan menunggu per akun | FR-20 sampai FR-27 |
+
+Route akun dipanggil server Next.js, bukan browser. Masuk menjawab token sesi bertanda tangan; web menyimpannya di cookie `HttpOnly` miliknya dan mengirimnya balik sebagai `Authorization: Bearer` (ADR-0029). Batas kode: 60 detik dan 5 kode per email per jam, 10 permintaan dan 30 percobaan kode per klien per 15 menit. Sesi berakhir 30 hari setelah terakhir dipakai, atau 90 hari setelah masuk. Setiap jam API menghapus akun yang tidak dilengkapi dalam 24 jam (dan tidak punya laporan), sesi kedaluwarsa, dan kode kedaluwarsa. Saat akun dihapus, berkas foto yang ikut terhapus, termasuk unggahan yang belum dipasang ke laporan, dicatat di tabel `photo_deletions`. Setiap jam API memindahkan unggahan yang tidak dipasang dalam 24 jam ke antrean itu, lalu menghapus berkas di antrean dari R2 (`src/photos/cleanup.ts`); berkas yang gagal dihapus dicoba lagi jam berikutnya. Di development tanpa `RESEND_API_KEY`, kode masuk dicetak ke log API.
+
+Panel verifikator (ADR-0035 sampai ADR-0037) membaca dan memutuskan laporan lewat route `/verifier/*`, semuanya khusus verifikator dan admin, tanpa laporan sendiri, dan hanya dengan nama tampilan pelapor. Setiap keputusan mengunci baris laporan, jadi keputusan kedua menjawab 409. Terbitkan menyalin foto yang tidak disembunyikan dari bucket privat ke `lokasi/<id lokasi>/<id foto>.webp` di bucket publik, dengan area kabur dari `src/photos/blur.ts`, lalu menghapus berkas asli; foto laporan yang ditolak ikut dihapus. Perubahan data dicatat di `audit_log` tanpa data pribadi (ADR-0038). Setiap jam API juga menolak laporan klarifikasi yang tidak dijawab sampai tenggat 7 × 24 jam dengan alasan R6 (`src/verification/jobs.ts`); tidak ada timer systemd tambahan. Email status laporan (diterbitkan, ditolak, klarifikasi) diantrekan di `report_emails` bersama keputusannya, dikirim setelah transaksi selesai, dan yang gagal dicoba lagi setiap jam selama 3 hari (ADR-0039). Tautannya memakai origin pertama di `FRONTEND_ORIGINS`.
 
 Status lokasi dan ringkasannya dihitung dengan aturan "pintu masuk dulu" di `src/domain/status.ts` (ADR-0018) dan disimpan di tabel `places`; panggil `refreshPlaceStatus` setiap kali jawaban fasilitas berubah. Respons memakai nilai enum produk (mis. `sebagian`, `tidak_tersedia`); teks untuk pengguna disusun di web.
 
@@ -169,6 +230,17 @@ sudo systemctl enable --now akses-bogor-api akses-bogor-deploy.timer akses-bogor
 ```
 
 Terakhir, tambahkan public hostname `akses-bogor-api.yorhagarden.xyz` di tunnel Evergarden (Zero Trust → Networks → Tunnels), dengan service `http://127.0.0.1:8090`. Hostname lain di tunnel itu jangan diubah.
+
+### Peran
+
+Admin pertama dibuat dengan skrip, karena tidak ada route API yang bisa membuat admin (ADR-0035). Akunnya harus sudah masuk dan melengkapi nama tampilan di web. Lalu, di Evergarden:
+
+```bash
+sudo -u aksesbogor -H sh -c 'cd /srv/akses-bogor/current && COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
+  corepack pnpm exec tsx --env-file=/etc/akses-bogor/api.env scripts/peran.ts --email <email> --peran admin'
+```
+
+Admin kemudian memberi dan mencabut peran verifikator di halaman Tim verifikator di web. Perintah yang sama dengan `--peran pengguna` mencabut peran admin.
 
 ### Data Preview
 

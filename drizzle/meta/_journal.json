@@ -15,6 +15,34 @@
       "when": 1792998964802,
       "tag": "0001_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794084318555,
+      "tag": "0002_akun",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794085114786,
+      "tag": "0003_hapus_foto",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794090668071,
+      "tag": "0004_laporkan",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794109794241,
+      "tag": "0005_verifikasi",
+      "breakpoints": true
     }
   ]
 }

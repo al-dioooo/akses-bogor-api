@@ -1,5 +1,5 @@
 // Query baca lokasi. Semua hanya membaca lokasi yang sudah terbit (tabel `places`) dan foto yang lolos moderasi.
-import { and, asc, count, countDistinct, eq, exists, ilike, inArray, isNotNull, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, countDistinct, eq, exists, ilike, inArray, isNotNull, or, sql, type SQL } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import { districts, photos, placeFacilities, places, reports } from "../db/schema.js";
 import { computeStatus } from "../domain/status.js";
@@ -12,8 +12,8 @@ export interface ReadOptions {
 
 type PhotoRow = { id: string; storageKey: string; altText: string; caption: string | null; tag: (typeof photos.tag.enumValues)[number] };
 
-const photoUrl = (key: string, base?: string) => (base ? `${base.replace(/\/+$/, "")}/${key.split("/").map(encodeURIComponent).join("/")}` : null);
-const toPhoto = (p: PhotoRow, base?: string) => ({ id: p.id, url: photoUrl(p.storageKey, base), alt: p.altText, caption: p.caption, tag: p.tag });
+export const photoUrl = (key: string, base?: string) => (base ? `${base.replace(/\/+$/, "")}/${key.split("/").map(encodeURIComponent).join("/")}` : null);
+export const toPhoto = (p: PhotoRow, base?: string) => ({ id: p.id, url: photoUrl(p.storageKey, base), alt: p.altText, caption: p.caption, tag: p.tag });
 const escapeLike = (value: string) => value.replace(/[\\%_]/g, (c) => `\\${c}`);
 
 function filterConditions(f: PlaceFilters, bbox?: [number, number, number, number]): SQL | undefined {
@@ -61,7 +61,7 @@ const toSummary = (r: SummaryRow) => ({
   lastVerifiedAt: r.lastVerifiedAt.toISOString(),
 });
 
-const publishedPhotosOf = (db: Db, placeIds: string[]) =>
+export const publishedPhotosOf = (db: Db, placeIds: string[]) =>
   db
     .select({ placeId: photos.placeId, id: photos.id, storageKey: photos.storageKey, altText: photos.altText, caption: photos.caption, tag: photos.tag })
     .from(photos)
@@ -167,4 +167,31 @@ export async function listDistricts(db: Db) {
     .leftJoin(places, eq(places.districtSlug, districts.slug))
     .groupBy(districts.slug)
     .orderBy(asc(districts.name));
+}
+
+/**
+ * Lokasi terbit yang namanya mirip kata kunci, paling mirip dulu, untuk ditampilkan sebelum hasil Mapbox di pencarian
+ * formulir laporan (ADR-0032). Membantu pelapor menemukan lokasi yang sudah ada (FR-23).
+ */
+export async function placesNamed(db: Db, query: string, limit = 3) {
+  const q = query.toLowerCase();
+  const score = sql<number>`similarity(lower(${places.name}), ${q})`;
+  // Setiap kata kunci ada di nama, atau namanya sangat mirip (salah ketik).
+  const words = q.split(/\s+/).filter(Boolean);
+  const allWords = and(...words.map((word) => sql`strpos(lower(${places.name}), ${word}) > 0`));
+  const rows = await db
+    .select({ id: places.id, name: places.name, category: places.category, status: places.status, districtSlug: places.districtSlug, districtName: districts.name, location: places.location })
+    .from(places)
+    .innerJoin(districts, eq(districts.slug, places.districtSlug))
+    .where(or(allWords, sql`${score} >= 0.5`))
+    .orderBy(sql`${score} DESC`, asc(places.name))
+    .limit(limit);
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    category: r.category,
+    status: r.status,
+    district: { slug: r.districtSlug, name: r.districtName },
+    location: { lat: r.location.y, lng: r.location.x },
+  }));
 }
