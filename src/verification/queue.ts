@@ -1,9 +1,12 @@
-// Bacaan panel verifikator (FR-30, FR-37, FR-38). Laporan milik verifikator itu sendiri tidak pernah dikembalikan,
+// Bacaan panel verifikator (FR-30, FR-31, FR-37, FR-38). Laporan milik verifikator itu sendiri tidak pernah dikembalikan,
 // dan pelapor hanya disebut dengan nama tampilannya.
 import { and, asc, count, eq, inArray, isNull, lt, ne, or, sql } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import { districts, photos, placeFacilities, places, reportClarifications, reports, users } from "../db/schema.js";
-import type { FacilityAnswer } from "../domain/status.js";
+import { computeStatus, FACILITIES, type FacilityAnswer } from "../domain/status.js";
+import { HttpError } from "../http/errors.js";
+import { publishedPhotosOf, toPhoto, type ReadOptions } from "../places/queries.js";
+import { nearbyPlaces } from "../reports/location.js";
 
 /** Isian laporan yang disimpan `submitReport` di `reports.submission` (versi 1). */
 export type Submission = {
@@ -17,6 +20,18 @@ export type Submission = {
 
 const iso = (value: Date) => new Date(value).toISOString();
 const isoOrNull = (value: Date | null) => (value ? iso(value) : null);
+
+/** Jawaban urut ramp, toilet, guiding block, lift; yang tidak ada dianggap Belum tahu. */
+export const orderedFacilities = (items: readonly (FacilityAnswer & { note?: string | null })[]) =>
+  FACILITIES.map((facility) => {
+    const found = items.find((f) => f.facility === facility);
+    return { facility, answer: found?.answer ?? "belum_tahu", reason: found?.reason ?? null, note: found?.note ?? null };
+  });
+
+const preview = (items: readonly FacilityAnswer[]) => {
+  const { status, available, relevant, unknown } = computeStatus(items);
+  return { status, available, relevant, unknown };
+};
 
 /** Bukan laporan milik `viewerId` (FR-37). Laporan tanpa pelapor (akun dihapus) tetap boleh. */
 const notOwnedBy = (viewerId: string) => or(isNull(reports.reporterId), ne(reports.reporterId, viewerId));
@@ -82,6 +97,138 @@ export async function listQueue(db: Db, viewerId: string, status: "menunggu" | "
         worsens: worsens(r.placeId, submission),
       };
     }),
+  };
+}
+
+export const ownReport = () => new HttpError(403, "laporan_sendiri", "Anda tidak bisa memeriksa laporan Anda sendiri. Biarkan verifikator lain yang memeriksanya.");
+export const reportNotFound = () => new HttpError(404, "laporan_tidak_ditemukan", "Laporan ini tidak ditemukan. Mungkin pelapornya sudah menghapus akun.");
+
+/** Laporan lengkap untuk halaman pemeriksaan (FR-31), dengan data lokasi saat ini untuk dibandingkan. */
+export async function getReview(db: Db, viewerId: string, id: string, opts: ReadOptions = {}) {
+  const [row] = await db
+    .select({
+      id: reports.id,
+      kind: reports.kind,
+      status: reports.status,
+      reporterId: reports.reporterId,
+      reporterName: users.displayName,
+      placeId: reports.placeId,
+      submission: reports.submission,
+      location: reports.location,
+      districtSlug: districts.slug,
+      districtName: districts.name,
+      submittedAt: reports.submittedAt,
+      decidedAt: reports.decidedAt,
+      rejectionReason: reports.rejectionReason,
+      reviewerNote: reports.reviewerNote,
+    })
+    .from(reports)
+    .innerJoin(districts, eq(districts.slug, reports.districtSlug))
+    .leftJoin(users, eq(users.id, reports.reporterId))
+    .where(eq(reports.id, id));
+  if (!row) throw reportNotFound();
+  if (row.reporterId === viewerId) throw ownReport();
+
+  const submission = row.submission as Submission;
+  const point = { lat: row.location!.y, lng: row.location!.x };
+  const [reportPhotos, clarifications, place, nearby] = await Promise.all([
+    db
+      .select({
+        id: photos.id,
+        tag: photos.tag,
+        caption: photos.caption,
+        alt: photos.altText,
+        width: photos.width,
+        height: photos.height,
+        moderation: photos.moderation,
+        blur: photos.blurRegions,
+        clarificationId: photos.clarificationId,
+      })
+      .from(photos)
+      .where(eq(photos.reportId, id))
+      .orderBy(asc(photos.createdAt), asc(photos.id)),
+    db
+      .select({
+        id: reportClarifications.id,
+        question: reportClarifications.question,
+        askedAt: reportClarifications.askedAt,
+        dueAt: reportClarifications.dueAt,
+        answer: reportClarifications.answer,
+        answeredAt: reportClarifications.answeredAt,
+      })
+      .from(reportClarifications)
+      .where(eq(reportClarifications.reportId, id))
+      .orderBy(asc(reportClarifications.askedAt)),
+    row.placeId ? currentPlace(db, row.placeId, opts) : null,
+    nearbyPlaces(db, point, submission.name, row.placeId ?? undefined),
+  ]);
+  const facilities = orderedFacilities(submission.facilities);
+
+  return {
+    id: row.id,
+    kind: row.kind,
+    status: row.status,
+    submittedAt: iso(row.submittedAt),
+    decidedAt: isoOrNull(row.decidedAt),
+    rejectionReason: row.rejectionReason,
+    reporterName: row.reporterName,
+    reviewerNote: row.reviewerNote,
+    submission: {
+      name: submission.name,
+      category: submission.category,
+      location: point,
+      district: { slug: row.districtSlug, name: row.districtName },
+      landmark: submission.landmark,
+      description: submission.description,
+      facilities,
+      status: preview(facilities),
+    },
+    photos: reportPhotos.map(({ moderation, blur, ...p }) => ({ ...p, hidden: moderation === "disembunyikan", blur: blur ?? [] })),
+    clarifications: clarifications.map((c) => ({ ...c, askedAt: iso(c.askedAt), dueAt: iso(c.dueAt), answeredAt: isoOrNull(c.answeredAt) })),
+    place,
+    nearby,
+  };
+}
+
+async function currentPlace(db: Db, placeId: string, opts: ReadOptions) {
+  const [row] = await db
+    .select({
+      id: places.id,
+      updatedAt: places.updatedAt,
+      name: places.name,
+      category: places.category,
+      location: places.location,
+      districtSlug: districts.slug,
+      districtName: districts.name,
+      landmark: places.landmark,
+      description: places.description,
+      lastVerifiedAt: places.lastVerifiedAt,
+    })
+    .from(places)
+    .innerJoin(districts, eq(districts.slug, places.districtSlug))
+    .where(eq(places.id, placeId));
+  if (!row) return null;
+  const [answers, published] = await Promise.all([
+    db
+      .select({ facility: placeFacilities.facility, answer: placeFacilities.answer, reason: placeFacilities.reason, note: placeFacilities.note })
+      .from(placeFacilities)
+      .where(eq(placeFacilities.placeId, placeId)),
+    publishedPhotosOf(db, [placeId]),
+  ]);
+  const facilities = orderedFacilities(answers);
+  return {
+    id: row.id,
+    version: iso(row.updatedAt),
+    name: row.name,
+    category: row.category,
+    location: { lat: row.location.y, lng: row.location.x },
+    district: { slug: row.districtSlug, name: row.districtName },
+    landmark: row.landmark,
+    description: row.description,
+    facilities,
+    status: preview(facilities),
+    lastVerifiedAt: iso(row.lastVerifiedAt),
+    photos: published.map((p) => toPhoto(p, opts.photoBaseUrl)),
   };
 }
 

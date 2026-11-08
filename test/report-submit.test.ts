@@ -11,7 +11,7 @@ import { png } from "./helpers/photos.js";
 
 const env = loadEnv({ NODE_ENV: "test", DATABASE_URL: "postgresql://test@localhost/test", BETTER_AUTH_SECRET: "rahasia-tes-yang-panjangnya-lebih-dari-32-karakter" });
 const NOW = new Date("2026-11-07T10:00:00.000Z");
-const store: PhotoStore = { put: async () => {}, remove: async () => {} };
+const store: PhotoStore = { put: async () => {}, get: async () => new Uint8Array(), remove: async () => {} };
 
 let db: Db;
 let close: () => Promise<void>;

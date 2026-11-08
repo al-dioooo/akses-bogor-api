@@ -85,7 +85,7 @@ Saat akun dihapus, `reporter_id` di laporan menjadi kosong (`ON DELETE SET NULL`
 | `src/email` | Isi email dan pengirim Resend atau log (ADR-0030) |
 | `src/admin` | Peran akun: tim verifikasi, memberi dan mencabut peran (ADR-0035) |
 | `src/audit` | Penulis log audit dan pembanding nilai sebelum dan sesudah (ADR-0038) |
-| `src/verification` | Panel verifikator: antrean dan lokasi yang perlu dicek ulang (ADR-0035, ADR-0036) |
+| `src/verification` | Panel verifikator: antrean, laporan untuk diperiksa, dan lokasi yang perlu dicek ulang (ADR-0035, ADR-0036) |
 | `src/routes` | Route Fastify, satu berkas per kelompok |
 | `scripts` | Skrip pendukung, mis. pembuat `docs/openapi.json` |
 | `test` | Tes Vitest dengan `app.inject`; tes database memakai PGlite + PostGIS di dalam proses |

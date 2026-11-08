@@ -3,11 +3,13 @@ import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import type { Auth } from "../auth/auth.js";
 import { requireVerifier } from "../auth/session.js";
 import { HttpError, errorSchema } from "../http/errors.js";
-import { listQueue, listRecheck } from "../verification/queue.js";
-import { queue, queueQuery, recheckList } from "../verification/schemas.js";
+import { getReview, listQueue, listRecheck } from "../verification/queue.js";
+import { queue, queueQuery, recheckList, review, reportIdParams } from "../verification/schemas.js";
 
 export type VerifierRouteOptions = {
   auth?: Auth;
+  /** Alamat publik bucket foto, untuk foto lokasi yang sudah tayang. */
+  photoBaseUrl?: string;
   now: () => Date;
 };
 
@@ -40,6 +42,25 @@ export const verifierRoutes: FastifyPluginAsyncZod<VerifierRouteOptions> = async
       const user = await verifier(request);
       reply.header("cache-control", "no-store");
       return listQueue(app.db, user.id, request.query.status);
+    },
+  );
+
+  app.get(
+    "/verifier/reports/:id",
+    {
+      schema: {
+        tags: [TAG],
+        summary: "Laporan untuk diperiksa",
+        description:
+          "Semua isian, foto (tanpa alamat; dibuka lewat `GET /verifier/photos/{id}`), titik, klarifikasi, data lokasi saat ini untuk dibandingkan, dan lokasi mirip di sekitar (FR-31). Pelapor hanya disebut dengan nama tampilan. Laporan sendiri menjawab 403 `laporan_sendiri` (FR-37).",
+        params: reportIdParams,
+        response: { 200: review, 400: errorSchema, 404: errorSchema, ...guarded },
+      },
+    },
+    async (request, reply) => {
+      const user = await verifier(request);
+      reply.header("cache-control", "no-store");
+      return getReview(app.db, user.id, request.params.id, { photoBaseUrl: opts.photoBaseUrl });
     },
   );
 
