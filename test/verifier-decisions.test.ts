@@ -40,7 +40,11 @@ describe("POST /verifier/reports/:id/reject (FR-32)", () => {
     expect(await rig.db.select().from(photos).where(eq(photos.reportId, id))).toEqual([]);
     for (const photo of photoIds) expect(rig.memory.files.has(`laporan/${photo}.webp`)).toBe(false);
     expect(await rig.db.select().from(photoDeletions)).toEqual([]);
-    expect(await rig.db.select({ kind: reportEmails.kind }).from(reportEmails).where(eq(reportEmails.reportId, id))).toEqual([{ kind: "ditolak" }]);
+    // Email langsung terkirim setelah keputusan, jadi antreannya kosong lagi (ADR-0039).
+    expect(await rig.db.select().from(reportEmails).where(eq(reportEmails.reportId, id))).toEqual([]);
+    expect(rig.sent.at(-1)).toMatchObject({ to: "pelapor@contoh.id", subject: "Laporan Anda belum bisa diterbitkan: Masjid duplikat contoh" });
+    expect(rig.sent.at(-1)!.text).toContain("Tempat ini sudah ada di AksesBogor.");
+    expect(rig.sent.at(-1)!.text).not.toContain("Sama dengan Masjid contoh A");
     const [entry] = await rig.db.select().from(auditLog).where(and(eq(auditLog.entityId, id), eq(auditLog.action, "ditolak")));
     expect(entry).toMatchObject({ entityType: "laporan", actorId: verifier.user.id, changes: { status: { sebelum: "menunggu", sesudah: "ditolak" }, alasan: "duplikat", fotoDihapus: 2 } });
     expect(JSON.stringify(entry)).not.toContain("Sama dengan");
@@ -83,7 +87,11 @@ describe("POST /verifier/reports/:id/clarify (FR-32, FR-41)", () => {
     expect(await rig.db.select().from(reportClarifications).where(eq(reportClarifications.reportId, id))).toEqual([
       expect.objectContaining({ question, askedBy: verifier.user.id, askedAt: rig.clock.now, dueAt: new Date("2026-11-15T03:00:00.000Z"), answer: null }),
     ]);
-    expect(await rig.db.select({ kind: reportEmails.kind }).from(reportEmails).where(eq(reportEmails.reportId, id))).toEqual([{ kind: "klarifikasi" }]);
+    expect(await rig.db.select().from(reportEmails).where(eq(reportEmails.reportId, id))).toEqual([]);
+    expect(rig.sent.at(-1)).toMatchObject({ to: "pelapor@contoh.id", subject: "Pertanyaan tentang laporan Anda: Rumah sakit tanya contoh" });
+    expect(rig.sent.at(-1)!.text).toContain(question);
+    expect(rig.sent.at(-1)!.text).toContain(`https://akses-bogor.contoh.id/akun/laporan/${id}`);
+    expect(rig.sent.at(-1)!.text).toContain("15 November 2026 pukul 10.00 WIB");
     const [entry] = await rig.db.select().from(auditLog).where(and(eq(auditLog.entityId, id), eq(auditLog.action, "klarifikasi_diminta")));
     expect(JSON.stringify(entry!.changes)).not.toContain("parkir");
     expect((await myReports()).find((r) => r.id === id)).toMatchObject({ status: "klarifikasi", clarificationQuestion: question, clarificationDueAt: "2026-11-15T03:00:00.000Z" });

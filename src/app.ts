@@ -157,13 +157,15 @@ export async function buildApp(env: Env, deps: { db?: Db; now?: () => Date; fetc
         ? localStore(env.PHOTO_STORAGE_DIR ?? ".data/foto")
         : undefined);
   await app.register(reportRoutes, { auth, store: photoStore, now });
-  await app.register(verifierRoutes, { auth, photoBaseUrl: env.PHOTO_PUBLIC_URL, store: photoStore, now });
+  // Tautan di email status laporan memakai origin web pertama (ADR-0039).
+  const reportEmail = { mailer, webUrl: env.FRONTEND_ORIGINS[0] ?? "http://localhost:3000" };
+  await app.register(verifierRoutes, { auth, photoBaseUrl: env.PHOTO_PUBLIC_URL, store: photoStore, email: reportEmail, now });
   if (env.NODE_ENV !== "test") {
     const stop = schedulePhotoCleanup(app.db, photoStore, now, app.log);
     app.addHook("onClose", async () => stop());
   }
   if (env.NODE_ENV !== "test") {
-    const stop = scheduleVerificationJobs(app.db, photoStore, now, app.log);
+    const stop = scheduleVerificationJobs(app.db, photoStore, reportEmail, now, app.log);
     app.addHook("onClose", async () => stop());
   }
   if (auth && env.NODE_ENV !== "test") {

@@ -96,7 +96,10 @@ describe("publishing a new place (FR-32, FR-33)", () => {
     expect(actions.map((e) => `${e.entity}:${e.action}`)).toEqual(["lokasi:dibuat", "laporan:diterbitkan", "foto:diterbitkan", "foto:dihapus"]);
     expect(actions[0]!.changes).toMatchObject({ name: { sebelum: null, sesudah: "Masjid Al-Ikhlas" }, status: { sebelum: null, sesudah: "sebagian" }, laporan: id });
     expect(JSON.stringify(actions)).not.toContain("foto 1");
-    expect(await rig.db.select({ kind: reportEmails.kind }).from(reportEmails).where(eq(reportEmails.reportId, id))).toEqual([{ kind: "diterbitkan" }]);
+    expect(await rig.db.select().from(reportEmails).where(eq(reportEmails.reportId, id))).toEqual([]);
+    const published = rig.sent.find((e) => e.subject === "Laporan Anda sudah terbit: Masjid Al-Ikhlas")!;
+    expect(published.to).toBe("pelapor@contoh.id");
+    expect(published.text).toContain(`https://akses-bogor.contoh.id/lokasi/${placeId}`);
     const mine = (await rig.app.inject({ method: "GET", url: "/me/reports", headers: rig.as(reporter.token) })).json().items as { id: string }[];
     expect(mine.find((r) => r.id === id)).toMatchObject({ status: "diterbitkan", placeId });
   });
