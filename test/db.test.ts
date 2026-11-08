@@ -38,6 +38,8 @@ describe("migrations", () => {
       "photos",
       "place_facilities",
       "places",
+      "report_clarifications",
+      "report_emails",
       "reports",
       "sessions",
       "users",
