@@ -41,6 +41,7 @@ pnpm dev               # http://localhost:8080/healthz
 | `pnpm db:generate` | Membuat migrasi Drizzle dari `src/db/schema.ts` |
 | `pnpm db:migrate` | Menjalankan migrasi ke database di `DATABASE_URL` |
 | `pnpm db:seed` | Mengosongkan data lokasi dan laporan, lalu mengisi tujuh lokasi contoh; kecamatan dan batasnya tidak dihapus; ditolak di production |
+| `pnpm peran --email <email> --peran <admin\|verifikator\|pengguna>` | Mengganti peran akun yang sudah dilengkapi, mis. membuat admin pertama; dicatat di log audit sebagai `skrip` (ADR-0035) |
 
 ## Database
 
@@ -211,6 +212,17 @@ sudo systemctl enable --now akses-bogor-api akses-bogor-deploy.timer akses-bogor
 ```
 
 Terakhir, tambahkan public hostname `akses-bogor-api.yorhagarden.xyz` di tunnel Evergarden (Zero Trust → Networks → Tunnels), dengan service `http://127.0.0.1:8090`. Hostname lain di tunnel itu jangan diubah.
+
+### Peran
+
+Admin pertama dibuat dengan skrip, karena tidak ada route API yang bisa membuat admin (ADR-0035). Akunnya harus sudah masuk dan melengkapi nama tampilan di web. Lalu, di Evergarden:
+
+```bash
+sudo -u aksesbogor -H sh -c 'cd /srv/akses-bogor/current && COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
+  corepack pnpm exec tsx --env-file=/etc/akses-bogor/api.env scripts/peran.ts --email <email> --peran admin'
+```
+
+Admin kemudian memberi dan mencabut peran verifikator di halaman Tim verifikator di web. Perintah yang sama dengan `--peran pengguna` mencabut peran admin.
 
 ### Data Preview
 
