@@ -42,7 +42,7 @@ export const locationCheck = z
   .describe("Hasil pengecekan lokasi");
 
 /** Teks beberapa baris (deskripsi): boleh baris baru dan tab, tanpa karakter kontrol lain. */
-const paragraph = (max: number) =>
+export const paragraph = (max: number) =>
   z
     .string()
     .trim()

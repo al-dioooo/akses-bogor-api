@@ -5,9 +5,10 @@ import { requireVerifier } from "../auth/session.js";
 import { HttpError, errorSchema } from "../http/errors.js";
 import { blurPhoto } from "../photos/blur.js";
 import type { PhotoStore } from "../photos/storage.js";
+import { rejectReport, requestClarification } from "../verification/decide.js";
 import { moderatePhoto, photoForReview } from "../verification/photos.js";
 import { getReview, listQueue, listRecheck } from "../verification/queue.js";
-import { moderationBody, photoIdParams, photoVersionQuery, queue, queueQuery, recheckList, reportIdParams, reportPhotoParams, review, reviewPhoto } from "../verification/schemas.js";
+import { clarifyBody, decision, moderationBody, photoIdParams, rejectBody, photoVersionQuery, queue, queueQuery, recheckList, reportIdParams, reportPhotoParams, review, reviewPhoto } from "../verification/schemas.js";
 
 export type VerifierRouteOptions = {
   auth?: Auth;
@@ -116,6 +117,46 @@ export const verifierRoutes: FastifyPluginAsyncZod<VerifierRouteOptions> = async
     async (request) => {
       const user = await verifier(request);
       return moderatePhoto(app.db, user.id, request.params.id, request.params.photoId, request.body, opts.now());
+    },
+  );
+
+  app.post(
+    "/verifier/reports/:id/reject",
+    {
+      schema: {
+        tags: [TAG],
+        summary: "Tolak laporan",
+        description:
+          "Menolak dengan alasan baku R1 sampai R5 (FR-32). Semua foto laporan dihapus; isian tetap ada untuk Laporan saya. Pelapor mendapat email berisi pesan baku alasannya (FR-40). Laporan yang sudah diputuskan 409 `sudah_diputuskan`; laporan sendiri 403.",
+        params: reportIdParams,
+        body: rejectBody,
+        response: { 200: decision, 400: errorSchema, 404: errorSchema, 409: errorSchema, ...guarded },
+      },
+    },
+    async (request) => {
+      const user = await verifier(request);
+      await rejectReport(app.db, opts.store, user.id, request.params.id, request.body, opts.now());
+      return { status: "ditolak" as const, rejectionReason: request.body.reason };
+    },
+  );
+
+  app.post(
+    "/verifier/reports/:id/clarify",
+    {
+      schema: {
+        tags: [TAG],
+        summary: "Minta klarifikasi",
+        description:
+          "Mengirim pertanyaan ke pelapor lewat email dengan tenggat 7 × 24 jam (FR-32, FR-41, ADR-0036). Tanpa jawaban sampai tenggat, laporan ditolak otomatis dengan R6. Hanya dari status menunggu; laporan yang masih menunggu jawaban 409 `klarifikasi_terbuka`.",
+        params: reportIdParams,
+        body: clarifyBody,
+        response: { 200: decision, 400: errorSchema, 404: errorSchema, 409: errorSchema, ...guarded },
+      },
+    },
+    async (request) => {
+      const user = await verifier(request);
+      const result = await requestClarification(app.db, user.id, request.params.id, request.body, opts.now());
+      return { status: result.status, clarificationDueAt: result.dueAt };
     },
   );
 
