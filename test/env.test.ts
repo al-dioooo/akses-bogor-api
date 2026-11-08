@@ -65,4 +65,18 @@ describe("loadEnv", () => {
   it("needs the Resend key and sender together", () => {
     expect(() => loadEnv({ DATABASE_URL: "postgresql://test:test@localhost:5432/test", RESEND_API_KEY: "re_rahasia" })).toThrow(/EMAIL_FROM/);
   });
+
+  it("needs all five R2 settings together", () => {
+    const r2 = {
+      R2_ACCOUNT_ID: "0123456789abcdef0123456789abcdef",
+      R2_ACCESS_KEY_ID: "kunci",
+      R2_SECRET_ACCESS_KEY: "rahasia",
+      R2_BUCKET_LAPORAN: "akses-bogor-foto-laporan",
+      R2_BUCKET_PUBLIK: "akses-bogor-foto",
+    };
+    const base = { DATABASE_URL: "postgresql://test:test@localhost:5432/test" };
+    expect(loadEnv({ ...base, ...r2 }).R2_BUCKET_LAPORAN).toBe("akses-bogor-foto-laporan");
+    expect(() => loadEnv({ ...base, ...r2, R2_SECRET_ACCESS_KEY: "" })).toThrow(/R2_ACCOUNT_ID/);
+    expect(() => loadEnv({ ...base, ...r2, R2_ACCOUNT_ID: "bukan-id" })).toThrow(/R2_ACCOUNT_ID/);
+  });
 });
