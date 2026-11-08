@@ -154,7 +154,7 @@ Status lokasi dan ringkasannya dihitung dengan aturan "pintu masuk dulu" di `src
 
 Semua galat memakai bentuk `{ "galat": "kode_snake_case", "pesan": "Pesan untuk pengguna" }`.
 
-Setiap klien mendapat 120 permintaan per menit (selain `/healthz`); lewat dari itu API menjawab 429 `terlalu_sering`. Klien dikenali dari header `cf-connecting-ip` yang ditulis Cloudflare, bukan dari `X-Forwarded-For` yang bisa diisi klien. Server Next.js mengirim `x-web-server-secret` dan `x-visitor-ip`; bila rahasianya sama dengan `WEB_SERVER_SECRET`, kuota dihitung per IP pengunjung itu.
+Setiap klien mendapat 120 permintaan per menit (selain `/healthz`); lewat dari itu API menjawab 429 `terlalu_sering`. Klien dikenali dari header `cf-connecting-ip` yang ditulis Cloudflare, bukan dari `X-Forwarded-For` yang bisa diisi klien. Server Next.js mengirim `x-web-server-secret` dan `x-visitor-ip`; bila rahasianya sama dengan `WEB_SERVER_SECRET`, kuota dihitung per IP pengunjung itu. Kunci yang sama dipakai batas per route, yaitu permintaan dan percobaan kode masuk, masuk dengan Google, pencarian tempat, dan unggah foto, sehingga pengunjung lain di belakang server web yang sama tidak ikut kena 429.
 
 ## Arsitektur
 
