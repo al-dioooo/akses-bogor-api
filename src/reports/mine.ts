@@ -1,7 +1,8 @@
 import { desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Db } from "../db/client.js";
-import { places, rejectionReason, reportKind, reportStatus, reports } from "../db/schema.js";
+import { photoTag, places, rejectionReason, reportKind, reportStatus, reports } from "../db/schema.js";
+import { line, paragraph } from "./schemas.js";
 
 export const myReports = z
   .object({
@@ -21,6 +22,38 @@ export const myReports = z
     ),
   })
   .describe("Laporan saya");
+
+const clarification = z.object({
+  id: z.uuid(),
+  question: z.string(),
+  askedAt: z.iso.datetime(),
+  dueAt: z.iso.datetime(),
+  answer: z.string().nullable(),
+  answeredAt: z.iso.datetime().nullable(),
+});
+
+export const myReport = z
+  .object({
+    id: z.uuid(),
+    kind: z.enum(reportKind.enumValues),
+    status: z.enum(reportStatus.enumValues),
+    placeId: z.uuid().nullable(),
+    placeName: z.string(),
+    submittedAt: z.iso.datetime(),
+    photos: z.number().int().describe("Jumlah foto laporan; jawaban klarifikasi boleh menambah sampai total 10"),
+    clarifications: z.array(clarification).describe("Pertanyaan verifikator dan jawaban Anda, berurutan"),
+  })
+  .describe("Satu laporan saya dengan klarifikasinya");
+
+export const clarificationBody = z.object({
+  answer: paragraph(1000).describe("Jawaban untuk pertanyaan verifikator"),
+  photos: z
+    .array(z.object({ id: z.uuid().describe("Id dari `POST /reports/photos`"), tag: z.enum(photoTag.enumValues), caption: line(200).optional() }))
+    .max(10)
+    .default([])
+    .refine((items) => new Set(items.map((p) => p.id)).size === items.length, "Foto tidak boleh dobel")
+    .describe("Foto baru yang sudah diunggah akun ini; total foto laporan paling banyak 10"),
+});
 
 const iso = (value: Date | null) => (value ? new Date(value).toISOString() : null);
 
