@@ -133,6 +133,8 @@ Contoh lengkap ada di [.env.example](.env.example). Jangan commit `.env`.
 | `GET /verifier/reports/{id}` | Isian, foto, titik, klarifikasi, data lokasi saat ini, dan lokasi mirip untuk dibandingkan; laporan sendiri 403 | FR-31, FR-37 |
 | `GET /verifier/photos/{id}` | Foto laporan yang belum terbit dari bucket privat, `?versi=kabur` untuk pratinjau area kabur; `Cache-Control: private, no-store` | FR-34, ADR-0031, ADR-0037 |
 | `PATCH /verifier/reports/{id}/photos/{photoId}` | Moderasi foto sebelum keputusan: tag, keterangan, sembunyikan, area kabur | FR-34, ADR-0037 |
+| `POST /verifier/reports/{id}/clarify` | Minta klarifikasi dengan tenggat 7 × 24 jam; email ke pelapor | FR-32, FR-41 |
+| `POST /verifier/reports/{id}/reject` | Tolak dengan alasan R1–R5; foto laporan dihapus; email ke pelapor | FR-32, FR-40 |
 | `GET /verifier/places/recheck` | Lokasi yang terakhir diverifikasi lebih dari 12 bulan lalu, terlama dulu | FR-38 |
 | `POST /reports` | Kirim laporan baru, perubahan, atau kekurangan ke antrean verifikasi dengan foto yang sudah diunggah; kecamatan dihitung ulang; kunci draf mencegah laporan ganda; 20 laporan per 24 jam dan 30 laporan menunggu per akun | FR-20 sampai FR-27 |
 

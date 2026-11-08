@@ -3,7 +3,8 @@ import { z } from "zod";
 import { facilityAnswer, facilityKind, photoTag, placeCategory, placeStatus, rejectionReason, reportKind, reportStatus, unavailableReason } from "../db/schema.js";
 import { photo as publishedPhoto } from "../places/schemas.js";
 import { MAX_BLUR_REGIONS } from "../photos/blur.js";
-import { line, nearbyPlace } from "../reports/schemas.js";
+import { line, nearbyPlace, paragraph } from "../reports/schemas.js";
+import { VERIFIER_REASONS } from "./decide.js";
 
 const category = z.enum(placeCategory.enumValues);
 const district = z.object({ slug: z.string(), name: z.string() });
@@ -64,6 +65,27 @@ export const moderationBody = z
     blur: z.array(blurRegion).max(MAX_BLUR_REGIONS).optional().describe("Menggantikan semua area kabur; kosong berarti tanpa area"),
   })
   .refine((body) => Object.keys(body).length > 0, "Tidak ada yang diubah");
+
+const reviewerNote = paragraph(1000).optional().describe("Catatan internal untuk verifikator lain; tidak dikirim ke pelapor (ADR-0036)");
+
+export const rejectBody = z.object({
+  reason: z.enum(VERIFIER_REASONS).describe("Alasan baku R1 sampai R5; pelapor menerima pesan baku alasan ini (Panduan Verifikasi 6.3)"),
+  note: reviewerNote,
+});
+
+export const clarifyBody = z.object({
+  question: paragraph(1000).describe("Pertanyaan untuk pelapor, dikirim lewat email (FR-41)"),
+  note: reviewerNote,
+});
+
+export const decision = z
+  .object({
+    status: z.enum(reportStatus.enumValues),
+    rejectionReason: z.enum(rejectionReason.enumValues).nullable().optional(),
+    clarificationDueAt: z.iso.datetime().optional(),
+    placeId: z.uuid().optional().describe("Lokasi yang dibuat atau diperbarui saat terbit"),
+  })
+  .describe("Hasil keputusan");
 
 export const reviewPhoto = z.object({
   id: z.uuid(),
