@@ -7,7 +7,7 @@ let close: () => Promise<void>;
 
 beforeAll(async () => {
   ({ client, close } = await createTestDb());
-  await client.exec(`INSERT INTO districts (slug, name) VALUES ('bogor-tengah', 'Bogor Tengah')`);
+  await client.exec(`INSERT INTO districts (slug, name) VALUES ('bogor-tengah', 'Bogor Tengah') ON CONFLICT DO NOTHING`);
 }, 60_000);
 
 afterAll(async () => {
@@ -30,7 +30,21 @@ describe("migrations", () => {
     const { rows } = await client.query<{ table_name: string }>(
       `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE' AND table_name <> 'spatial_ref_sys' ORDER BY table_name`,
     );
-    expect(rows.map((r) => r.table_name)).toEqual(["audit_log", "districts", "photos", "place_facilities", "places", "reports", "users"]);
+    expect(rows.map((r) => r.table_name)).toEqual([
+      "accounts",
+      "audit_log",
+      "districts",
+      "photo_deletions",
+      "photos",
+      "place_facilities",
+      "places",
+      "report_clarifications",
+      "report_emails",
+      "reports",
+      "sessions",
+      "users",
+      "verifications",
+    ]);
   });
 });
 
@@ -76,5 +90,62 @@ describe("constraints", () => {
     await client.query(`DELETE FROM users WHERE id = $1`, [userId]);
     const { rows } = await client.query<{ reporter_id: string | null }>(`SELECT reporter_id FROM reports WHERE id = $1`, [reports[0]!.id]);
     expect(rows[0]!.reporter_id).toBeNull();
+  });
+});
+
+describe("kecamatan boundaries (ADR-0034)", () => {
+  const districtAt = async (lng: number, lat: number) => {
+    const { rows } = await client.query<{ slug: string }>(
+      `SELECT slug FROM districts WHERE ST_Covers(boundary, ST_SetSRID(ST_MakePoint($1, $2), 4326)) ORDER BY slug`,
+      [lng, lat],
+    );
+    return rows.map((r) => r.slug);
+  };
+
+  it("fill valid boundaries for all six kecamatan", async () => {
+    const { rows } = await client.query<{ slug: string; valid: boolean }>(
+      `SELECT slug, ST_IsValid(boundary) AS valid FROM districts WHERE boundary IS NOT NULL ORDER BY slug`,
+    );
+    expect(rows).toEqual(
+      ["bogor-barat", "bogor-selatan", "bogor-tengah", "bogor-timur", "bogor-utara", "tanah-sareal"].map((slug) => ({ slug, valid: true })),
+    );
+  });
+
+  it("put a point in exactly one kecamatan and none outside Kota Bogor", async () => {
+    // Kebun Raya Bogor, Bogor Tengah
+    expect(await districtAt(106.7991, -6.5976)).toEqual(["bogor-tengah"]);
+    // Kampus IPB Dramaga, Kabupaten Bogor (ADR-0010)
+    expect(await districtAt(106.7268, -6.5579)).toEqual([]);
+  });
+
+  it("keep boundaries when sample data is seeded again", async () => {
+    const { seedSampleData } = await import("../src/db/seed.js");
+    const { drizzle } = await import("drizzle-orm/pglite");
+    await seedSampleData(drizzle(client) as never);
+    const { rows } = await client.query<{ n: number }>(`SELECT count(*)::int AS n FROM districts WHERE boundary IS NOT NULL`);
+    expect(rows[0]!.n).toBe(6);
+  });
+
+  it("place every sample location inside its own kecamatan", async () => {
+    const { rows } = await client.query<{ name: string; district_slug: string; found: string | null }>(
+      `SELECT p.name, p.district_slug, d.slug AS found FROM places p LEFT JOIN districts d ON ST_Covers(d.boundary, p.location) ORDER BY p.name`,
+    );
+    for (const row of rows) expect(row.found, row.name).toBe(row.district_slug);
+  });
+});
+
+describe("photo uploads (ADR-0031)", () => {
+  it("keep exactly one of report and uploader on a photo", async () => {
+    const insert = (reportId: string | null, uploaderId: string | null) =>
+      client.query(
+        `INSERT INTO photos (report_id, uploader_id, storage_key, alt_text, width, height, bytes) VALUES ($1, $2, $3, '', 10, 10, 100)`,
+        [reportId, uploaderId, `laporan/${crypto.randomUUID()}.webp`],
+      );
+    const { rows: users } = await client.query<{ id: string }>(`INSERT INTO users (display_name, email) VALUES ('Ani', 'ani@contoh.id') RETURNING id`);
+    const { rows: reports } = await client.query<{ id: string }>(`INSERT INTO reports (kind, status, submission) VALUES ('baru', 'menunggu', '{}') RETURNING id`);
+    await expect(insert(null, null)).rejects.toThrow(/photos_report_or_uploader/);
+    await expect(insert(reports[0]!.id, users[0]!.id)).rejects.toThrow(/photos_report_or_uploader/);
+    await insert(null, users[0]!.id);
+    await insert(reports[0]!.id, null);
   });
 });
