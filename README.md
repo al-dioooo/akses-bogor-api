@@ -41,6 +41,7 @@ pnpm dev               # http://localhost:8080/healthz
 | `pnpm db:generate` | Membuat migrasi Drizzle dari `src/db/schema.ts` |
 | `pnpm db:migrate` | Menjalankan migrasi ke database di `DATABASE_URL` |
 | `pnpm db:seed` | Mengosongkan data lokasi dan laporan, lalu mengisi tujuh lokasi contoh; kecamatan dan batasnya tidak dihapus; ditolak di production |
+| `pnpm pengetahuan:osm [--salinan]` | Mengambil fitur dan rute angkutan Kota Bogor dari OpenStreetMap ke basis pengetahuan agen rute (ADR-0042) |
 | `pnpm peran --email <email> --peran <admin\|verifikator\|pengguna>` | Mengganti peran akun yang sudah dilengkapi, mis. membuat admin pertama; dicatat di log audit sebagai `skrip` (ADR-0035) |
 
 ## Database
@@ -77,6 +78,19 @@ Kecamatan laporan dihitung dari batas enam kecamatan di `districts.boundary` (FR
 
 - Poligon dibangun dari garis anggota setiap relasi dengan `ST_MakeValid(ST_BuildArea(ST_Collect(...)))`, tanpa penyederhanaan, lalu ditulis dengan `ST_AsText(..., 6)`. Sebelum dipakai, periksa bahwa keenam poligon valid, tidak saling bertumpuk, dan gabungannya sama dengan batas kota.
 - Untuk memperbarui, buat migrasi baru yang menimpa `boundary` dengan `ON CONFLICT ("slug") DO UPDATE`, dan bandingkan dulu dengan batas lama.
+
+### Basis Pengetahuan Agen Rute
+
+Agen rute (ADR-0042) membaca data dari empat tabel: `knowledge_sources` (sumber, lisensi, tanggal ambil, SHA-256 unduhan), `knowledge_passages` (potongan teks untuk retrieval), `osm_features`, dan `transit_routes`. Isinya dari skrip di `scripts/pengetahuan/`, bukan dari migrasi. Setiap skrip mengganti sumbernya dalam satu transaksi, jadi aman dijalankan ulang, dan menyimpan salinan mentah unduhan di `.data/pengetahuan/` beserta alamat dan waktu ambilnya. Dengan `--salinan`, skrip memuat salinan terakhir itu tanpa mengunduh lagi dan tanpa mengubah tanggal ambil.
+
+| Perintah | Sumber | Isi |
+| --- | --- | --- |
+| `pnpm pengetahuan:osm` | Satu kueri area Overpass untuk relasi Kota Bogor (14745927) | Fitur bertag `wheelchair`, `toilets:wheelchair`, `ramp`, `kerb`, `tactile_paving`, tangga, lift, pintu masuk bertag akses, halte, dan relasi `route=bus` (BisKita dan angkot) dengan nama jalan yang dilewati |
+
+- Data OSM © kontributor OpenStreetMap, berlisensi [ODbL](https://www.openstreetmap.org/copyright). Tabel `osm_features` dan `transit_routes` adalah database turunan OSM: bila isinya dibagikan ke publik dalam jumlah besar, bagikan dengan ODbL. Jawaban yang memakai data ini menyebut atribusinya.
+- Kueri tanpa `meta`, jadi tidak ada nama penyunting atau changeset. Hanya tag dalam daftar izin di `src/knowledge/osm.ts` yang disimpan; kontak, situs, dan catatan bebas dibuang.
+- Fitur di luar batas kecamatan (ADR-0034) dibuang, dan garis rute dipotong ke Kota Bogor.
+- Kebijakan Overpass: jalankan paling sering sekali sehari, satu skrip pada satu waktu. Server FOSSGIS meminta User-Agent yang menyebut nama aplikasi; isi `PENGETAHUAN_USER_AGENT` sebelum menjalankan skrip secara rutin.
 
 ## Environment Variables
 

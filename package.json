@@ -18,7 +18,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "tsx --env-file=.env scripts/seed.ts",
-    "peran": "tsx --env-file-if-exists=.env scripts/peran.ts"
+    "peran": "tsx --env-file-if-exists=.env scripts/peran.ts",
+    "pengetahuan:osm": "tsx --env-file-if-exists=.env scripts/pengetahuan/osm.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.3.1",
