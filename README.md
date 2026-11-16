@@ -42,6 +42,7 @@ pnpm dev               # http://localhost:8080/healthz
 | `pnpm db:migrate` | Menjalankan migrasi ke database di `DATABASE_URL` |
 | `pnpm db:seed` | Mengosongkan data lokasi dan laporan, lalu mengisi tujuh lokasi contoh; kecamatan dan batasnya tidak dihapus; ditolak di production |
 | `pnpm pengetahuan:osm [--salinan]` | Mengambil fitur dan rute angkutan Kota Bogor dari OpenStreetMap ke basis pengetahuan agen rute (ADR-0042) |
+| `pnpm pengetahuan:regulasi [--salinan]` | Mengambil teks resmi UU No. 8 Tahun 2016 dan Permen PUPR No. 14/PRT/M/2017, dipotong per pasal dan per bagian lampiran |
 | `pnpm peran --email <email> --peran <admin\|verifikator\|pengguna>` | Mengganti peran akun yang sudah dilengkapi, mis. membuat admin pertama; dicatat di log audit sebagai `skrip` (ADR-0035) |
 
 ## Database
@@ -86,10 +87,12 @@ Agen rute (ADR-0042) membaca data dari empat tabel: `knowledge_sources` (sumber,
 | Perintah | Sumber | Isi |
 | --- | --- | --- |
 | `pnpm pengetahuan:osm` | Satu kueri area Overpass untuk relasi Kota Bogor (14745927) | Fitur bertag `wheelchair`, `toilets:wheelchair`, `ramp`, `kerb`, `tactile_paving`, tangga, lift, pintu masuk bertag akses, halte, dan relasi `route=bus` (BisKita dan angkot) dengan nama jalan yang dilewati |
+| `pnpm pengetahuan:regulasi` | PDF resmi UU No. 8 Tahun 2016 dari peraturan.go.id, dan ZIP resmi Permen PUPR No. 14/PRT/M/2017 dari JDIH Kementerian PU | Potongan per pasal (pasal panjang per ayat atau angka) dan per bagian Lampiran I–IV, dengan rujukan seperti "Permen PUPR No. 14/PRT/M/2017, Lampiran II, B.2 Ram" |
 
 - Data OSM © kontributor OpenStreetMap, berlisensi [ODbL](https://www.openstreetmap.org/copyright). Tabel `osm_features` dan `transit_routes` adalah database turunan OSM: bila isinya dibagikan ke publik dalam jumlah besar, bagikan dengan ODbL. Jawaban yang memakai data ini menyebut atribusinya.
 - Kueri tanpa `meta`, jadi tidak ada nama penyunting atau changeset. Hanya tag dalam daftar izin di `src/knowledge/osm.ts` yang disimpan; kontak, situs, dan catatan bebas dibuang.
 - Fitur di luar batas kecamatan (ADR-0034) dibuang, dan garis rute dipotong ke Kota Bogor.
+- Peraturan perundang-undangan tidak dilindungi hak cipta (UU No. 28 Tahun 2014, Pasal 42 huruf b). Salinan Berita Negara Permen PUPR di peraturan.go.id tidak dipakai karena lampirannya berupa gambar pindaian tanpa teks. Skrip berhenti tanpa mengubah data lama bila jumlah pasal yang terbaca tidak sesuai (153 dan 59), dan tidak pernah memakai salinan tidak resmi.
 - Kebijakan Overpass: jalankan paling sering sekali sehari, satu skrip pada satu waktu. Server FOSSGIS meminta User-Agent yang menyebut nama aplikasi; isi `PENGETAHUAN_USER_AGENT` sebelum menjalankan skrip secara rutin.
 
 ## Environment Variables
