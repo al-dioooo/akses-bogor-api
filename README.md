@@ -43,6 +43,7 @@ pnpm dev               # http://localhost:8080/healthz
 | `pnpm db:seed` | Mengosongkan data lokasi dan laporan, lalu mengisi tujuh lokasi contoh; kecamatan dan batasnya tidak dihapus; ditolak di production |
 | `pnpm pengetahuan:osm [--salinan]` | Mengambil fitur dan rute angkutan Kota Bogor dari OpenStreetMap ke basis pengetahuan agen rute (ADR-0042) |
 | `pnpm pengetahuan:regulasi [--salinan]` | Mengambil teks resmi UU No. 8 Tahun 2016 dan Permen PUPR No. 14/PRT/M/2017, dipotong per pasal dan per bagian lampiran |
+| `pnpm pengetahuan:dokumen [--salinan]` | Mengambil halaman edukasi, Panduan Verifikasi, dan ADR aturan fasilitas dan status; jalankan ulang setelah dokumen itu berubah |
 | `pnpm peran --email <email> --peran <admin\|verifikator\|pengguna>` | Mengganti peran akun yang sudah dilengkapi, mis. membuat admin pertama; dicatat di log audit sebagai `skrip` (ADR-0035) |
 
 ## Database
@@ -88,6 +89,7 @@ Agen rute (ADR-0042) membaca data dari empat tabel: `knowledge_sources` (sumber,
 | --- | --- | --- |
 | `pnpm pengetahuan:osm` | Satu kueri area Overpass untuk relasi Kota Bogor (14745927) | Fitur bertag `wheelchair`, `toilets:wheelchair`, `ramp`, `kerb`, `tactile_paving`, tangga, lift, pintu masuk bertag akses, halte, dan relasi `route=bus` (BisKita dan angkot) dengan nama jalan yang dilewati |
 | `pnpm pengetahuan:regulasi` | PDF resmi UU No. 8 Tahun 2016 dari peraturan.go.id, dan ZIP resmi Permen PUPR No. 14/PRT/M/2017 dari JDIH Kementerian PU | Potongan per pasal (pasal panjang per ayat atau angka) dan per bagian Lampiran I–IV, dengan rujukan seperti "Permen PUPR No. 14/PRT/M/2017, Lampiran II, B.2 Ram" |
+| `pnpm pengetahuan:dokumen` | Repo publik akses-bogor-web dan akses-bogor-docs di GitHub, cabang `main` | Halaman edukasi Aksesibilitas, Disabilitas, dan Tips (`messages/id.json`, masih draf menurut ADR-0041), Panduan Verifikasi, dan ADR-0017, ADR-0018, ADR-0022 tanpa bagian opsi yang tidak dipilih, dipotong per heading |
 
 - Data OSM © kontributor OpenStreetMap, berlisensi [ODbL](https://www.openstreetmap.org/copyright). Tabel `osm_features` dan `transit_routes` adalah database turunan OSM: bila isinya dibagikan ke publik dalam jumlah besar, bagikan dengan ODbL. Jawaban yang memakai data ini menyebut atribusinya.
 - Kueri tanpa `meta`, jadi tidak ada nama penyunting atau changeset. Hanya tag dalam daftar izin di `src/knowledge/osm.ts` yang disimpan; kontak, situs, dan catatan bebas dibuang.
