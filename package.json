@@ -20,7 +20,8 @@
     "db:seed": "tsx --env-file=.env scripts/seed.ts",
     "peran": "tsx --env-file-if-exists=.env scripts/peran.ts",
     "pengetahuan:osm": "tsx --env-file-if-exists=.env scripts/pengetahuan/osm.ts",
-    "pengetahuan:regulasi": "tsx --env-file-if-exists=.env scripts/pengetahuan/regulasi.ts"
+    "pengetahuan:regulasi": "tsx --env-file-if-exists=.env scripts/pengetahuan/regulasi.ts",
+    "pengetahuan:dokumen": "tsx --env-file-if-exists=.env scripts/pengetahuan/dokumen.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.3.1",
