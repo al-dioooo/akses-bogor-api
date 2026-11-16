@@ -34,6 +34,9 @@ describe("migrations", () => {
       "accounts",
       "audit_log",
       "districts",
+      "knowledge_passages",
+      "knowledge_sources",
+      "osm_features",
       "photo_deletions",
       "photos",
       "place_facilities",
@@ -42,6 +45,7 @@ describe("migrations", () => {
       "report_emails",
       "reports",
       "sessions",
+      "transit_routes",
       "users",
       "verifications",
     ]);
