@@ -6,6 +6,7 @@ import { knowledgeKind, placeCategory, placeStatus } from "../db/schema.js";
 import { HttpError } from "../http/errors.js";
 import { placeDetail } from "../places/schemas.js";
 import { prioritySchema } from "../routes/districts.js";
+import { cardInput, placeCardSchema, routeCardSchema, showPlaceCard, showRouteCard } from "./cards.js";
 import { findPlace, findPlacesToContribute, kecamatanPriorityTool, placeAccessibility, searchKnowledgeTool, type ToolContext } from "./tools.js";
 
 const placeId = z.uuid().describe("Id lokasi AksesBogor dari find_place");
@@ -105,7 +106,27 @@ const priorityTool = {
   run: kecamatanPriorityTool,
 };
 
-export const AGENT_TOOLS = [findPlaceTool, placeAccessibilityTool, knowledgeTool, contributeTool, priorityTool] as const;
+const placeCardTool = {
+  name: "show_place_card",
+  description:
+    "Menampilkan kartu sebuah tempat di layar pengguna: lokasi AksesBogor (placeId dari find_place) atau tempat OpenStreetMap (osmType dan osmId dari find_places_to_contribute). Hasilnya hanya konfirmasi; isi kartu tidak dikirim kepada Anda.",
+  input: cardInput,
+  output: z.object({ pesan: z.string(), kartu: placeCardSchema }),
+  run: showPlaceCard,
+};
+
+const routeCardTool = {
+  name: "show_route_card",
+  description:
+    "Menampilkan kartu rute jalan kaki ke sebuah tempat di layar pengguna. Aplikasi menghitung rutenya sendiri dari posisi pengguna, dengan peringatan tetap; Anda tidak menerima rute itu dan tidak boleh menilai rutenya. Input sama dengan show_place_card. Hasilnya hanya konfirmasi.",
+  input: cardInput,
+  output: z.object({ pesan: z.string(), kartu: routeCardSchema }),
+  run: showRouteCard,
+};
+
+export const AGENT_TOOLS = [findPlaceTool, placeAccessibilityTool, knowledgeTool, contributeTool, priorityTool, placeCardTool, routeCardTool] as const;
+/** Alat yang hanya menampilkan kartu di web; model menerima `pesan`-nya saja. */
+export const CARD_TOOLS: ReadonlySet<string> = new Set([placeCardTool.name, routeCardTool.name]);
 export type AgentTool = (typeof AGENT_TOOLS)[number];
 export type ToolName = AgentTool["name"];
 

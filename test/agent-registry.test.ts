@@ -19,7 +19,7 @@ afterAll(async () => {
 
 describe("tool registry", () => {
   it("offers only the model tools, never a route or the user's position", () => {
-    expect(AGENT_TOOLS.map((t) => t.name)).toEqual(["find_place", "place_accessibility", "search_knowledge", "find_places_to_contribute", "kecamatan_priority"]);
+    expect(AGENT_TOOLS.map((t) => t.name)).toEqual(["find_place", "place_accessibility", "search_knowledge", "find_places_to_contribute", "kecamatan_priority", "show_place_card", "show_route_card"]);
     expect(JSON.stringify(toolDefinitions())).not.toMatch(/"(from|lat|lng|polyline|geometry)"/);
   });
 
