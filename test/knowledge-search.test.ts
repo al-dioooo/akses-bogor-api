@@ -39,6 +39,7 @@ beforeAll(async () => {
     insertPassages(tx, guide.id, [
       { citation: "Panduan Verifikasi, bagian 5.2", heading: "Foto ramp", body: "Foto ramp memperlihatkan seluruh ramp dari bawah, termasuk pegangan tangan dan kemiringan." },
       { citation: "Panduan Verifikasi, bagian 5.3", heading: "Guiding block", body: "Guiding block dinilai tersedia bila jalurnya menyambung dari trotoar sampai pintu masuk." },
+      { citation: "Panduan Verifikasi, bagian 5.4", heading: "Kemiringan ramp", body: "Kemiringan diperkirakan dari foto samping." },
     ]),
   );
 }, 60_000);
@@ -131,6 +132,15 @@ describe("searchKnowledge", () => {
 
   it("treats tsquery syntax in the question as plain words", async () => {
     await expect(searchKnowledge(db, "ramp & !(gedung) | :* <-> '")).resolves.toBeInstanceOf(Array);
+  });
+});
+
+describe("stemmed column", () => {
+  const stemsOf = async (citation: string) =>
+    ((await db.execute(sql`SELECT search_stem::text AS s FROM knowledge_passages WHERE citation = ${citation}`)) as unknown as { rows: { s: string }[] }).rows[0]?.s;
+
+  it("is filled from the citation, heading and body when passages are inserted", async () => {
+    expect(await stemsOf("Panduan Verifikasi, bagian 5.4")).toMatch(/'miring':\d+A/);
   });
 });
 
