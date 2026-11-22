@@ -18,12 +18,17 @@ const MAX_TOKENS = 1200;
 
 export type OpenRouterLog = { warn: (details: Record<string, unknown>, message: string) => void };
 
+/**
+ * Batas harian untuk semua pengguna. `take` dipanggil sebelum setiap permintaan HTTP (`false` berarti habis), dan `give`
+ * mengembalikan jatahnya bila permintaan gagal, karena OpenRouter hanya menghitung permintaan yang berhasil.
+ */
+export type RequestBudget = { take(): boolean; give(): void };
+
 type Options = {
   apiKey: string;
   models?: readonly string[];
   fetch?: typeof fetch;
-  /** Dipanggil sebelum setiap permintaan HTTP; `false` berarti batas harian untuk semua pengguna sudah habis. */
-  take?: () => boolean;
+  budget?: RequestBudget;
   log?: OpenRouterLog;
   /** Untuk tes; bawaan `RETRY_DELAY_MS`. */
   retryDelayMs?: number;
@@ -100,14 +105,16 @@ function turnOf(body: WireAnswer | null): AgentTurn {
 }
 
 /** `AgentModel` lewat OpenRouter dengan daftar model berurutan; lihat ADR-0043 untuk cadangan dan batasnya. */
-export function openRouterModel({ apiKey, models = DEFAULT_MODELS, fetch = globalThis.fetch, take = () => true, log, retryDelayMs = RETRY_DELAY_MS }: Options): AgentModel {
+const UNLIMITED: RequestBudget = { take: () => true, give: () => {} };
+
+export function openRouterModel({ apiKey, models = DEFAULT_MODELS, fetch = globalThis.fetch, budget = UNLIMITED, log, retryDelayMs = RETRY_DELAY_MS }: Options): AgentModel {
   const groups: string[][] = [];
   for (let i = 0; i < models.length; i += MODELS_PER_REQUEST) groups.push(models.slice(i, i + MODELS_PER_REQUEST));
 
   /** Satu permintaan HTTP untuk satu kelompok model. Melempar `RetryableError` bila kelompok berikutnya boleh dicoba. */
   async function requestGroup(group: string[], step: AgentStep): Promise<AgentTurn> {
     if (step.signal?.aborted) throw new AgentBusyError("tenggat");
-    if (!take()) throw new AgentBusyError("kuota");
+    if (!budget.take()) throw new AgentBusyError("kuota");
     const payload = {
       models: group,
       messages: wireMessages(step.system, step.messages),
@@ -129,10 +136,12 @@ export function openRouterModel({ apiKey, models = DEFAULT_MODELS, fetch = globa
       });
       body = (await response.json().catch(() => null)) as WireAnswer | null;
     } catch {
+      budget.give();
       if (step.signal?.aborted) throw new AgentBusyError("tenggat");
       log?.warn({ models: group }, "OpenRouter tidak bisa dihubungi atau terlalu lama");
       throw new RetryableError("OpenRouter tidak bisa dihubungi atau terlalu lama");
     }
+    if (!response.ok) budget.give();
     const details = { models: group, status: response.status, code: body?.error?.code };
     try {
       // Galat bisa datang dengan status 200, jadi badan jawaban selalu diperiksa.
