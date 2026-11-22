@@ -1,7 +1,8 @@
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
+import { listCandidates } from "../contribute/facilities.js";
 import { HttpError, errorSchema } from "../http/errors.js";
 import { getPlace, listPlaces, mapPlaces, placeStats, type ReadOptions } from "../places/queries.js";
-import { listQuery, mapQuery, placeDetail, placeIdParams, placeList, placeMap, placeStats as placeStatsSchema } from "../places/schemas.js";
+import { candidateMap, candidateQuery, listQuery, mapQuery, placeDetail, placeIdParams, placeList, placeMap, placeStats as placeStatsSchema } from "../places/schemas.js";
 
 export const placeRoutes: FastifyPluginAsyncZod<ReadOptions & { now: () => Date }> = async (app, opts) => {
   const read = { photoBaseUrl: opts.photoBaseUrl };
@@ -32,6 +33,34 @@ export const placeRoutes: FastifyPluginAsyncZod<ReadOptions & { now: () => Date 
       },
     },
     async (request) => mapPlaces(app.db, request.query),
+  );
+
+  app.get(
+    "/places/candidates",
+    {
+      schema: {
+        tags: ["Lokasi"],
+        summary: "Kandidat Belum ada data dari OpenStreetMap",
+        description:
+          "Kampus, masjid, halte, dan rumah sakit di OpenStreetMap tanpa lokasi AksesBogor berkategori sama dalam 50 m, untuk lapisan \"Belum ada data\" di Peta (ADR-0049). Kandidat belum diperiksa tim: tanpa status, tidak terhitung sebagai lokasi terbit, dan `wheelchair` adalah nilai mentah tag OSM. Data © kontributor OpenStreetMap (ODbL); atribusi di `source` wajib tampil bersama datanya.",
+        querystring: candidateQuery,
+        response: { 200: candidateMap, 400: errorSchema },
+      },
+    },
+    async (request, reply) => {
+      const { candidates, source } = await listCandidates(app.db, request.query);
+      reply.header("cache-control", "public, max-age=300");
+      return {
+        type: "FeatureCollection" as const,
+        features: candidates.map((c) => ({
+          type: "Feature" as const,
+          id: `${c.osm.osmType}/${c.osm.osmId}`,
+          geometry: { type: "Point" as const, coordinates: [c.location.lng, c.location.lat] as [number, number] },
+          properties: { osmType: c.osm.osmType as "node" | "way" | "relation", osmId: c.osm.osmId, name: c.name, category: c.category, district: c.district, wheelchair: c.wheelchair },
+        })),
+        source,
+      };
+    },
   );
 
   app.get(
