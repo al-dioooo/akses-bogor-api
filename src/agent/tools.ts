@@ -17,7 +17,10 @@ export async function findPlace(ctx: ToolContext, input: { query: string }) {
   return { places: await placesNamed(ctx.db, input.query, 5) };
 }
 
-/** place_accessibility: jawaban fasilitas yang sudah diverifikasi, status, dan tanggal verifikasi terakhir. */
+/**
+ * place_accessibility: jawaban fasilitas yang sudah diverifikasi, status, dan tanggal verifikasi terakhir. Koordinat
+ * tempat tidak ikut: model tidak membutuhkannya, dan rute hanya ditampilkan aplikasi.
+ */
 export async function placeAccessibility(ctx: ToolContext, input: { placeId: string }) {
   const place = await getPlace(ctx.db, input.placeId, ctx.now());
   if (!place) throw new HttpError(404, "lokasi_tidak_ditemukan", "Lokasi tidak ditemukan.");
@@ -26,7 +29,6 @@ export async function placeAccessibility(ctx: ToolContext, input: { placeId: str
     name: place.name,
     category: place.category,
     district: place.district,
-    location: place.location,
     landmark: place.landmark,
     status: place.status,
     summary: place.summary,

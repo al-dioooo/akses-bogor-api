@@ -45,6 +45,7 @@ describe("place_accessibility", () => {
     });
     expect(place.facilities).toContainEqual({ facility: "guiding_block", answer: "tidak_tersedia", reason: "tidak_sesuai", note: "Jalur terputus sebelum pintu masuk" });
     expect(place).not.toHaveProperty("photos");
+    expect(place).not.toHaveProperty("location");
   });
 
   it("answers 404 for an unknown place", async () => {
