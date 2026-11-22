@@ -34,3 +34,17 @@ export async function insertPassages(tx: Tx, sourceId: string, passages: readonl
   const rows = passages.map((p, position) => ({ sourceId, position, citation: p.citation, heading: p.heading ?? null, body: p.body, searchStem: stemVector(p) }));
   await inBatches(rows, 200, (batch) => tx.insert(knowledgePassages).values(batch));
 }
+
+/**
+ * Menghitung ulang `search_stem` semua potongan dalam satu transaksi, tanpa mengunduh atau memotong ulang sumbernya.
+ * Dipakai setelah migrasi yang menambah kolom itu, dan setiap kali stemmer atau daftar kata dasarnya berubah.
+ */
+export async function reindexStems(db: Db): Promise<number> {
+  const rows = await db
+    .select({ id: knowledgePassages.id, citation: knowledgePassages.citation, heading: knowledgePassages.heading, body: knowledgePassages.body })
+    .from(knowledgePassages);
+  await db.transaction(async (tx) => {
+    for (const row of rows) await tx.update(knowledgePassages).set({ searchStem: stemVector(row) }).where(eq(knowledgePassages.id, row.id));
+  });
+  return rows.length;
+}

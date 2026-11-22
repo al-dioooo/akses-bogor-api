@@ -46,6 +46,7 @@ pnpm dev               # http://localhost:8080/healthz
 | `pnpm pengetahuan:dokumen [--salinan]` | Mengambil halaman edukasi, Panduan Verifikasi, dan ADR aturan fasilitas dan status; jalankan ulang setelah dokumen itu berubah |
 | `pnpm pengetahuan:disabilitas [--salinan]` | Mengambil jumlah penyandang disabilitas terdaftar per kecamatan dari Open Data Kota Bogor (Dinas Sosial) untuk prioritas kecamatan (ADR-0043); dipakai hanya saat `DISABILITY_DATA_ENABLED` menyala |
 | `pnpm pengetahuan:fasilitas [--salinan]` | Mengambil kampus, masjid, halte, dan rumah sakit di Kota Bogor dari OpenStreetMap sebagai calon tujuan kontributor (ADR-0043) |
+| `pnpm pengetahuan:indeks` | Menghitung ulang bentuk dasar (`search_stem`, ADR-0044) semua potongan basis pengetahuan dari teks yang sudah tersimpan, tanpa mengunduh. Jalankan sekali setelah migrasi 0009, dan setiap kali `src/knowledge/stemmer.ts` atau `src/knowledge/kata-dasar.ts` berubah |
 | `pnpm pengetahuan:evaluasi [R01 …] [--terpisah] [--rinci] [--json berkas]` | Mengukur retrieval `search_knowledge` tanpa model: recall@3, recall@5, recall@8, dan MRR terhadap sitasi yang harus ditemukan untuk setiap pertanyaan di `scripts/pengetahuan/uji-retrieval.json`. Butuh basis pengetahuan yang sudah dimuat. `--terpisah` memakai set `uji-retrieval-terpisah.json`, yang hanya untuk memeriksa dan tidak dipakai untuk menyetel |
 | `pnpm agen:evaluasi [K01 …]` | Menjalankan pertanyaan uji agen kontributor (`scripts/agen/pertanyaan-uji.json`) sekali ke model gratis OpenRouter sungguhan; butuh `OPENROUTER_API_KEY` di environment lokal dan memakai kuota harian, jadi jalankan seperlunya. Berhenti setelah `EVALUASI_MAKS_BERHASIL` (bawaan 14) permintaan berhasil |
 | `pnpm peran --email <email> --peran <admin\|verifikator\|pengguna>` | Mengganti peran akun yang sudah dilengkapi, mis. membuat admin pertama; dicatat di log audit sebagai `skrip` (ADR-0035) |
@@ -87,7 +88,7 @@ Kecamatan laporan dihitung dari batas enam kecamatan di `districts.boundary` (FR
 
 ### Basis Pengetahuan Agen Rute
 
-Agen rute (ADR-0042) membaca data dari empat tabel: `knowledge_sources` (sumber, lisensi, tanggal ambil, SHA-256 unduhan), `knowledge_passages` (potongan teks untuk retrieval), `osm_features`, dan `transit_routes`. Isinya dari skrip di `scripts/pengetahuan/`, bukan dari migrasi. Setiap skrip mengganti sumbernya dalam satu transaksi, jadi aman dijalankan ulang, dan menyimpan salinan mentah unduhan di `.data/pengetahuan/` beserta alamat dan waktu ambilnya. Dengan `--salinan`, skrip memuat salinan terakhir itu tanpa mengunduh lagi dan tanpa mengubah tanggal ambil.
+Agen rute (ADR-0042) membaca data dari empat tabel: `knowledge_sources` (sumber, lisensi, tanggal ambil, SHA-256 unduhan), `knowledge_passages` (potongan teks untuk retrieval; kolom `search` dihitung PostgreSQL, kolom bentuk dasar `search_stem` dihitung API dengan stemmer bahasa Indonesia, ADR-0044), `osm_features`, dan `transit_routes`. Isinya dari skrip di `scripts/pengetahuan/`, bukan dari migrasi. Setiap skrip mengganti sumbernya dalam satu transaksi, jadi aman dijalankan ulang, dan menyimpan salinan mentah unduhan di `.data/pengetahuan/` beserta alamat dan waktu ambilnya. Dengan `--salinan`, skrip memuat salinan terakhir itu tanpa mengunduh lagi dan tanpa mengubah tanggal ambil.
 
 | Perintah | Sumber | Isi |
 | --- | --- | --- |

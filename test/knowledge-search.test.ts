@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Db } from "../src/db/client.js";
 import { knowledgePassages, knowledgeSources } from "../src/db/schema.js";
 import { queryTerms, searchKnowledge } from "../src/knowledge/search.js";
-import { insertPassages, replaceSource } from "../src/knowledge/store.js";
+import { insertPassages, reindexStems, replaceSource } from "../src/knowledge/store.js";
 import { createTestDb } from "./helpers/db.js";
 
 let db: Db;
@@ -140,6 +140,13 @@ describe("stemmed column", () => {
     ((await db.execute(sql`SELECT search_stem::text AS s FROM knowledge_passages WHERE citation = ${citation}`)) as unknown as { rows: { s: string }[] }).rows[0]?.s;
 
   it("is filled from the citation, heading and body when passages are inserted", async () => {
+    expect(await stemsOf("Panduan Verifikasi, bagian 5.4")).toMatch(/'miring':\d+A/);
+  });
+
+  it("is recomputed for every passage by reindexStems", async () => {
+    await db.execute(sql`UPDATE knowledge_passages SET search_stem = ''::tsvector`);
+    expect(await stemsOf("Panduan Verifikasi, bagian 5.4")).toBe("");
+    expect(await reindexStems(db)).toBeGreaterThanOrEqual(5);
     expect(await stemsOf("Panduan Verifikasi, bagian 5.4")).toMatch(/'miring':\d+A/);
   });
 });
