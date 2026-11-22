@@ -326,7 +326,7 @@ export const reportEmails = pgTable(
 );
 
 // Basis pengetahuan agen rute (ADR-0042). Diisi skrip di `scripts/pengetahuan/`, tidak pernah dari permintaan pengguna.
-export const knowledgeKind = pgEnum("knowledge_kind", ["osm", "angkutan_umum", "regulasi", "dokumen_aksesbogor"]);
+export const knowledgeKind = pgEnum("knowledge_kind", ["osm", "angkutan_umum", "regulasi", "dokumen_aksesbogor", "data_disabilitas"]);
 /** Jenis fitur OpenStreetMap, dipilih dari tagnya dengan urutan prioritas di `src/knowledge/osm.ts`. */
 export const osmFeatureKind = pgEnum("osm_feature_kind", ["tangga", "lift", "pintu_masuk", "kerb", "ramp", "guiding_block", "halte", "tempat"]);
 
@@ -430,3 +430,30 @@ export const transitRoutes = pgTable(
   },
   (t) => [index("transit_routes_geom_idx").using("gist", t.geom), index("transit_routes_source_idx").on(t.sourceId)],
 );
+
+// Data untuk kontributor (ADR-0043). Diisi skrip di `scripts/pengetahuan/`, tidak pernah dari permintaan pengguna.
+/** Jenis disabilitas dalam bahasa AksesBogor (ADR-0041); label asli sumber disimpan di `source_label`. */
+export const disabilityCategory = pgEnum("disability_category", ["fisik", "netra", "mental", "lainnya"]);
+
+/**
+ * Jumlah penyandang disabilitas yang terdaftar di Dinas Sosial Kota Bogor per kecamatan, tahun, dan jenis, dari Open
+ * Data Kota Bogor. Bukan jumlah seluruh penduduk. Sumber, syarat pakai, dan tanggal ambil ada di `knowledge_sources`.
+ */
+export const disabilityCounts = pgTable(
+  "disability_counts",
+  {
+    sourceId: varchar("source_id", { length: 80 })
+      .notNull()
+      .references(() => knowledgeSources.id, { onDelete: "cascade" }),
+    districtSlug: varchar("district_slug", { length: 40 })
+      .notNull()
+      .references(() => districts.slug),
+    year: smallint("year").notNull(),
+    category: disabilityCategory("category").notNull(),
+    /** Label di sumber, mis. "CACAT TUBUH". Hanya untuk sitasi, tidak ditampilkan di antarmuka. */
+    sourceLabel: varchar("source_label", { length: 60 }).notNull(),
+    count: integer("count").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.sourceId, t.districtSlug, t.year, t.category] }), check("disability_counts_count_check", sql`${t.count} >= 0`)],
+);
+
