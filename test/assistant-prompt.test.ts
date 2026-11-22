@@ -29,6 +29,8 @@ describe("assistantPrompt", () => {
     expect(prompt).toContain("checkedByTeam benar");
     expect(prompt).toContain("belum diperiksa tim");
     expect(prompt).toContain("Jangan memberi saran medis");
+    expect(prompt).toContain("juga bila titik awal belum dipilih");
+    expect(prompt).toContain("jangan menyebut nomor telepon dari ingatan");
   });
 
   it("is the prompt of the assistant profile", () => {
