@@ -10,7 +10,7 @@ import { obtain, withDb } from "./unduh.js";
 
 const RAW = "https://raw.githubusercontent.com/al-dioooo/";
 const BLOB = "https://github.com/al-dioooo/";
-const WEB = "https://akses-bogor.vercel.app/";
+const WEB = "https://akses-bogor.aldio.dev/";
 const LICENSE = "Milik tim AksesBogor (repo publik tanpa lisensi terbuka)";
 /** Bagian ADR yang tidak dipakai: opsi yang tidak dipilih bisa terbaca sebagai aturan. */
 const ADR_SKIP = /^(Referensi|Opsi yang Dipertimbangkan|Pro & Kontra tiap Opsi)$/;

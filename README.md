@@ -203,7 +203,7 @@ Diagram dan struktur folder ada di [docs/arsitektur.md](docs/arsitektur.md).
 
 ## Deployment
 
-Produksi berjalan di Evergarden, VM Ubuntu 24.04 di OCI region Batam, dan dibuka di `https://akses-bogor-api.yorhagarden.xyz` lewat Cloudflare Tunnel ([ADR-0026](https://github.com/al-dioooo/akses-bogor-docs/blob/main/decisions/0026-api-dan-postgresql-di-evergarden-oci.md)). Berkasnya ada di [deploy/](deploy/).
+Produksi berjalan di Evergarden, VM Ubuntu 24.04 di OCI region Batam, dan dibuka di `https://akses-bogor-api.aldio.dev` lewat Cloudflare Tunnel ([ADR-0026](https://github.com/al-dioooo/akses-bogor-docs/blob/main/decisions/0026-api-dan-postgresql-di-evergarden-oci.md)). Untuk sementara lingkungan ini disebut staging, dan domain produksinya belum diputuskan ([ADR-0045](https://github.com/al-dioooo/akses-bogor-docs/blob/main/decisions/0045-alamat-staging-di-aldio-dev.md)). Berkasnya ada di [deploy/](deploy/).
 
 | Bagian | Di Evergarden |
 | --- | --- |
@@ -222,7 +222,7 @@ Merge `main` ke `release` lewat PR. Paling lama lima menit kemudian, timer menge
 ```bash
 journalctl -u akses-bogor-deploy -n 50     # hasil deploy terakhir
 sudo systemctl start akses-bogor-deploy    # deploy sekarang tanpa menunggu timer
-curl https://akses-bogor-api.yorhagarden.xyz/healthz
+curl https://akses-bogor-api.aldio.dev/healthz
 ```
 
 Rollback dilakukan dengan revert di `release`. Bila perlu kembali sebelum revert itu masuk, hentikan timer supaya tidak men-deploy ulang, lalu pindahkan tautan ke rilis sebelumnya:
@@ -270,7 +270,7 @@ sudo -u aksesbogor -H /usr/local/lib/akses-bogor/deploy.sh release
 sudo systemctl enable --now akses-bogor-api akses-bogor-deploy.timer akses-bogor-backup.timer
 ```
 
-Terakhir, tambahkan public hostname `akses-bogor-api.yorhagarden.xyz` di tunnel Evergarden (Zero Trust → Networks → Tunnels), dengan service `http://127.0.0.1:8090`. Hostname lain di tunnel itu jangan diubah.
+Terakhir, tambahkan public hostname `akses-bogor-api.aldio.dev` di tunnel Evergarden (Zero Trust → Networks → Tunnels), dengan service `http://127.0.0.1:8090`. Hostname lain di tunnel itu jangan diubah.
 
 ### Peran
 
