@@ -31,6 +31,7 @@ export async function placeAccessibility(ctx: ToolContext, input: { placeId: str
     category: place.category,
     district: place.district,
     landmark: place.landmark,
+    description: place.description,
     status: place.status,
     summary: place.summary,
     because: place.because,
