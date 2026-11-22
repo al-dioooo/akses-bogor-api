@@ -6,6 +6,7 @@ import type { Db } from "../db/client.js";
 import type { osmFeatureKind } from "../db/schema.js";
 import { HttpError } from "../http/errors.js";
 import { OSM_ATTRIBUTION } from "../knowledge/osm.js";
+import { getOsmPlace } from "../contribute/facilities.js";
 import { getPlace } from "../places/queries.js";
 import { DirectionsQuotaError, NoRouteError, type LatLng, type WalkingRouter } from "./directions.js";
 import { decodePolyline, encodePolyline } from "./polyline.js";
@@ -42,9 +43,9 @@ function kilometers(a: LatLng, b: LatLng) {
  * Rute jalan kaki dari posisi pengguna ke pin lokasi. Posisi dibulatkan ke 4 desimal (sekitar 11 m) sebelum dikirim ke
  * Mapbox. Jawaban Mapbox tidak disimpan.
  */
-export async function walkingRoute(ctx: RouteContext, input: { from: LatLng; placeId: string }) {
+export async function walkingRoute(ctx: RouteContext, input: { from: LatLng; placeId?: string; osm?: { type: string; id: number } }) {
   if (!ctx.walking) throw new HttpError(503, "rute_belum_diatur", "Rute jalan kaki belum diatur di server.");
-  const place = await getPlace(ctx.db, input.placeId, ctx.now());
+  const place = await destinationOf(ctx, input);
   if (!place) throw new HttpError(404, "lokasi_tidak_ditemukan", "Lokasi tidak ditemukan.");
   const from = { lat: Math.round(input.from.lat * 1e4) / 1e4, lng: Math.round(input.from.lng * 1e4) / 1e4 };
   if (!insideBbox(from)) throw new HttpError(422, "di_luar_kota_bogor", "Posisi Anda berada di luar Kota Bogor. Rute hanya tersedia dari dalam Kota Bogor.");
@@ -60,7 +61,7 @@ export async function walkingRoute(ctx: RouteContext, input: { from: LatLng; pla
     throw new HttpError(502, "rute_gagal", "Rute jalan kaki sedang tidak bisa dimuat. Coba lagi sebentar lagi.");
   }
   return {
-    destination: { placeId: place.id, name: place.name, location: place.location },
+    destination: { placeId: place.placeId, osm: place.osm, name: place.name, location: place.location },
     distanceMeters: route.distanceMeters,
     durationSeconds: route.durationSeconds,
     steps: route.steps,
@@ -69,6 +70,19 @@ export async function walkingRoute(ctx: RouteContext, input: { from: LatLng; pla
     warning: ROUTE_WARNING,
     attribution: MAPBOX_ATTRIBUTION,
   };
+}
+
+type Destination = { placeId: string | null; osm: { type: string; id: number } | null; name: string | null; location: LatLng };
+
+/** Tujuan rute: lokasi AksesBogor, atau tempat OpenStreetMap tanpa data AksesBogor untuk kontributor (ADR-0043). */
+async function destinationOf(ctx: RouteContext, input: { placeId?: string; osm?: { type: string; id: number } }): Promise<Destination | null> {
+  if (input.placeId) {
+    const place = await getPlace(ctx.db, input.placeId, ctx.now());
+    return place ? { placeId: place.id, osm: null, name: place.name, location: place.location } : null;
+  }
+  if (!input.osm) return null;
+  const place = await getOsmPlace(ctx.db, { osmType: input.osm.type, osmId: input.osm.id });
+  return place ? { placeId: null, osm: { type: input.osm.type, id: input.osm.id }, name: place.name, location: place.location } : null;
 }
 
 const WHEELCHAIR: Record<string, string> = { yes: "bisa untuk kursi roda", limited: "terbatas untuk kursi roda", no: "tidak bisa untuk kursi roda" };
