@@ -21,6 +21,12 @@ describe("guardRouteClaims", () => {
 });
 
 describe("systemPrompt", () => {
+  it("tells disabled users plainly that the data is not available yet", () => {
+    const prompt = systemPrompt();
+    expect(prompt).toContain("katakan dengan jelas bahwa datanya belum tersedia di AksesBogor");
+    expect(prompt).toContain("Jangan menebak atau menyiratkan aksesibilitas");
+  });
+
   it("asks for plain text, since the web shows the answer as it is", () => {
     expect(systemPrompt({ id: "x", name: "Tempat", lastVerifiedAt: "2026-10-18T03:00:00.000Z" })).toContain("tanpa Markdown");
   });
