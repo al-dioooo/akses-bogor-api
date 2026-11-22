@@ -1,4 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { buildApp } from "../src/app.js";
+import { loadEnv } from "../src/config/env.js";
 import { categoryOf, getOsmPlace, listCandidates, loadFacilities, parseFacilities, placesWithoutData } from "../src/contribute/facilities.js";
 import type { Db } from "../src/db/client.js";
 import { seedSampleData } from "../src/db/seed.js";
@@ -96,5 +98,30 @@ describe("facilities from OpenStreetMap", () => {
     expect(await ids({ category: ["rumah_sakit", "kampus"] })).toEqual([3]);
     expect(await ids({ district: ["bogor-tengah"] })).toEqual([]);
     expect(await ids({ district: ["bogor-barat", "bogor-tengah"], category: ["masjid"] })).toEqual([2]);
+  });
+
+  it("serves candidates as cached GeoJSON with the OSM attribution", async () => {
+    const app = await buildApp(loadEnv({ NODE_ENV: "test", DATABASE_URL: "postgresql://test@localhost/test" }), { db });
+    await app.ready();
+    try {
+      const res = await app.inject({ method: "GET", url: "/places/candidates?category=masjid" });
+      expect(res.statusCode).toBe(200);
+      expect(res.headers["cache-control"]).toBe("public, max-age=300");
+      expect(res.json()).toEqual({
+        type: "FeatureCollection",
+        features: [
+          {
+            type: "Feature",
+            id: "way/2",
+            geometry: { type: "Point", coordinates: [106.7645, -6.5705] },
+            properties: { osmType: "way", osmId: 2, name: "Masjid Al-Ikhlas", category: "masjid", district: { slug: "bogor-barat", name: "Bogor Barat" }, wheelchair: "limited" },
+          },
+        ],
+        source: expect.objectContaining({ attribution: "© kontributor OpenStreetMap", license: "Open Database License (ODbL) 1.0" }),
+      });
+      expect((await app.inject({ method: "GET", url: "/places/candidates?category=gereja" })).statusCode).toBe(400);
+    } finally {
+      await app.close();
+    }
   });
 });
