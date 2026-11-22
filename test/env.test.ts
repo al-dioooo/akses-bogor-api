@@ -94,4 +94,17 @@ describe("loadEnv", () => {
     expect(loadEnv({ ...base, OPENROUTER_MODELS: "vendor/a:free, vendor/b:free," }).OPENROUTER_MODELS).toEqual(["vendor/a:free", "vendor/b:free"]);
     expect(() => loadEnv({ ...base, OPENROUTER_API_KEY: "sk-ant-salah-tempat" })).toThrow(/OPENROUTER_API_KEY/);
   });
+
+  it("uses Claude for the agent by default, with optional model and effort, and a configurable daily cap", () => {
+    const base = { DATABASE_URL: "postgresql://test:test@localhost:5432/test" };
+    const plain = loadEnv({ ...base, ANTHROPIC_API_KEY: "", ANTHROPIC_MODEL: "", ANTHROPIC_EFFORT: "" });
+    expect(plain).toMatchObject({ AGENT_PROVIDER: "anthropic", AGENT_REQUESTS_PER_DAY: 45 });
+    expect(plain.ANTHROPIC_API_KEY ?? plain.ANTHROPIC_MODEL ?? plain.ANTHROPIC_EFFORT).toBeUndefined();
+    const set = loadEnv({ ...base, AGENT_PROVIDER: "openrouter", AGENT_REQUESTS_PER_DAY: "200", ANTHROPIC_API_KEY: "sk-ant-tes", ANTHROPIC_EFFORT: "medium" });
+    expect(set).toMatchObject({ AGENT_PROVIDER: "openrouter", AGENT_REQUESTS_PER_DAY: 200, ANTHROPIC_API_KEY: "sk-ant-tes", ANTHROPIC_EFFORT: "medium" });
+    expect(() => loadEnv({ ...base, AGENT_PROVIDER: "gratis" })).toThrow(/AGENT_PROVIDER/);
+    expect(() => loadEnv({ ...base, ANTHROPIC_API_KEY: "sk-or-salah-tempat" })).toThrow(/ANTHROPIC_API_KEY/);
+    expect(() => loadEnv({ ...base, ANTHROPIC_EFFORT: "max" })).toThrow(/ANTHROPIC_EFFORT/);
+    expect(() => loadEnv({ ...base, AGENT_REQUESTS_PER_DAY: "0" })).toThrow(/AGENT_REQUESTS_PER_DAY/);
+  });
 });

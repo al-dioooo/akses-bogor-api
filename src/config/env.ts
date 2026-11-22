@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DEFAULT_REQUESTS_PER_DAY } from "../agent/limits.js";
 
 const csv = (fallback = "") =>
   z
@@ -56,7 +57,7 @@ const schema = z
     PHOTO_STORAGE_DIR: optional(z.string().min(1)),
     /**
      * Route agen rute `/agent/*` dan rute jalan kaki `/route/*` (ADR-0042). Mati sampai syarat peluncurannya terpenuhi,
-     * termasuk Kebijakan Privasi yang menyebut Mapbox Directions, OpenRouter, dan penyedia model.
+     * termasuk Kebijakan Privasi yang menyebut Mapbox Directions dan penyedia model.
      */
     ROUTE_AGENT_ENABLED: z.stringbool().default(false),
     /**
@@ -64,7 +65,20 @@ const schema = z
      * Diskominfo Kota Bogor mengizinkan pemakaiannya, karena syarat portal membatasi pemakaian untuk pihak ketiga.
      */
     DISABILITY_DATA_ENABLED: z.stringbool().default(false),
-    /** API key OpenRouter untuk model agen rute (ADR-0042). Kosong berarti agen menjawab sibuk; API tetap jalan. */
+    /**
+     * Penyedia model agen (ADR-0047): `anthropic` untuk Claude API, atau `openrouter`. Tidak ada cadangan otomatis ke
+     * penyedia lain; pertanyaan hanya dikirim ke penyedia yang dipilih di sini.
+     */
+    AGENT_PROVIDER: z.enum(["anthropic", "openrouter"]).default("anthropic"),
+    /** Permintaan ke model yang berhasil per hari UTC untuk semua pengguna. Bawaan 45. */
+    AGENT_REQUESTS_PER_DAY: z.coerce.number().int().min(1).default(DEFAULT_REQUESTS_PER_DAY),
+    /** API key Claude API untuk model agen (ADR-0047). Kosong berarti agen menjawab sibuk; API tetap jalan. */
+    ANTHROPIC_API_KEY: optional(z.string().startsWith("sk-ant-")),
+    /** Model Claude untuk agen. Kosong berarti `claude-haiku-5-5`. */
+    ANTHROPIC_MODEL: optional(z.string().trim().min(1)),
+    /** Effort Claude (`output_config.effort`): `low`, `medium`, atau `high`. Kosong berarti bawaan API ini (ADR-0047). */
+    ANTHROPIC_EFFORT: optional(z.enum(["low", "medium", "high"])),
+    /** API key OpenRouter bila `AGENT_PROVIDER=openrouter` (ADR-0042). Kosong berarti agen menjawab sibuk; API tetap jalan. */
     OPENROUTER_API_KEY: optional(z.string().startsWith("sk-or-")),
     /** Model OpenRouter berurutan, dipisah koma; yang pertama dicoba dulu. Kosong berarti daftar bawaan API. */
     OPENROUTER_MODELS: csv(),

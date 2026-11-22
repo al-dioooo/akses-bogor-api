@@ -17,14 +17,16 @@ const base = {
   DATABASE_URL: "postgresql://test@localhost/test",
   BETTER_AUTH_SECRET: "rahasia-tes-yang-panjangnya-lebih-dari-32-karakter",
   ROUTE_AGENT_ENABLED: "true",
+  AGENT_PROVIDER: "openrouter",
   OPENROUTER_MODELS: "a/satu:free,b/dua:free,c/tiga:free,d/empat:free",
 };
+const CLAUDE_URL = "https://api.anthropic.com/v1/messages";
 const NOW = new Date("2026-11-22T05:00:00.000Z");
 
 /** Jawaban OpenRouter tiruan, dipakai berurutan. */
 let replies: (() => Response)[] = [];
 const fetch = vi.fn<typeof globalThis.fetch>(async (url) => {
-  if (String(url) !== OPENROUTER_URL) throw new Error(`alamat tak terduga ${String(url)}`);
+  if (String(url) !== OPENROUTER_URL && String(url) !== CLAUDE_URL) throw new Error(`alamat tak terduga ${String(url)}`);
   const reply = replies.shift();
   if (!reply) throw new Error("permintaan OpenRouter tak terduga");
   return reply();
@@ -34,12 +36,17 @@ const toolCall = (name: string, args: string, id = "c1") => () =>
   Response.json({ model: "a/satu:free", choices: [{ finish_reason: "tool_calls", message: { content: null, tool_calls: [{ id, type: "function", function: { name, arguments: args } }] } }] });
 const failure = (status: number, metadata?: Record<string, unknown>) => () => Response.json({ error: { code: status, message: "galat", metadata } }, { status });
 const sentBody = (call: number) => JSON.parse((fetch.mock.calls[call]![1] as RequestInit).body as string);
+/** Jawaban Claude API tiruan. */
+const claude = (content: unknown[], stop_reason: string) => () =>
+  Response.json({ id: "msg_1", type: "message", role: "assistant", model: "claude-haiku-5-5", content, stop_reason, stop_details: null, stop_sequence: null, usage: { input_tokens: 10, output_tokens: 5 } });
 
 let db: Db;
 let close: () => Promise<void>;
 let app: Awaited<ReturnType<typeof buildApp>>;
 let disabled: Awaited<ReturnType<typeof buildApp>>;
 let keyless: Awaited<ReturnType<typeof buildApp>>;
+let claudeApp: Awaited<ReturnType<typeof buildApp>>;
+let claudeKeyless: Awaited<ReturnType<typeof buildApp>>;
 let sari: { token: string };
 let budi: { token: string };
 let dewi: { token: string };
@@ -59,7 +66,10 @@ beforeAll(async () => {
   app = await buildApp(loadEnv({ ...base, OPENROUTER_API_KEY: "sk-or-tes" }), deps);
   disabled = await buildApp(loadEnv({ ...base, ROUTE_AGENT_ENABLED: "false", OPENROUTER_API_KEY: "sk-or-tes" }), deps);
   keyless = await buildApp(loadEnv(base), deps);
-  await Promise.all([app.ready(), disabled.ready(), keyless.ready()]);
+  const claudeBase = { ...base, AGENT_PROVIDER: "anthropic" };
+  claudeApp = await buildApp(loadEnv({ ...claudeBase, ANTHROPIC_API_KEY: "sk-ant-tes" }), deps);
+  claudeKeyless = await buildApp(loadEnv(claudeBase), deps);
+  await Promise.all([app.ready(), disabled.ready(), keyless.ready(), claudeApp.ready(), claudeKeyless.ready()]);
   const helpers = accounts(app, sent);
   sari = await helpers.reporter("sari@contoh.id", "Sari");
   budi = await helpers.reporter("budi@contoh.id", "Budi");
@@ -69,7 +79,7 @@ beforeAll(async () => {
 }, 60_000);
 
 afterAll(async () => {
-  await Promise.all([app.close(), disabled.close(), keyless.close()]);
+  await Promise.all([app.close(), disabled.close(), keyless.close(), claudeApp.close(), claudeKeyless.close()]);
   await close();
 });
 
@@ -91,7 +101,7 @@ describe("POST /agent/ask", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("is busy without an OpenRouter key", async () => {
+  it("is busy without an OpenRouter key when OpenRouter is chosen", async () => {
     const res = await ask(sari.token, { placeId: halteId, question: "Ada ramp?" }, keyless);
     expect(res.statusCode).toBe(503);
     expect(res.json()).toEqual({ galat: "agen_sibuk", pesan: "Agen sedang sibuk, coba lagi nanti." });
@@ -179,6 +189,30 @@ describe("POST /agent/ask", () => {
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({ answer: "Mulai dari kecamatan prioritas.", sources: [] });
     expect(sentBody(0).messages[0].content).not.toContain("Tempat yang sedang dilihat");
+  });
+
+  it("asks Claude when it is the provider, replaying its blocks with the tool results and never sending coordinates", async () => {
+    const thinking = { type: "thinking", thinking: "", signature: "sig" };
+    const call = { type: "tool_use", id: "toolu_1", name: "search_knowledge", input: { query: "hak aksesibilitas" } };
+    replies = [claude([thinking, call], "tool_use"), claude([{ type: "text", text: "Menurut UU No. 8 Tahun 2016, Pasal 18, ..." }], "end_turn")];
+    const res = await ask(sari.token, { placeId: halteId, question: "Apa hak aksesibilitas saya?" }, claudeApp);
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ answer: "Menurut UU No. 8 Tahun 2016, Pasal 18, ...", model: "claude-haiku-5-5" });
+    expect(fetch.mock.calls.map(([url]) => String(url))).toEqual([CLAUDE_URL, CLAUDE_URL]);
+    for (const n of [0, 1]) expect(JSON.stringify(sentBody(n))).not.toMatch(/"(lat|lng|location|geometry|polyline)"|-6\.59|106\.79/);
+    expect(sentBody(1).messages.slice(-2)).toEqual([
+      { role: "assistant", content: [thinking, call] },
+      { role: "user", content: [{ type: "tool_result", tool_use_id: "toolu_1", content: expect.stringContaining("UU No. 8 Tahun 2016, Pasal 18") }] },
+    ]);
+  });
+
+  it("is busy without a Claude key, without calling the API or using the account's daily questions", async () => {
+    for (let i = 0; i <= QUESTIONS_PER_ACCOUNT_PER_DAY; i += 1) {
+      const res = await ask(rina.token, { question: "Mulai dari mana?" }, claudeKeyless);
+      expect(res.statusCode).toBe(503);
+      expect(res.json().galat).toBe("agen_sibuk");
+    }
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it("validates the question, the history and the place", async () => {
