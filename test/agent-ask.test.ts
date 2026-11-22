@@ -49,7 +49,7 @@ describe("askAgent", () => {
     expect(result).toEqual({
       answer: "Ramp tersedia (data terverifikasi AksesBogor, diverifikasi 2026-10-18).",
       model: "a/satu:free",
-      sources: [{ type: "lokasi", placeId: halteId, name: "Halte contoh", lastVerifiedAt: "2026-10-18T03:00:00.000Z" }],
+      sources: [{ type: "lokasi", placeId: halteId, name: "Halte contoh", lastVerifiedAt: "2026-10-18T03:00:00.000Z", verifiedBy: "tim" }],
       cards: [],
     });
     expect(steps[0]!.system).toContain('"name":"Halte contoh"');
