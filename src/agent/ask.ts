@@ -43,7 +43,8 @@ export type Seen = {
  */
 export type AgentProfile = {
   tools: readonly RegisteredTool[];
-  system: (place?: ChosenPlace) => string;
+  /** `ctx` hanya untuk membaca apakah titik awal ada; nilai posisinya tidak boleh masuk instruksi. */
+  system: (place?: ChosenPlace, ctx?: ToolContext) => string;
   guard: (text: string, seen: Seen) => string;
 };
 
@@ -116,7 +117,7 @@ export async function askAgent(
     }
   };
 
-  const system = profile.system(place);
+  const system = profile.system(place, ctx);
   const tools = toolDefinitions(profile.tools);
   const messages: AgentMessage[] = [...(input.history ?? []), { role: "user", content: input.question }];
   const signal = AbortSignal.timeout(deadlineMs);
