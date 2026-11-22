@@ -35,7 +35,7 @@ const schema = z
      * route akun menjawab 503; di development dipakai rahasia tetap khusus lokal.
      */
     BETTER_AUTH_SECRET: optional(z.string().min(32)),
-    /** Alamat publik API, mis. https://akses-bogor-api.yorhagarden.xyz. */
+    /** Alamat publik API, mis. https://akses-bogor-api.aldio.dev. */
     BETTER_AUTH_URL: optional(z.url()),
     /** Client ID OAuth Google untuk memeriksa ID token. Kosong berarti masuk dengan Google mati. */
     GOOGLE_CLIENT_ID: optional(z.string().min(1)),
