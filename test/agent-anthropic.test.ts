@@ -7,8 +7,8 @@ const step: AgentStep = { system: "Aturan", messages: [{ role: "user", content: 
 const usage = { input_tokens: 12, output_tokens: 34, cache_read_input_tokens: 4000, cache_creation_input_tokens: 56 };
 
 /** Jawaban Claude API tiruan dengan blok konten dan alasan berhenti tertentu. */
-const message = (content: unknown[], stop_reason = "end_turn") =>
-  Response.json({ id: "msg_1", type: "message", role: "assistant", model: DEFAULT_MODEL, content, stop_reason, stop_details: null, stop_sequence: null, usage });
+const message = (content: unknown[], stop_reason = "end_turn", stop_details: unknown = null) =>
+  Response.json({ id: "msg_1", type: "message", role: "assistant", model: DEFAULT_MODEL, content, stop_reason, stop_details, stop_sequence: null, usage });
 const failure = (status: number, type: string, details?: Record<string, unknown>) =>
   Response.json({ type: "error", error: { type, message: "galat", ...(details ? { details } : {}) }, request_id: "req_1" }, { status, headers: { "retry-after-ms": "0", "request-id": "req_1" } });
 const bodyOf = (fetch: ReturnType<typeof vi.fn>, call = 0) => JSON.parse((fetch.mock.calls[call]![1] as RequestInit).body as string);
@@ -100,6 +100,27 @@ describe("anthropicModel", () => {
     for (const [reply, reason] of cases) {
       const turn = await model(async () => reply).next(step);
       expect(turn).toEqual({ kind: "no_answer", reason, model: DEFAULT_MODEL });
+    }
+  });
+
+  it("logs only the category of a refusal, not its explanation", async () => {
+    const log = { info: vi.fn(), warn: vi.fn() };
+    const refusal = message([], "refusal", { type: "refusal", category: "cyber", explanation: "Pertanyaan tentang ramp ditolak." });
+    const turn = await model(async () => refusal, { log }).next(step);
+    expect(turn).toEqual({ kind: "no_answer", reason: "ditolak", model: DEFAULT_MODEL });
+    expect(log.info).toHaveBeenCalledWith(expect.objectContaining({ stop: "refusal", refusalCategory: "cyber" }), "langkah agen Claude");
+    expect(JSON.stringify(log.info.mock.calls)).not.toMatch(/ramp|ditolak/i);
+  });
+
+  it("keeps the SDK's own logging off even when ANTHROPIC_LOG asks for debug", async () => {
+    vi.stubEnv("ANTHROPIC_LOG", "debug");
+    const spies = (["debug", "info", "log", "warn", "error"] as const).map((level) => vi.spyOn(console, level).mockImplementation(() => {}));
+    try {
+      await model(async () => message([{ type: "text", text: "Ramp tersedia." }])).next(step);
+      for (const spy of spies) expect(spy).not.toHaveBeenCalled();
+    } finally {
+      for (const spy of spies) spy.mockRestore();
+      vi.unstubAllEnvs();
     }
   });
 

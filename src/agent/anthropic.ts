@@ -122,7 +122,8 @@ export function anthropicModel({ apiKey, model = DEFAULT_MODEL, effort = DEFAULT
       },
     };
   }
-  const client = new Anthropic({ apiKey, maxRetries, timeout: TIMEOUT_MS, ...(fetch ? { fetch } : {}) });
+  // Log SDK dimatikan, termasuk lewat ANTHROPIC_LOG, karena level debug mencatat badan permintaan beserta pertanyaan pengguna.
+  const client = new Anthropic({ apiKey, maxRetries, timeout: TIMEOUT_MS, logLevel: "off", ...(fetch ? { fetch } : {}) });
 
   return {
     async next(step: AgentStep): Promise<AgentTurn> {
@@ -159,6 +160,8 @@ export function anthropicModel({ apiKey, model = DEFAULT_MODEL, effort = DEFAULT
           output: usage.output_tokens,
           cacheRead: usage.cache_read_input_tokens ?? 0,
           cacheWrite: usage.cache_creation_input_tokens ?? 0,
+          // Untuk penolakan hanya kategorinya; teks penjelasannya bisa mengulang isi pertanyaan.
+          ...(message.stop_reason === "refusal" ? { refusalCategory: message.stop_details?.category ?? null } : {}),
         },
         "langkah agen Claude",
       );
