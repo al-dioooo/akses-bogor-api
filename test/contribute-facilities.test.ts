@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { categoryOf, getOsmPlace, loadFacilities, parseFacilities, placesWithoutData } from "../src/contribute/facilities.js";
+import { categoryOf, getOsmPlace, listCandidates, loadFacilities, parseFacilities, placesWithoutData } from "../src/contribute/facilities.js";
 import type { Db } from "../src/db/client.js";
 import { seedSampleData } from "../src/db/seed.js";
 import type { OverpassElement } from "../src/knowledge/osm.js";
@@ -11,7 +11,7 @@ const elements: OverpassElement[] = [
   // Halte 20 m dari "Halte contoh": sudah punya data AksesBogor.
   { type: "node", id: 1, lat: -6.5959, lon: 106.7943, tags: { highway: "bus_stop", name: "Halte Pajajaran", phone: "0251-1" } },
   // Masjid di Bogor Barat tanpa lokasi AksesBogor di dekatnya.
-  { type: "way", id: 2, center: { lat: -6.5705, lon: 106.7645 }, tags: { amenity: "place_of_worship", religion: "muslim", name: "Masjid Al-Ikhlas" } },
+  { type: "way", id: 2, center: { lat: -6.5705, lon: 106.7645 }, tags: { amenity: "place_of_worship", religion: "muslim", name: "Masjid Al-Ikhlas", wheelchair: "limited" } },
   // Rumah sakit 60 m dari "Rumah sakit contoh": di luar jarak 50 m, jadi belum punya data.
   { type: "node", id: 3, lat: -6.5705, lon: 106.764, tags: { amenity: "hospital" } },
   // Gereja bukan kategori MVP.
@@ -70,5 +70,31 @@ describe("facilities from OpenStreetMap", () => {
       osmUrl: "https://www.openstreetmap.org/way/2",
     });
     expect(await getOsmPlace(db, { osmType: "node", osmId: 5 })).toBeNull();
+  });
+
+  it("lists candidates for the Peta layer with their point, kecamatan, raw wheelchair tag, and source", async () => {
+    const { candidates, source } = await listCandidates(db, {});
+    // The halte 20 m from a published halte is left out; the hospital 60 m away stays.
+    expect(candidates).toEqual([
+      { osm: { osmType: "node", osmId: 3 }, name: null, category: "rumah_sakit", district: { slug: "bogor-barat", name: "Bogor Barat" }, location: { lat: -6.5705, lng: 106.764 }, wheelchair: null },
+      { osm: { osmType: "way", osmId: 2 }, name: "Masjid Al-Ikhlas", category: "masjid", district: { slug: "bogor-barat", name: "Bogor Barat" }, location: { lat: -6.5705, lng: 106.7645 }, wheelchair: "limited" },
+    ]);
+    expect(source).toEqual({
+      title: "Kampus, masjid, halte, dan rumah sakit di Kota Bogor (OpenStreetMap)",
+      license: "Open Database License (ODbL) 1.0",
+      attribution: "© kontributor OpenStreetMap",
+      url: "https://www.openstreetmap.org/copyright",
+      retrievedAt: "2026-11-22T10:00:00.000Z",
+    });
+  });
+
+  it("filters candidates by name, category, and kecamatan", async () => {
+    const ids = async (filters: Parameters<typeof listCandidates>[1]) => (await listCandidates(db, filters)).candidates.map((c) => c.osm.osmId);
+    expect(await ids({ q: "al-ikh" })).toEqual([2]);
+    // "%" and "_" in the search are plain characters, not wildcards.
+    expect(await ids({ q: "%" })).toEqual([]);
+    expect(await ids({ category: ["rumah_sakit", "kampus"] })).toEqual([3]);
+    expect(await ids({ district: ["bogor-tengah"] })).toEqual([]);
+    expect(await ids({ district: ["bogor-barat", "bogor-tengah"], category: ["masjid"] })).toEqual([2]);
   });
 });
