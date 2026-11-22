@@ -39,6 +39,8 @@ const sentBody = (call: number) => JSON.parse((fetch.mock.calls[call]![1] as Req
 /** Jawaban Claude API tiruan. */
 const claude = (content: unknown[], stop_reason: string) => () =>
   Response.json({ id: "msg_1", type: "message", role: "assistant", model: "claude-haiku-5-5", content, stop_reason, stop_details: null, stop_sequence: null, usage: { input_tokens: 10, output_tokens: 5 } });
+const claudeFailure = (status: number, type: string) => () =>
+  Response.json({ type: "error", error: { type, message: "galat" } }, { status, headers: { "retry-after-ms": "1" } });
 
 let db: Db;
 let close: () => Promise<void>;
@@ -47,6 +49,7 @@ let disabled: Awaited<ReturnType<typeof buildApp>>;
 let keyless: Awaited<ReturnType<typeof buildApp>>;
 let claudeApp: Awaited<ReturnType<typeof buildApp>>;
 let claudeKeyless: Awaited<ReturnType<typeof buildApp>>;
+let claudeBothKeys: Awaited<ReturnType<typeof buildApp>>;
 let sari: { token: string };
 let budi: { token: string };
 let dewi: { token: string };
@@ -69,7 +72,8 @@ beforeAll(async () => {
   const claudeBase = { ...base, AGENT_PROVIDER: "anthropic" };
   claudeApp = await buildApp(loadEnv({ ...claudeBase, ANTHROPIC_API_KEY: "sk-ant-tes" }), deps);
   claudeKeyless = await buildApp(loadEnv(claudeBase), deps);
-  await Promise.all([app.ready(), disabled.ready(), keyless.ready(), claudeApp.ready(), claudeKeyless.ready()]);
+  claudeBothKeys = await buildApp(loadEnv({ ...claudeBase, ANTHROPIC_API_KEY: "sk-ant-tes", OPENROUTER_API_KEY: "sk-or-tes" }), deps);
+  await Promise.all([app.ready(), disabled.ready(), keyless.ready(), claudeApp.ready(), claudeKeyless.ready(), claudeBothKeys.ready()]);
   const helpers = accounts(app, sent);
   sari = await helpers.reporter("sari@contoh.id", "Sari");
   budi = await helpers.reporter("budi@contoh.id", "Budi");
@@ -79,7 +83,7 @@ beforeAll(async () => {
 }, 60_000);
 
 afterAll(async () => {
-  await Promise.all([app.close(), disabled.close(), keyless.close(), claudeApp.close(), claudeKeyless.close()]);
+  await Promise.all([app.close(), disabled.close(), keyless.close(), claudeApp.close(), claudeKeyless.close(), claudeBothKeys.close()]);
   await close();
 });
 
@@ -204,6 +208,23 @@ describe("POST /agent/ask", () => {
       { role: "assistant", content: [thinking, call] },
       { role: "user", content: [{ type: "tool_result", tool_use_id: "toolu_1", content: expect.stringContaining("UU No. 8 Tahun 2016, Pasal 18") }] },
     ]);
+  });
+
+  it("never falls back to OpenRouter when Claude fails, even with both keys set", async () => {
+    const cases = [
+      [401, "authentication_error"],
+      [429, "rate_limit_error"],
+      [529, "overloaded_error"],
+    ] as const;
+    for (const [status, type] of cases) {
+      // Dua jawaban gagal: SDK mengulang sekali untuk 429 dan 529.
+      replies = [claudeFailure(status, type), claudeFailure(status, type)];
+      const res = await ask(rina.token, { question: "Mulai dari mana?" }, claudeBothKeys);
+      expect(res.statusCode).toBe(503);
+      expect(res.json().galat).toBe("agen_sibuk");
+    }
+    // 401 sekali, 429 dan 529 masing-masing dua kali; tidak satu pun ke OpenRouter.
+    expect(fetch.mock.calls.map(([url]) => String(url))).toEqual(Array(5).fill(CLAUDE_URL));
   });
 
   it("is busy without a Claude key, without calling the API or using the account's daily questions", async () => {
