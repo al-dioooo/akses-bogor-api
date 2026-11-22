@@ -1,7 +1,7 @@
 // Skema Drizzle untuk model data PRD bagian 9. Nama tabel dan kolom dalam bahasa Inggris; nilai enum
 // memakai istilah produk (ADR di akses-bogor-docs) supaya sama dengan yang dibaca tim dan pengguna.
 import { sql } from "drizzle-orm";
-import { bigserial, boolean, check, customType, geometry, index, integer, jsonb, pgEnum, pgTable, primaryKey, smallint, text, timestamp, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
+import { bigint, bigserial, boolean, check, customType, geometry, index, integer, jsonb, pgEnum, pgTable, primaryKey, smallint, text, timestamp, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
 
 // ADR-0004
 export const placeCategory = pgEnum("place_category", ["kampus", "masjid", "halte", "rumah_sakit"]);
@@ -323,4 +323,110 @@ export const reportEmails = pgTable(
     nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("report_emails_report_kind_idx").on(t.reportId, t.kind), index("report_emails_next_idx").on(t.nextAttemptAt)],
+);
+
+// Basis pengetahuan agen rute (ADR-0042). Diisi skrip di `scripts/pengetahuan/`, tidak pernah dari permintaan pengguna.
+export const knowledgeKind = pgEnum("knowledge_kind", ["osm", "angkutan_umum", "regulasi", "dokumen_aksesbogor"]);
+/** Jenis fitur OpenStreetMap, dipilih dari tagnya dengan urutan prioritas di `src/knowledge/osm.ts`. */
+export const osmFeatureKind = pgEnum("osm_feature_kind", ["tangga", "lift", "pintu_masuk", "kerb", "ramp", "guiding_block", "halte", "tempat"]);
+
+const tsvector = customType<{ data: string }>({ dataType: () => "tsvector" });
+const anyGeometry = customType<{ data: string; driverData: string }>({ dataType: () => "geometry(Geometry, 4326)" });
+const multiLine = customType<{ data: string; driverData: string }>({ dataType: () => "geometry(MultiLineString, 4326)" });
+
+/**
+ * Satu sumber data: hasil satu kali ambil (satu kueri Overpass, satu berkas regulasi, satu dokumen AksesBogor).
+ * Setiap baris data di tabel pengetahuan menunjuk ke sini, sehingga sumber, lisensi, dan tanggal ambilnya selalu
+ * ikut. Menjalankan ulang skrip mengganti sumber beserta semua barisnya.
+ */
+export const knowledgeSources = pgTable("knowledge_sources", {
+  id: varchar("id", { length: 80 }).primaryKey(),
+  kind: knowledgeKind("kind").notNull(),
+  title: varchar("title", { length: 300 }).notNull(),
+  /** Alamat asal yang bisa dibuka orang, mis. berkas PDF resmi atau halaman dokumen. */
+  url: text("url").notNull(),
+  license: varchar("license", { length: 300 }).notNull(),
+  /** Kalimat atribusi yang wajib ikut saat isi sumber ini dipakai, mis. "© kontributor OpenStreetMap". */
+  attribution: varchar("attribution", { length: 300 }),
+  retrievedAt: timestamp("retrieved_at", { withTimezone: true }).notNull(),
+  /** SHA-256 berkas mentah yang diunduh, untuk tahu apakah sumbernya berubah sejak pengambilan terakhir. */
+  sha256: varchar("sha256", { length: 64 }),
+});
+
+/**
+ * Potongan teks untuk retrieval. `search` dihitung PostgreSQL dari sitasi, judul, dan isi dengan konfigurasi `simple`,
+ * karena PostgreSQL tidak punya stemmer bahasa Indonesia. Kolom embedding (pgvector) bisa ditambah nanti tanpa mengubah
+ * pemanggil `searchKnowledge`.
+ */
+export const knowledgePassages = pgTable(
+  "knowledge_passages",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    sourceId: varchar("source_id", { length: 80 })
+      .notNull()
+      .references(() => knowledgeSources.id, { onDelete: "cascade" }),
+    /** Urutan potongan di dalam sumbernya. */
+    position: integer("position").notNull(),
+    /** Rujukan yang bisa dikutip, mis. "UU No. 8 Tahun 2016, Pasal 18". */
+    citation: varchar("citation", { length: 300 }).notNull(),
+    /** Judul bab, bagian, atau heading tempat potongan ini berada. */
+    heading: varchar("heading", { length: 300 }),
+    body: text("body").notNull(),
+    search: tsvector("search")
+      .notNull()
+      .generatedAlwaysAs(
+        sql`setweight(to_tsvector('simple', coalesce(citation, '') || ' ' || coalesce(heading, '')), 'A') || setweight(to_tsvector('simple', body), 'B')`,
+      ),
+  },
+  (t) => [
+    uniqueIndex("knowledge_passages_source_position_idx").on(t.sourceId, t.position),
+    index("knowledge_passages_search_idx").using("gin", t.search),
+    index("knowledge_passages_body_trgm_idx").using("gin", t.body.op("gin_trgm_ops")),
+  ],
+);
+
+/**
+ * Fitur OpenStreetMap di Kota Bogor yang berguna untuk rute dan aksesibilitas (ADR-0042). Hanya tag dalam daftar izin
+ * yang disimpan, tanpa metadata penyunting. Data © kontributor OpenStreetMap, berlisensi ODbL.
+ */
+export const osmFeatures = pgTable(
+  "osm_features",
+  {
+    osmType: varchar("osm_type", { length: 8 }).notNull(),
+    osmId: bigint("osm_id", { mode: "number" }).notNull(),
+    sourceId: varchar("source_id", { length: 80 })
+      .notNull()
+      .references(() => knowledgeSources.id, { onDelete: "cascade" }),
+    kind: osmFeatureKind("kind").notNull(),
+    name: varchar("name", { length: 200 }),
+    tags: jsonb("tags").$type<Record<string, string>>().notNull(),
+    geom: anyGeometry("geom").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.osmType, t.osmId] }),
+    index("osm_features_geom_idx").using("gist", t.geom),
+    index("osm_features_kind_idx").on(t.kind),
+    index("osm_features_source_idx").on(t.sourceId),
+  ],
+);
+
+/** Relasi rute bus dari OpenStreetMap, dipotong ke Kota Bogor, dengan halte berurutan (ADR-0042). */
+export const transitRoutes = pgTable(
+  "transit_routes",
+  {
+    osmId: bigint("osm_id", { mode: "number" }).primaryKey(),
+    sourceId: varchar("source_id", { length: 80 })
+      .notNull()
+      .references(() => knowledgeSources.id, { onDelete: "cascade" }),
+    ref: varchar("ref", { length: 40 }),
+    name: varchar("name", { length: 300 }),
+    operator: varchar("operator", { length: 200 }),
+    network: varchar("network", { length: 200 }),
+    fromName: varchar("from_name", { length: 200 }),
+    toName: varchar("to_name", { length: 200 }),
+    /** Halte dan platform anggota relasi yang ada di Kota Bogor, sesuai urutan di relasi. */
+    stops: jsonb("stops").$type<{ osmType: string; osmId: number; name: string | null }[]>().notNull(),
+    geom: multiLine("geom"),
+  },
+  (t) => [index("transit_routes_geom_idx").using("gist", t.geom), index("transit_routes_source_idx").on(t.sourceId)],
 );
