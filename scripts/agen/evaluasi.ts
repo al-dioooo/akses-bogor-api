@@ -34,15 +34,18 @@ const wanted = process.argv.slice(2);
 const questions = wanted.length > 0 ? all.filter((q) => wanted.includes(q.id)) : all;
 
 let requests = 0;
-const countingFetch: typeof fetch = (input, init) => {
+let succeeded = 0;
+const countingFetch: typeof fetch = async (input, init) => {
   requests += 1;
-  return fetch(input, init);
+  const response = await fetch(input, init);
+  if (response.ok) succeeded += 1;
+  return response;
 };
 const model = openRouterModel({
   apiKey: env.OPENROUTER_API_KEY,
   models: env.OPENROUTER_MODELS.length > 0 ? env.OPENROUTER_MODELS : DEFAULT_MODELS,
   fetch: countingFetch,
-  take: () => requests < MAX_REQUESTS,
+  budget: { take: () => requests < MAX_REQUESTS, give: () => {} },
   log: { warn: (details, message) => console.log(`  [peringatan] ${message} ${JSON.stringify(details)}`) },
 });
 
@@ -73,4 +76,6 @@ for (const [index, q] of questions.entries()) {
 }
 
 await pool.end();
-console.log(`\n=== Ringkasan (id, pemeriksaan otomatis, permintaan, model)\n${summary.join("\n")}\nTotal permintaan OpenRouter: ${requests}`);
+console.log(
+  `\n=== Ringkasan (id, pemeriksaan otomatis, permintaan, model)\n${summary.join("\n")}\nTotal permintaan HTTP ke OpenRouter: ${requests}, yang berhasil (dihitung kuota OpenRouter): ${succeeded}`,
+);
