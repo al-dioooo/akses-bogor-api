@@ -84,7 +84,7 @@ const obstaclesResponse = z.object({
 });
 
 const askBody = z.object({
-  placeId: z.uuid().describe("Id lokasi AksesBogor yang dipilih pengguna"),
+  placeId: z.uuid().optional().describe("Id lokasi AksesBogor bila pengguna bertanya dari halaman tempat itu"),
   question: z.string().trim().min(2).max(500).describe("Pertanyaan pengguna"),
   history: z
     .array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().trim().min(1).max(1000) }))
@@ -211,8 +211,8 @@ export const agentRoutes: FastifyPluginAsyncZod<AgentRouteOptions> = async (app,
     {
       schema: {
         tags: [TAG_AGENT],
-        summary: "Bertanya kepada agen rute",
-        description: `Pertanyaan tentang tempat yang dipilih: jawaban fasilitas terverifikasi, regulasi, aturan AksesBogor, angkutan umum, dan tips (ADR-0043). Model hanya menerima pertanyaan, giliran sebelumnya, dan data tempat, tidak pernah posisi pengguna atau rute. Tidak ada percakapan yang disimpan. Menjawab 503 \`agen_sibuk\` bila kuota OpenRouter habis atau semua model gagal, dan 429 setelah ${QUESTIONS_PER_ACCOUNT_PER_DAY} pertanyaan per akun per hari WIB.\n\n${COMMON}`,
+        summary: "Bertanya kepada agen AksesBogor untuk kontributor",
+        description: `Pertanyaan kontributor: tempat yang perlu dipetakan, jawaban fasilitas terverifikasi, regulasi, aturan AksesBogor, dan cara melapor (ADR-0043). Penyandang disabilitas yang menanyakan rute aksesibel atau tempat tanpa data terverifikasi mendapat jawaban bahwa datanya belum tersedia. Model hanya menerima pertanyaan, giliran sebelumnya, data tempat, dan hasil alat, tidak pernah posisi pengguna atau rute. Tidak ada percakapan yang disimpan. Menjawab 503 \`agen_sibuk\` bila kuota OpenRouter habis atau semua model gagal, dan 429 setelah ${QUESTIONS_PER_ACCOUNT_PER_DAY} pertanyaan per akun per hari WIB.\n\n${COMMON}`,
         body: askBody,
         response: { 200: askResponse, ...errors },
       },

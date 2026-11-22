@@ -163,6 +163,14 @@ describe("POST /agent/ask", () => {
     expect(refused.json().galat).toBe("agen_terlalu_sering");
   });
 
+  it("answers without a chosen place", async () => {
+    replies = [answer("Mulai dari kecamatan prioritas.")];
+    const res = await ask(sari.token, { question: "Saya mau bantu memetakan, mulai dari mana?" });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ answer: "Mulai dari kecamatan prioritas.", sources: [] });
+    expect(sentBody(0).messages[0].content).not.toContain("Tempat yang sedang dilihat");
+  });
+
   it("validates the question, the history and the place", async () => {
     expect((await ask(sari.token, { placeId: halteId, question: "x" })).statusCode).toBe(400);
     const long = Array.from({ length: 7 }, () => ({ role: "user", content: "Halo" }));
