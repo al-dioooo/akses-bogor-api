@@ -25,6 +25,7 @@ import { schedulePhotoCleanup } from "./photos/cleanup.js";
 import { scheduleVerificationJobs } from "./verification/jobs.js";
 import { localStore, r2Store, type PhotoStore } from "./photos/storage.js";
 import { adminRoutes } from "./routes/admin.js";
+import { adminPlaceRoutes } from "./routes/admin-places.js";
 import { agentRoutes } from "./routes/agent.js";
 import { authRoutes } from "./routes/auth.js";
 import { districtRoutes } from "./routes/districts.js";
@@ -153,6 +154,7 @@ export async function buildApp(env: Env, deps: { db?: Db; now?: () => Date; fetc
   await app.register(authRoutes, { auth, mailer, googleEnabled: Boolean(env.GOOGLE_CLIENT_ID), now });
   await app.register(meRoutes, { auth, mailer, now });
   await app.register(adminRoutes, { auth, now });
+  await app.register(adminPlaceRoutes, { auth, photoBaseUrl: env.PHOTO_PUBLIC_URL, now });
   // Foto laporan (ADR-0031): R2 bila diatur, folder lokal di development, dan tidak ada di production tanpa R2.
   const { R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_LAPORAN, R2_BUCKET_PUBLIK } = env;
   const photoStore =
