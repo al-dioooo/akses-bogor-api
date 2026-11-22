@@ -19,7 +19,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "tsx --env-file=.env scripts/seed.ts",
     "peran": "tsx --env-file-if-exists=.env scripts/peran.ts",
-    "pengetahuan:osm": "tsx --env-file-if-exists=.env scripts/pengetahuan/osm.ts"
+    "pengetahuan:osm": "tsx --env-file-if-exists=.env scripts/pengetahuan/osm.ts",
+    "pengetahuan:regulasi": "tsx --env-file-if-exists=.env scripts/pengetahuan/regulasi.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.3.1",
@@ -42,9 +43,11 @@
     "@types/pg": "^8.23.1",
     "drizzle-kit": "^0.31.11",
     "eslint": "^10.13.0",
+    "fflate": "0.8.3",
     "tsx": "^4.23.15",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.72.0",
+    "unpdf": "1.9.1",
     "vitest": "^5.0.5"
   }
 }
