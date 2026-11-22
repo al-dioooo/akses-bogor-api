@@ -167,7 +167,7 @@ Contoh lengkap ada di [.env.example](.env.example). Jangan commit `.env`.
 | `POST /agent/tools/find_place` | Lokasi AksesBogor bernama mirip, paling banyak 5 | FR-60 |
 | `POST /agent/tools/place_accessibility` | Status, jawaban fasilitas terverifikasi, dan tanggal verifikasi terakhir sebuah lokasi, tanpa koordinat | FR-60 |
 | `POST /agent/tools/search_knowledge` | Potongan regulasi, dokumen AksesBogor, dan rute angkutan dengan sitasi, sumber, dan lisensi | FR-60 |
-| `POST /agent/ask` | Pertanyaan tentang tempat yang dipilih, dijawab model gratis lewat OpenRouter dengan sumbernya; model tidak menerima posisi atau rute; 5 pertanyaan per akun per hari, 503 `agen_sibuk` bila kuota habis | FR-60, ADR-0043 |
+| `POST /agent/ask` | Pertanyaan kontributor (tempat yang perlu dipetakan, data terverifikasi, regulasi), dijawab model gratis lewat OpenRouter dengan sumbernya; model tidak menerima posisi atau rute; 5 pertanyaan per akun per hari, 503 `agen_sibuk` bila kuota habis | FR-60, ADR-0043 |
 | `POST /route/walking` | Rute jalan kaki Mapbox dari posisi pengguna ke pin lokasi, dengan peringatan tetap dan atribusi, hanya untuk browser pengguna; 30 per akun per jam, 1.000 per hari | FR-60, ADR-0042 |
 | `POST /route/obstacles` | Tangga, kerb, ramp, lift, pintu masuk, dan guiding block OSM dalam 20 m (maks. 50 m) dari garis rute, hanya untuk browser pengguna | FR-60, ADR-0042 |
 
