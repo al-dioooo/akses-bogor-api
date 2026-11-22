@@ -87,7 +87,26 @@ describe("askAgent", () => {
     });
     const tool = steps[1]!.messages.at(-1)!;
     expect(tool).toMatchObject({ role: "tool", toolCallId: "c1", name: "search_knowledge" });
+    expect(tool).not.toHaveProperty("isError");
     expect(JSON.parse((tool as { content: string }).content).passages[0].citation).toContain("B.2 Ram");
+  });
+
+  it("hands the provider's own blocks of a tool round back unchanged on the next step", async () => {
+    const raw = [{ type: "thinking", thinking: "", signature: "sig" }, { type: "tool_use", id: "c1", name: "find_place", input: { query: "halte" } }];
+    const { model, steps } = scripted({ kind: "tool_calls", calls: [{ id: "c1", name: "find_place", input: { query: "halte" } }], raw }, { kind: "answer", text: "Ada." });
+    await askAgent({ model, ctx: ctx() }, { question: "Ada halte?" });
+    expect(steps[1]!.messages.at(-2)).toEqual({ role: "assistant", content: "", toolCalls: [{ id: "c1", name: "find_place", input: { query: "halte" } }], raw });
+    // Riwayat hanya bertambah di belakang: langkah kedua diawali persis dengan pesan langkah pertama.
+    expect(steps[1]!.messages.slice(0, steps[0]!.messages.length)).toEqual(steps[0]!.messages);
+  });
+
+  it("answers with the fixed reply when the model refuses or is cut off, without another step", async () => {
+    for (const reason of ["ditolak", "terpotong", "kosong"] as const) {
+      const { model } = scripted({ kind: "no_answer", reason, model: "claude-haiku-5-5" });
+      const result = await askAgent({ model, ctx: ctx() }, { placeId: halteId, question: "Ada ramp?" });
+      expect(result).toMatchObject({ answer: NO_ANSWER, model: "claude-haiku-5-5", cards: [] });
+      expect(model.next).toHaveBeenCalledTimes(1);
+    }
   });
 
   it("looks the regulation up and asks again when the model cites one from memory", async () => {
@@ -117,8 +136,9 @@ describe("askAgent", () => {
       { kind: "answer", text: "Maaf." },
     );
     await askAgent({ model, ctx: ctx() }, { placeId: halteId, question: "Coba" });
-    const results = steps[1]!.messages.filter((m) => m.role === "tool").map((m) => JSON.parse((m as { content: string }).content).galat);
-    expect(results).toEqual(["input_tidak_valid", "input_tidak_valid", "alat_tidak_dikenal", "lokasi_tidak_ditemukan"]);
+    const results = steps[1]!.messages.filter((m) => m.role === "tool");
+    expect(results.map((m) => JSON.parse(m.content).galat)).toEqual(["input_tidak_valid", "input_tidak_valid", "alat_tidak_dikenal", "lokasi_tidak_ditemukan"]);
+    expect(results.every((m) => m.isError === true)).toBe(true);
   });
 
   it("answers 'Belum tahu' places as unknown in the instructions and never sends a route tool", async () => {
@@ -146,6 +166,7 @@ describe("askAgent", () => {
     await askAgent({ model, ctx: ctx() }, { placeId: halteId, question: "Banyak" });
     const errors = steps[1]!.messages.filter((m) => m.role === "tool" && m.content.includes("terlalu_banyak_panggilan"));
     expect(errors).toHaveLength(2);
+    expect(errors.every((m) => m.role === "tool" && m.isError)).toBe(true);
   });
 
   it("removes a sentence that calls the route accessible", async () => {
