@@ -28,7 +28,8 @@ describe("find_place", () => {
   it("finds published places by part of the name", async () => {
     const { places } = await findPlace(context(), { query: "halte" });
     expect(places.map((p) => p.name).sort()).toEqual(["Halte contoh", "Halte contoh B"]);
-    expect(places[0]).toMatchObject({ category: "halte", district: { slug: expect.any(String) }, location: { lat: expect.any(Number) } });
+    expect(places[0]).toMatchObject({ category: "halte", district: { slug: expect.any(String) } });
+    expect(places[0]).not.toHaveProperty("location");
   });
 });
 
