@@ -94,7 +94,7 @@ Saat akun dihapus, `reporter_id` di laporan, `reviewer_id`, penanya klarifikasi,
 | `src/audit` | Penulis log audit dan pembanding nilai sebelum dan sesudah (ADR-0038) |
 | `src/verification` | Panel verifikator: antrean, laporan untuk diperiksa, dan lokasi yang perlu dicek ulang (ADR-0035, ADR-0036) |
 | `src/knowledge` | Basis pengetahuan agen rute: pengolah data OSM, regulasi, dan dokumen, penulisan per sumber, dan retrieval full-text (ADR-0042) |
-| `src/agent` | Tiga alat untuk model agen rute sebagai fungsi, daftar alat dengan skema input dan output dan larik `tools` format OpenAI, dan antarmuka model (ADR-0042) |
+| `src/agent` | Tiga alat untuk model agen rute, daftar alat dengan larik `tools` format OpenAI, adapter OpenRouter, putaran agen untuk `POST /agent/ask`, instruksi sistem, dan batas harian (ADR-0042, ADR-0043) |
 | `src/routes` | Route Fastify, satu berkas per kelompok |
 | `scripts` | Skrip pendukung, mis. pembuat `docs/openapi.json`, dan pengambil data basis pengetahuan di `scripts/pengetahuan/` |
 | `test` | Tes Vitest dengan `app.inject`; tes database memakai PGlite + PostGIS di dalam proses |
