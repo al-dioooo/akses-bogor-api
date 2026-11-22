@@ -64,6 +64,13 @@
       "when": 1795340461035,
       "tag": "0008_fasilitas_osm",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1795346513799,
+      "tag": "0009_pengetahuan_stem",
+      "breakpoints": true
     }
   ]
 }

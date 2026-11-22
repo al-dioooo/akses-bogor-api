@@ -25,7 +25,8 @@
     "pengetahuan:disabilitas": "tsx --env-file-if-exists=.env scripts/pengetahuan/disabilitas.ts",
     "pengetahuan:fasilitas": "tsx --env-file-if-exists=.env scripts/pengetahuan/fasilitas.ts",
     "agen:evaluasi": "tsx --env-file-if-exists=.env scripts/agen/evaluasi.ts",
-    "pengetahuan:evaluasi": "tsx --env-file-if-exists=.env scripts/pengetahuan/evaluasi.ts"
+    "pengetahuan:evaluasi": "tsx --env-file-if-exists=.env scripts/pengetahuan/evaluasi.ts",
+    "pengetahuan:indeks": "tsx --env-file-if-exists=.env scripts/pengetahuan/indeks.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.3.1",

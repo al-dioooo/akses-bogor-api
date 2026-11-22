@@ -354,9 +354,10 @@ export const knowledgeSources = pgTable("knowledge_sources", {
 });
 
 /**
- * Potongan teks untuk retrieval. `search` dihitung PostgreSQL dari sitasi, judul, dan isi dengan konfigurasi `simple`,
- * karena PostgreSQL tidak punya stemmer bahasa Indonesia. Kolom embedding (pgvector) bisa ditambah nanti tanpa mengubah
- * pemanggil `searchKnowledge`.
+ * Potongan teks untuk retrieval. `search` dihitung PostgreSQL dari sitasi, judul, dan isi dengan konfigurasi `simple`.
+ * PostgreSQL tidak punya stemmer bahasa Indonesia, jadi `search_stem` berisi kata-kata yang sama dalam bentuk dasarnya,
+ * dihitung API dengan `src/knowledge/stemmer.ts` saat potongan disimpan (ADR-0044). Kolom embedding (pgvector) bisa
+ * ditambah nanti tanpa mengubah pemanggil `searchKnowledge`.
  */
 export const knowledgePassages = pgTable(
   "knowledge_passages",
@@ -377,10 +378,13 @@ export const knowledgePassages = pgTable(
       .generatedAlwaysAs(
         sql`setweight(to_tsvector('simple', coalesce(citation, '') || ' ' || coalesce(heading, '')), 'A') || setweight(to_tsvector('simple', body), 'B')`,
       ),
+    /** Bentuk dasar sitasi dan judul (bobot A) serta isi (bobot B). Kosong sampai `pnpm pengetahuan:indeks` dijalankan. */
+    searchStem: tsvector("search_stem").notNull().default(sql`''::tsvector`),
   },
   (t) => [
     uniqueIndex("knowledge_passages_source_position_idx").on(t.sourceId, t.position),
     index("knowledge_passages_search_idx").using("gin", t.search),
+    index("knowledge_passages_search_stem_idx").using("gin", t.searchStem),
     index("knowledge_passages_body_trgm_idx").using("gin", t.body.op("gin_trgm_ops")),
   ],
 );

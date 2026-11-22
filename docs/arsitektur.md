@@ -73,7 +73,7 @@ erDiagram
 | `audit_log` | Siapa mengubah apa dan kapan, tanpa data pribadi; pengubah kosong dengan label `sistem` atau `skrip` untuk tindakan tanpa akun, dan kosong tanpa label berarti akunnya sudah dihapus | FR-35, ADR-0024, ADR-0038 |
 | `report_emails` | Email status laporan yang menunggu dikirim atau dicoba ulang: hanya id laporan dan jenis email | ADR-0039 |
 | `knowledge_sources` | Sumber basis pengetahuan agen rute: jenis, judul, alamat, lisensi, atribusi, tanggal ambil, dan SHA-256 unduhan. Menghapus sumber menghapus semua barisnya | ADR-0042 |
-| `knowledge_passages` | Potongan teks regulasi, dokumen AksesBogor, dan rute angkutan dengan sitasi; kolom `search` (tsvector `simple`) dihitung PostgreSQL | ADR-0042 |
+| `knowledge_passages` | Potongan teks regulasi, dokumen AksesBogor, dan rute angkutan dengan sitasi; kolom `search` (tsvector `simple`) dihitung PostgreSQL, kolom `search_stem` (bentuk dasar) dihitung API | ADR-0042, ADR-0044 |
 | `osm_features` | Fitur OpenStreetMap di Kota Bogor (tangga, kerb, ramp, lift, pintu masuk, guiding block, halte, tempat bertag `wheelchair`) dengan tag dalam daftar izin; data ODbL | ADR-0042 |
 | `transit_routes` | Relasi rute bus dan angkot OpenStreetMap, garisnya dipotong ke Kota Bogor, dengan halte berurutan; data ODbL | ADR-0042 |
 | `disability_counts` | Jumlah penyandang disabilitas terdaftar di Dinas Sosial per kecamatan, tahun, dan jenis, dari Open Data Kota Bogor; label asli sumber hanya untuk sitasi | ADR-0043 |
