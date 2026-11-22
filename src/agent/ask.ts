@@ -53,10 +53,10 @@ export async function askAgent({ model, ctx, deadlineMs = QUESTION_DEADLINE_MS }
 
   const cards: Card[] = [];
   /**
-   * Menjalankan satu panggilan alat. Galat dan argumen yang salah dikembalikan ke model sebagai hasil alat. Alat kartu
-   * hanya mengembalikan `pesan` ke model; kartunya disimpan untuk web.
+   * Menjalankan satu panggilan alat. Galat dan argumen yang salah dikembalikan ke model sebagai hasil alat dengan
+   * `isError`. Alat kartu hanya mengembalikan `pesan` ke model; kartunya disimpan untuk web.
    */
-  const run = async (call: ToolCall): Promise<string> => {
+  const run = async (call: ToolCall): Promise<{ content: string; isError?: true }> => {
     try {
       const result = await runTool(ctx, call.name, call.input);
       if (call.name === "place_accessibility") addPlace(result as { id: string; name: string; lastVerifiedAt: string });
@@ -76,11 +76,11 @@ export async function askAgent({ model, ctx, deadlineMs = QUESTION_DEADLINE_MS }
       if (CARD_TOOLS.has(call.name)) {
         const { pesan, kartu } = result as { pesan: string; kartu: PlaceCard | RouteCard };
         cards.push(kartu);
-        return JSON.stringify({ pesan });
+        return { content: JSON.stringify({ pesan }) };
       }
-      return JSON.stringify(result);
+      return { content: JSON.stringify(result) };
     } catch (error) {
-      if (error instanceof HttpError) return JSON.stringify({ galat: error.code, pesan: error.message });
+      if (error instanceof HttpError) return { content: JSON.stringify({ galat: error.code, pesan: error.message }), isError: true };
       throw error;
     }
   };
@@ -96,12 +96,14 @@ export async function askAgent({ model, ctx, deadlineMs = QUESTION_DEADLINE_MS }
     const last = round === MAX_TOOL_ROUNDS;
     const turn = await model.next({ system, messages, tools, toolChoice: last ? "none" : "auto", signal });
     answeredBy = turn.model ?? answeredBy;
+    // Model menolak, jawabannya terpotong, atau kosong: jawaban tetap, tanpa langkah tambahan.
+    if (turn.kind === "no_answer") break;
     if (turn.kind === "answer" && !searched && !corrected && !last && CITES_REGULATION.test(turn.text)) {
       // Model menyebut peraturan dari ingatannya. Server menjalankan search_knowledge dengan pertanyaan pengguna, lalu
       // meminta jawaban ulang dari potongan yang ditemukan. Hanya sekali per pertanyaan.
       corrected = true;
       const call: ToolCall = { id: "cek-sumber", name: "search_knowledge", input: { query: input.question.slice(0, 300) } };
-      messages.push({ role: "assistant", content: "", toolCalls: [call] }, { role: "tool", toolCallId: call.id, name: call.name, content: await run(call) });
+      messages.push({ role: "assistant", content: "", toolCalls: [call] }, { role: "tool", toolCallId: call.id, name: call.name, ...(await run(call)) });
       continue;
     }
     if (turn.kind === "answer") return { answer: guardRouteClaims(turn.text), sources: [...sources.values()], model: answeredBy, cards };
@@ -111,13 +113,13 @@ export async function askAgent({ model, ctx, deadlineMs = QUESTION_DEADLINE_MS }
       for (const call of turn.calls.slice(0, MAX_CALLS_PER_ROUND)) await run(call);
       return { answer: guardRouteClaims(turn.text), sources: [...sources.values()], model: answeredBy, cards };
     }
-    messages.push({ role: "assistant", content: turn.text ?? "", toolCalls: turn.calls });
+    messages.push({ role: "assistant", content: turn.text ?? "", toolCalls: turn.calls, raw: turn.raw });
     for (const [index, call] of turn.calls.entries()) {
-      const content =
+      const result =
         index < MAX_CALLS_PER_ROUND
           ? await run(call)
-          : JSON.stringify({ galat: "terlalu_banyak_panggilan", pesan: `Paling banyak ${MAX_CALLS_PER_ROUND} panggilan alat per putaran.` });
-      messages.push({ role: "tool", toolCallId: call.id, name: call.name, content });
+          : { content: JSON.stringify({ galat: "terlalu_banyak_panggilan", pesan: `Paling banyak ${MAX_CALLS_PER_ROUND} panggilan alat per putaran.` }), isError: true as const };
+      messages.push({ role: "tool", toolCallId: call.id, name: call.name, ...result });
     }
   }
   return { answer: NO_ANSWER, sources: [...sources.values()], model: answeredBy, cards };
