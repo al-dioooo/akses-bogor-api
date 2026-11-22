@@ -21,7 +21,8 @@
     "peran": "tsx --env-file-if-exists=.env scripts/peran.ts",
     "pengetahuan:osm": "tsx --env-file-if-exists=.env scripts/pengetahuan/osm.ts",
     "pengetahuan:regulasi": "tsx --env-file-if-exists=.env scripts/pengetahuan/regulasi.ts",
-    "pengetahuan:dokumen": "tsx --env-file-if-exists=.env scripts/pengetahuan/dokumen.ts"
+    "pengetahuan:dokumen": "tsx --env-file-if-exists=.env scripts/pengetahuan/dokumen.ts",
+    "agen:evaluasi": "tsx --env-file-if-exists=.env scripts/agen/evaluasi.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.3.1",
