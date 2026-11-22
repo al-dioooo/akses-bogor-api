@@ -43,6 +43,7 @@ let keyless: Awaited<ReturnType<typeof buildApp>>;
 let sari: { token: string };
 let budi: { token: string };
 let dewi: { token: string };
+let rina: { token: string };
 let halteId: string;
 const sent: Email[] = [];
 const mailer: Mailer = async (email) => {
@@ -63,6 +64,7 @@ beforeAll(async () => {
   sari = await helpers.reporter("sari@contoh.id", "Sari");
   budi = await helpers.reporter("budi@contoh.id", "Budi");
   dewi = await helpers.reporter("dewi@contoh.id", "Dewi");
+  rina = await helpers.reporter("rina@contoh.id", "Rina");
   halteId = (await placesNamed(db, "Halte contoh", 5)).find((p) => p.name === "Halte contoh")!.id;
 }, 60_000);
 
@@ -111,6 +113,14 @@ describe("POST /agent/ask", () => {
     expect(fetch).toHaveBeenCalledTimes(2);
     for (const call of [0, 1]) expect(JSON.stringify(sentBody(call))).not.toMatch(/"(lat|lng|location|geometry|polyline)"|-6\.59|106\.79/);
     expect(sentBody(1).messages.at(-1)).toMatchObject({ role: "tool", tool_call_id: "c1" });
+  });
+
+  it("returns cards for the web and only a confirmation to the model", async () => {
+    replies = [toolCall("show_route_card", JSON.stringify({ placeId: halteId })), answer("Kartu rute ke Halte contoh sudah tampil.")];
+    const res = await ask(rina.token, { question: "Tunjukkan rute ke Halte contoh" });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().cards).toEqual([{ type: "rute", target: { kind: "aksesbogor", placeId: halteId }, name: "Halte contoh" }]);
+    expect(JSON.parse(sentBody(1).messages.at(-1).content)).toEqual({ pesan: expect.stringContaining("Kartu rute ditampilkan untuk Halte contoh") });
   });
 
   it("returns invalid tool arguments to the model as an error instead of running the tool", async () => {

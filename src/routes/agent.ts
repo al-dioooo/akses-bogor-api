@@ -2,6 +2,7 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { askAgent } from "../agent/ask.js";
+import { placeCardSchema, routeCardSchema } from "../agent/cards.js";
 import { QUESTIONS_PER_ACCOUNT_PER_DAY, dailyLimit } from "../agent/limits.js";
 import { AgentBusyError, type AgentModel } from "../agent/model.js";
 import { AGENT_TOOLS, toolDefinitions } from "../agent/registry.js";
@@ -9,6 +10,7 @@ import type { ToolContext } from "../agent/tools.js";
 import type { Auth } from "../auth/auth.js";
 import { needsCompletion, requireSession } from "../auth/session.js";
 import { osmFeatureKind } from "../db/schema.js";
+import { prioritySchema } from "./districts.js";
 import { HttpError, errorSchema } from "../http/errors.js";
 import type { WalkingRouter } from "../map/directions.js";
 import { routeObstacles, walkingRoute, type RouteContext } from "../map/walking-route.js";
@@ -45,14 +47,25 @@ const definitions = z.object({
 });
 
 const location = z.object({ lat: z.number(), lng: z.number() });
-const walkingBody = z.object({
-  from: z
-    .object({ lat: z.number().min(-90).max(90).describe("Lintang (derajat, WGS 84)"), lng: z.number().min(-180).max(180).describe("Bujur (derajat, WGS 84)") })
-    .describe("Posisi pengguna saat ini, dari browser atau titik yang dipilih di peta"),
-  placeId: z.uuid().describe("Id lokasi AksesBogor tujuan"),
-});
+const walkingBody = z
+  .object({
+    from: z
+      .object({ lat: z.number().min(-90).max(90).describe("Lintang (derajat, WGS 84)"), lng: z.number().min(-180).max(180).describe("Bujur (derajat, WGS 84)") })
+      .describe("Posisi pengguna saat ini, dari browser atau titik yang dipilih di peta"),
+    placeId: z.uuid().optional().describe("Id lokasi AksesBogor tujuan"),
+    osm: z
+      .object({ type: z.enum(["node", "way", "relation"]), id: z.number().int() })
+      .optional()
+      .describe("Atau tempat OpenStreetMap tanpa data AksesBogor, dari kartu rute agen untuk kontributor (ADR-0043)"),
+  })
+  .refine((body) => Boolean(body.placeId) !== Boolean(body.osm), { message: "Isi placeId atau osm, salah satu" });
 const walkingResponse = z.object({
-  destination: z.object({ placeId: z.uuid(), name: z.string(), location }),
+  destination: z.object({
+    placeId: z.uuid().nullable(),
+    osm: z.object({ type: z.string(), id: z.number().int() }).nullable(),
+    name: z.string().nullable(),
+    location,
+  }),
   distanceMeters: z.number().int(),
   durationSeconds: z.number().int(),
   steps: z.array(
@@ -105,6 +118,9 @@ const askResponse = z.object({
     )
     .describe("Data terverifikasi AksesBogor dan potongan basis pengetahuan yang dibaca agen untuk jawaban ini"),
   model: z.string().nullable().describe("Model OpenRouter yang menjawab"),
+  cards: z
+    .array(z.union([placeCardSchema, routeCardSchema, prioritySchema.extend({ type: z.literal("prioritas") })]))
+    .describe("Kartu untuk ditampilkan web di bawah jawaban: tempat, rute (dihitung web dari posisi pengguna), atau prioritas kecamatan. Isinya tidak dikirim ke model"),
 });
 
 const errors = { 400: errorSchema, 401: errorSchema, 403: errorSchema, 404: errorSchema, 422: errorSchema, 429: errorSchema, 502: errorSchema, 503: errorSchema };
