@@ -8475,7 +8475,8 @@
                         "osm",
                         "angkutan_umum",
                         "regulasi",
-                        "dokumen_aksesbogor"
+                        "dokumen_aksesbogor",
+                        "data_disabilitas"
                       ]
                     }
                   },
@@ -8528,7 +8529,8 @@
                                   "osm",
                                   "angkutan_umum",
                                   "regulasi",
-                                  "dokumen_aksesbogor"
+                                  "dokumen_aksesbogor",
+                                  "data_disabilitas"
                                 ]
                               },
                               "title": {
