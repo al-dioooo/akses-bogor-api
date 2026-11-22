@@ -1,5 +1,6 @@
-// Query baca lokasi. Semua hanya membaca lokasi yang sudah terbit (tabel `places`) dan foto yang lolos moderasi.
-import { and, asc, count, countDistinct, eq, exists, ilike, inArray, isNotNull, or, sql, type SQL } from "drizzle-orm";
+// Query baca lokasi. Semua hanya membaca lokasi yang sudah terbit dan masih tayang (tabel `places`, tanpa yang diturunkan
+// admin, ADR-0050) dan foto yang lolos moderasi.
+import { and, asc, count, countDistinct, eq, exists, ilike, inArray, isNotNull, isNull, or, sql, type SQL } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import { districts, photos, placeFacilities, places, reports } from "../db/schema.js";
 import { computeStatus } from "../domain/status.js";
@@ -16,8 +17,15 @@ export const photoUrl = (key: string, base?: string) => (base ? `${base.replace(
 export const toPhoto = (p: PhotoRow, base?: string) => ({ id: p.id, url: photoUrl(p.storageKey, base), alt: p.altText, caption: p.caption, tag: p.tag });
 const escapeLike = (value: string) => value.replace(/[\\%_]/g, (c) => `\\${c}`);
 
+/** Lokasi yang masih tayang. Dipakai setiap query publik; lokasi yang diturunkan admin hanya terlihat di route admin. */
+export const published = isNull(places.unpublishedAt);
+
+/** Siapa yang terakhir menerbitkan data lokasi: verifikator lewat laporan, atau admin langsung (ADR-0050). */
+export const verifiedBy = (adminPublishedAt: Date | null) => (adminPublishedAt ? ("admin" as const) : ("tim" as const));
+
 function filterConditions(f: PlaceFilters, bbox?: [number, number, number, number]): SQL | undefined {
   const conditions: (SQL | undefined)[] = [
+    published,
     f.q ? ilike(places.name, `%${escapeLike(f.q)}%`) : undefined,
     f.category ? inArray(places.category, f.category) : undefined,
     f.district ? inArray(places.districtSlug, f.district) : undefined,
@@ -47,8 +55,9 @@ const summaryColumns = {
   unknown: places.facilitiesUnknown,
   location: places.location,
   lastVerifiedAt: places.lastVerifiedAt,
+  adminPublishedAt: places.adminPublishedAt,
 };
-type SummaryRow = { [K in keyof typeof summaryColumns]: (typeof summaryColumns)[K]["_"]["data"] };
+type SummaryRow = Omit<{ [K in keyof typeof summaryColumns]: (typeof summaryColumns)[K]["_"]["data"] }, "adminPublishedAt"> & { adminPublishedAt: Date | null };
 
 const toSummary = (r: SummaryRow) => ({
   id: r.id,
@@ -59,6 +68,7 @@ const toSummary = (r: SummaryRow) => ({
   summary: { available: r.available, relevant: r.relevant, unknown: r.unknown },
   location: { lat: r.location.y, lng: r.location.x },
   lastVerifiedAt: r.lastVerifiedAt.toISOString(),
+  verifiedBy: verifiedBy(r.adminPublishedAt),
 });
 
 export const publishedPhotosOf = (db: Db, placeIds: string[]) =>
@@ -118,7 +128,7 @@ export async function getPlace(db: Db, id: string, now: Date, opts: ReadOptions 
     .select({ ...summaryColumns, landmark: places.landmark, description: places.description })
     .from(places)
     .innerJoin(districts, eq(districts.slug, places.districtSlug))
-    .where(eq(places.id, id));
+    .where(and(eq(places.id, id), published));
   if (!row) return null;
   const [facilities, placePhotos] = await Promise.all([
     db
@@ -143,11 +153,12 @@ export async function getPlace(db: Db, id: string, now: Date, opts: ReadOptions 
 
 export async function placeStats(db: Db) {
   const [byCategory, [stepFree], [contributors]] = await Promise.all([
-    db.select({ category: places.category, n: count() }).from(places).groupBy(places.category),
+    db.select({ category: places.category, n: count() }).from(places).where(published).groupBy(places.category),
     db
       .select({ n: count() })
       .from(placeFacilities)
-      .where(and(eq(placeFacilities.facility, "ramp"), inArray(placeFacilities.answer, ["tersedia", "tidak_perlu"]))),
+      .innerJoin(places, eq(places.id, placeFacilities.placeId))
+      .where(and(published, eq(placeFacilities.facility, "ramp"), inArray(placeFacilities.answer, ["tersedia", "tidak_perlu"]))),
     db.select({ n: countDistinct(reports.reporterId) }).from(reports).where(and(eq(reports.status, "diterbitkan"), isNotNull(reports.reporterId))),
   ]);
   const counts = { kampus: 0, masjid: 0, halte: 0, rumah_sakit: 0 };
@@ -164,7 +175,7 @@ export async function listDistricts(db: Db) {
   return db
     .select({ slug: districts.slug, name: districts.name, city: districts.city, places: count(places.id) })
     .from(districts)
-    .leftJoin(places, eq(places.districtSlug, districts.slug))
+    .leftJoin(places, and(eq(places.districtSlug, districts.slug), published))
     .groupBy(districts.slug)
     .orderBy(asc(districts.name));
 }
@@ -183,7 +194,7 @@ export async function placesNamed(db: Db, query: string, limit = 3) {
     .select({ id: places.id, name: places.name, category: places.category, status: places.status, districtSlug: places.districtSlug, districtName: districts.name, location: places.location })
     .from(places)
     .innerJoin(districts, eq(districts.slug, places.districtSlug))
-    .where(or(allWords, sql`${score} >= 0.5`))
+    .where(and(published, or(allWords, sql`${score} >= 0.5`)))
     .orderBy(sql`${score} DESC`, asc(places.name))
     .limit(limit);
   return rows.map((r) => ({

@@ -69,13 +69,14 @@ export async function publishReport(db: Db, store: PhotoStore | undefined, viewe
 
       const [place] = report.placeId
         ? await tx
-            .select({ id: places.id, updatedAt: places.updatedAt, name: places.name, category: places.category, districtSlug: places.districtSlug, location: places.location, landmark: places.landmark, description: places.description, status: places.status })
+            .select({ id: places.id, updatedAt: places.updatedAt, name: places.name, category: places.category, districtSlug: places.districtSlug, location: places.location, landmark: places.landmark, description: places.description, status: places.status, unpublishedAt: places.unpublishedAt })
             .from(places)
             .where(eq(places.id, report.placeId))
             .for("update")
         : [];
       if (report.kind !== "baru") {
         if (!place) throw new HttpError(409, "lokasi_tidak_ada", "Lokasi yang dilaporkan sudah tidak ada. Tolak laporan ini.");
+        if (place.unpublishedAt) throw new HttpError(409, "lokasi_diturunkan", "Lokasi ini sudah diturunkan admin. Tolak laporan ini, atau minta admin menayangkannya lagi.");
         if (input.placeVersion !== place.updatedAt.toISOString()) {
           throw new HttpError(409, "lokasi_berubah", "Data lokasi ini baru saja berubah. Muat ulang halaman dan periksa lagi dengan data terbaru.");
         }
@@ -125,6 +126,9 @@ export async function publishReport(db: Db, store: PhotoStore | undefined, viewe
         facilitiesRelevant: status.relevant,
         facilitiesUnknown: status.unknown,
         lastVerifiedAt: now,
+        // Diterbitkan verifikator: label "langsung oleh admin" tidak berlaku lagi (ADR-0050).
+        adminPublishedAt: null,
+        adminPublishedBy: null,
         updatedAt: now,
       };
       let before: Snapshot | null = null;

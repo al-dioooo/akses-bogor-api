@@ -86,7 +86,7 @@ export async function submitReport(db: Db, reporterId: string, body: ReportBody,
     const [row] = await db
       .select({ name: places.name, category: places.category, location: places.location, landmark: places.landmark })
       .from(places)
-      .where(eq(places.id, body.placeId));
+      .where(and(eq(places.id, body.placeId), isNull(places.unpublishedAt)));
     if (!row) throw new HttpError(404, "lokasi_tidak_ditemukan", "Lokasi ini tidak ditemukan. Mungkin sudah dihapus; laporkan sebagai tempat baru.");
     place = { ...row, location: { lat: row.location.y, lng: row.location.x } };
   }
