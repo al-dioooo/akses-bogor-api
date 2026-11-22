@@ -29,9 +29,12 @@ export type AskResult = { answer: string; sources: Source[]; model: string | nul
 
 type Deps = { model: AgentModel; ctx: ToolContext; deadlineMs?: number };
 
-/** Jawaban agen untuk satu pertanyaan tentang tempat yang dipilih. Melempar 404 bila tempatnya tidak ada. */
-export async function askAgent({ model, ctx, deadlineMs = QUESTION_DEADLINE_MS }: Deps, input: { placeId: string; question: string; history?: Turn[] }): Promise<AskResult> {
-  const place = await placeAccessibility(ctx, { placeId: input.placeId });
+/**
+ * Jawaban agen untuk satu pertanyaan. `placeId` diisi bila pengguna bertanya dari halaman sebuah tempat; melempar 404
+ * bila tempatnya tidak ada.
+ */
+export async function askAgent({ model, ctx, deadlineMs = QUESTION_DEADLINE_MS }: Deps, input: { placeId?: string; question: string; history?: Turn[] }): Promise<AskResult> {
+  const place = input.placeId ? await placeAccessibility(ctx, { placeId: input.placeId }) : undefined;
   const sources = new Map<string, Source>();
   const addPlace = (p: { id: string; name: string; lastVerifiedAt: string }) =>
     sources.set(`lokasi:${p.id}`, { type: "lokasi", placeId: p.id, name: p.name, lastVerifiedAt: p.lastVerifiedAt });
@@ -42,13 +45,13 @@ export async function askAgent({ model, ctx, deadlineMs = QUESTION_DEADLINE_MS }
       sources.set(`pengetahuan:${p.citation}`, { type: "pengetahuan", citation: p.citation, title: p.source.title, url: p.source.url, license: p.source.license, attribution: p.source.attribution });
     }
   };
-  addPlace(place);
+  if (place) addPlace(place);
 
   /** Menjalankan satu panggilan alat. Galat dan argumen yang salah dikembalikan ke model sebagai hasil alat. */
   const run = async (call: ToolCall): Promise<string> => {
     try {
       const result = await runTool(ctx, call.name, call.input);
-      if (call.name === "place_accessibility") addPlace(result as typeof place);
+      if (call.name === "place_accessibility") addPlace(result as { id: string; name: string; lastVerifiedAt: string });
       if (call.name === "search_knowledge") addPassages((result as { passages: KnowledgeHit[] }).passages);
       return JSON.stringify(result);
     } catch (error) {

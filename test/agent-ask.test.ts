@@ -59,6 +59,14 @@ describe("askAgent", () => {
     expect(steps[0]!.toolChoice).toBe("auto");
   });
 
+  it("answers a contributor without a chosen place", async () => {
+    const { model, steps } = scripted({ kind: "answer", text: "Coba mulai dari kecamatan prioritas." });
+    const result = await askAgent({ model, ctx: ctx() }, { question: "Saya mau bantu memetakan, mulai dari mana?" });
+    expect(result).toEqual({ answer: "Coba mulai dari kecamatan prioritas.", sources: [], model: null });
+    expect(steps[0]!.system).toContain("untuk kontributor");
+    expect(steps[0]!.system).not.toContain("Tempat yang sedang dilihat");
+  });
+
   it("runs tool rounds and collects knowledge sources", async () => {
     const { model, steps } = scripted(
       { kind: "tool_calls", calls: [{ id: "c1", name: "search_knowledge", input: { query: "kemiringan ram" } }] },
