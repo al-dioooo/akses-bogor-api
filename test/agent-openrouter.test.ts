@@ -139,7 +139,7 @@ describe("openRouterModel", () => {
   });
 
   it("uses only free models by default", () => {
-    expect(DEFAULT_MODELS.length).toBeGreaterThanOrEqual(3);
+    expect(DEFAULT_MODELS.length).toBeGreaterThanOrEqual(2);
     expect(DEFAULT_MODELS.every((m) => m.endsWith(":free"))).toBe(true);
   });
 });

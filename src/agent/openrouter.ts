@@ -4,14 +4,11 @@ import { AgentBusyError, type AgentMessage, type AgentModel, type AgentStep, typ
 
 export const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
-/** Model gratis dengan tool calling, berurutan, dipilih 2026-11-22 (ADR-0043). Bisa diganti lewat `OPENROUTER_MODELS`. */
-export const DEFAULT_MODELS = [
-  "google/gemma-4-31b-it:free",
-  "baidu/ernie-5.5-flash-preview:free",
-  "nvidia/nemotron-3-ultra-550b-a55b:free",
-  "google/gemma-4-26b-a4b-it:free",
-  "nvidia/nemotron-3.5-super-vl:free",
-];
+/**
+ * Model gratis dengan tool calling yang lolos `data_collection: "deny"`, berurutan, dipilih 2026-11-22 (ADR-0043).
+ * Bisa diganti lewat `OPENROUTER_MODELS`.
+ */
+export const DEFAULT_MODELS = ["google/gemma-4-31b-it:free", "baidu/ernie-5.5-flash-preview:free", "inclusionai/ling-3.2-flash:free", "google/gemma-4-26b-a4b-it:free"];
 /** Model per permintaan di parameter `models`; OpenRouter mencoba yang berikutnya di dalam permintaan yang sama. */
 export const MODELS_PER_REQUEST = 3;
 const TIMEOUT_MS = 30_000;
