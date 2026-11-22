@@ -893,6 +893,252 @@
         }
       }
     },
+    "/places/candidates": {
+      "get": {
+        "summary": "Kandidat Belum ada data dari OpenStreetMap",
+        "tags": [
+          "Lokasi"
+        ],
+        "description": "Kampus, masjid, halte, dan rumah sakit di OpenStreetMap tanpa lokasi AksesBogor berkategori sama dalam 50 m, untuk lapisan \"Belum ada data\" di Peta (ADR-0049). Kandidat belum diperiksa tim: tanpa status, tidak terhitung sebagai lokasi terbit, dan `wheelchair` adalah nilai mentah tag OSM. Data © kontributor OpenStreetMap (ODbL); atribusi di `source` wajib tampil bersama datanya.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "description": "Cari nama tempat, cocok sebagian kata dan tanpa membedakan huruf besar"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "category",
+            "required": false,
+            "description": "Kategori, dipisah koma"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "district",
+            "required": false,
+            "description": "Slug kecamatan, dipisah koma, mis. bogor-tengah"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "FeatureCollection"
+                      ]
+                    },
+                    "features": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "Feature"
+                            ]
+                          },
+                          "id": {
+                            "type": "string",
+                            "description": "Tipe dan id OSM, mis. node/123"
+                          },
+                          "geometry": {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "Point"
+                                ]
+                              },
+                              "coordinates": {
+                                "type": "array",
+                                "items": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "number"
+                                    }
+                                  ]
+                                },
+                                "minItems": 2,
+                                "maxItems": 2,
+                                "description": "[lng, lat]"
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "coordinates"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "properties": {
+                            "type": "object",
+                            "properties": {
+                              "osmType": {
+                                "type": "string",
+                                "enum": [
+                                  "node",
+                                  "way",
+                                  "relation"
+                                ]
+                              },
+                              "osmId": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              "name": {
+                                "nullable": true,
+                                "description": "Nama di OSM; banyak halte tidak bernama",
+                                "type": "string"
+                              },
+                              "category": {
+                                "type": "string",
+                                "enum": [
+                                  "kampus",
+                                  "masjid",
+                                  "halte",
+                                  "rumah_sakit"
+                                ]
+                              },
+                              "district": {
+                                "type": "object",
+                                "properties": {
+                                  "slug": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "slug",
+                                  "name"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "wheelchair": {
+                                "nullable": true,
+                                "description": "Nilai mentah tag wheelchair OSM (mis. yes, limited, no), belum diperiksa tim AksesBogor",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "osmType",
+                              "osmId",
+                              "name",
+                              "category",
+                              "district",
+                              "wheelchair"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "id",
+                          "geometry",
+                          "properties"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "source": {
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string"
+                        },
+                        "license": {
+                          "type": "string"
+                        },
+                        "attribution": {
+                          "type": "string",
+                          "description": "Wajib tampil bersama data (ODbL)"
+                        },
+                        "url": {
+                          "type": "string",
+                          "format": "uri",
+                          "description": "Halaman hak cipta dan lisensi OpenStreetMap"
+                        },
+                        "retrievedAt": {
+                          "nullable": true,
+                          "description": "Waktu unduh dari Overpass; null bila data belum dimuat",
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                        }
+                      },
+                      "required": [
+                        "title",
+                        "license",
+                        "attribution",
+                        "url",
+                        "retrievedAt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "features",
+                    "source"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/places/stats": {
       "get": {
         "summary": "Angka untuk Beranda",
