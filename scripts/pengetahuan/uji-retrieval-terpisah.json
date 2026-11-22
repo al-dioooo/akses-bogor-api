@@ -1,0 +1,14 @@
+[
+  { "id": "T01", "jenis": "pintu", "pertanyaan": "Berapa lebar pintu masuk utama gedung umum?", "relevan": ["Permen PUPR No. 14/PRT/M/2017, Lampiran II, A.1 Pintu (bagian 1 dari 5)"] },
+  { "id": "T02", "jenis": "tangga", "pertanyaan": "Tinggi anak tangga yang dianjurkan berapa?", "relevan": ["Permen PUPR No. 14/PRT/M/2017, Lampiran II, B.1 Tangga (bagian 1 dari 5)"] },
+  { "id": "T03", "jenis": "parkir", "pertanyaan": "Berapa jarak maksimal tempat parkir penyandang disabilitas dari pintu masuk?", "relevan": ["Permen PUPR No. 14/PRT/M/2017, Lampiran III, 15 Tempat Parkir (bagian 1 dari 3)"] },
+  { "id": "T04", "jenis": "hak, uu", "pertanyaan": "Apakah pemerintah daerah wajib menyediakan fasilitas pejalan kaki yang aksesibel?", "relevan": ["UU No. 8 Tahun 2016, Pasal 101"] },
+  { "id": "T05", "jenis": "hak, uu", "pertanyaan": "Hak pelayanan publik untuk penyandang disabilitas apa saja?", "relevan": ["UU No. 8 Tahun 2016, Pasal 19"] },
+  { "id": "T06", "jenis": "verifikasi, foto", "pertanyaan": "Apa yang dilakukan verifikator kalau foto tidak cukup sebagai bukti?", "relevan": [["Panduan Verifikasi, 5. Bukti Foto › 5.1 Foto Minimum", "Panduan Verifikasi, 6. Keputusan › 6.2 Minta Klarifikasi"]] },
+  { "id": "T07", "jenis": "verifikasi", "pertanyaan": "Berapa hari pelapor punya waktu untuk menjawab klarifikasi?", "relevan": ["Panduan Verifikasi, 6. Keputusan › 6.2 Minta Klarifikasi"] },
+  { "id": "T08", "jenis": "angkutan", "pertanyaan": "Rute angkot dari Warung Jambu ke Sukasari", "relevan": ["OpenStreetMap, relasi rute 20397459"] },
+  { "id": "T09", "jenis": "lift, jawaban", "pertanyaan": "Kapan lift dijawab tidak perlu?", "relevan": [["Panduan Verifikasi, 4. Daftar Periksa › 4.2 Fasilitas › Lift / Elevator", "ADR-0017, Keputusan", "Halaman \"Mengenal aksesibilitas\" (draf), Empat jawaban untuk setiap fasilitas"]] },
+  { "id": "T10", "jenis": "toilet", "pertanyaan": "Tombol darurat di toilet disabilitas", "relevan": ["Permen PUPR No. 14/PRT/M/2017, Lampiran III, 5 Toilet (bagian 2 dari 5)"] },
+  { "id": "T11", "jenis": "jawaban", "pertanyaan": "Apa alasan yang bisa dipilih untuk jawaban Tidak tersedia?", "relevan": ["ADR-0022, Keputusan › Alasan untuk \"Tidak tersedia\""] },
+  { "id": "T12", "jenis": "foto, guiding block", "pertanyaan": "Bagaimana memotret guiding block untuk laporan?", "relevan": [["Halaman \"Tips berkunjung dan melapor\" (draf), Foto yang membantu verifikasi", "Panduan Verifikasi, 5. Bukti Foto › 5.2 Foto yang Diterima dan yang Kurang"]] }
+]

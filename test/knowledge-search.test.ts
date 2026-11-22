@@ -2,8 +2,8 @@ import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Db } from "../src/db/client.js";
 import { knowledgePassages, knowledgeSources } from "../src/db/schema.js";
-import { queryTerms, searchKnowledge } from "../src/knowledge/search.js";
-import { insertPassages, replaceSource } from "../src/knowledge/store.js";
+import { queryConcepts, queryTerms, searchKnowledge } from "../src/knowledge/search.js";
+import { insertPassages, reindexStems, replaceSource } from "../src/knowledge/store.js";
 import { createTestDb } from "./helpers/db.js";
 
 let db: Db;
@@ -39,6 +39,7 @@ beforeAll(async () => {
     insertPassages(tx, guide.id, [
       { citation: "Panduan Verifikasi, bagian 5.2", heading: "Foto ramp", body: "Foto ramp memperlihatkan seluruh ramp dari bawah, termasuk pegangan tangan dan kemiringan." },
       { citation: "Panduan Verifikasi, bagian 5.3", heading: "Guiding block", body: "Guiding block dinilai tersedia bila jalurnya menyambung dari trotoar sampai pintu masuk." },
+      { citation: "Panduan Verifikasi, bagian 5.4", heading: "Kemiringan ramp", body: "Kemiringan diperkirakan dari foto samping." },
     ]),
   );
 }, 60_000);
@@ -56,9 +57,38 @@ describe("queryTerms", () => {
     expect(queryTerms("pasal 18 UU 8/2016")).toEqual(["pasal", "18", "uu", "8", "2016"]);
   });
 
+  it("keeps belum, because Belum tahu is one of the AksesBogor answers", () => {
+    expect(queryTerms("Apa arti jawaban Belum tahu?")).toEqual(["arti", "jawaban", "belum", "tahu"]);
+  });
+
   it("returns nothing for a question made only of common words", () => {
     expect(queryTerms("apa itu yang di sana?")).toEqual(["sana"]);
     expect(queryTerms("apa itu yang")).toEqual([]);
+  });
+});
+
+describe("queryConcepts", () => {
+  it("turns a phrase from the synonym list into one concept with all its synonyms", () => {
+    const concepts = queryConcepts("Apakah jalur landai harus punya bordes?");
+    expect(concepts).toHaveLength(3);
+    expect(concepts[0]!.exact).toBe("(ram) | (ramp:*) | (jalur:* <-> landai:*) | (bidang:* <-> miring:*)");
+    expect(concepts[0]!.stem).toBe("(ram) | (ramp) | (jalur <-> landai) | (bidang <-> miring)");
+    expect(concepts.slice(1)).toEqual([
+      { exact: "punya:*", stem: "punya" },
+      { exact: "bordes:*", stem: "bordes" },
+    ]);
+  });
+
+  it("recognises synonyms in their affixed forms and keeps other words with their stems", () => {
+    const concepts = queryConcepts("Ukuran WC difabel yang dibolehkan");
+    expect(concepts.map((c) => c.stem.split(" | ")[0])).toEqual(["ukur", "(toilet)", "(difabel)", "boleh"]);
+    expect(queryConcepts("toiletnya")[0]!.stem).toContain("(kamar <-> mandi)");
+  });
+
+  it("matches regulation wording for limits, including phrases made of common words", () => {
+    const [limit, ...rest] = queryConcepts("tidak lebih dari 18 cm");
+    expect(limit!.exact).toContain("(maksimal:*)");
+    expect(rest.map((c) => c.exact)).toEqual(["18", "cm"]);
   });
 });
 
@@ -91,6 +121,37 @@ describe("searchKnowledge", () => {
     expect(hits[0]!.citation).toBe("Panduan Verifikasi, bagian 5.3");
   });
 
+  it("ranks a short passage matching more words above a long passage repeating fewer words", async () => {
+    const source = { ...uu, id: "uji-peringkat", title: "Uji peringkat" };
+    await replaceSource(db, source, (tx) =>
+      insertPassages(tx, source.id, [
+        { citation: "Uji peringkat, panjang", body: "Kanstin dan bordes. ".repeat(40) },
+        { citation: "Uji peringkat, pendek", body: "Selasar dengan kanstin dan bordes." },
+      ]),
+    );
+    const hits = await searchKnowledge(db, "selasar kanstin bordes");
+    expect(hits.map((h) => h.citation).slice(0, 2)).toEqual(["Uji peringkat, pendek", "Uji peringkat, panjang"]);
+    expect(hits[0]!.score - hits[1]!.score).toBeGreaterThan(0.5);
+  });
+
+  it("matches affixed forms through the stemmed column", async () => {
+    const hits = await searchKnowledge(db, "seberapa miring");
+    expect(hits[0]?.citation).toBe("Panduan Verifikasi, bagian 5.4");
+  });
+
+  it("still matches words as written when the stemmed column is empty", async () => {
+    await db.execute(sql`UPDATE knowledge_passages SET search_stem = ''::tsvector`);
+    expect((await searchKnowledge(db, "kemiringan"))[0]?.citation).toBe("Panduan Verifikasi, bagian 5.4");
+    await reindexStems(db);
+  });
+
+  it("finds passages that use a synonym of the question's words", async () => {
+    const source = { ...uu, id: "uji-padanan", title: "Uji padanan" };
+    await replaceSource(db, source, (tx) => insertPassages(tx, source.id, [{ citation: "Uji padanan, toilet", body: "Lebar pintu toilet paling sedikit 90 cm." }]));
+    const hits = await searchKnowledge(db, "lebar minimal pintu kamar mandi");
+    expect(hits[0]?.citation).toBe("Uji padanan, toilet");
+  });
+
   it("filters by source kind", async () => {
     const hits = await searchKnowledge(db, "aksesibilitas ramp", { kinds: ["dokumen_aksesbogor"] });
     expect(hits.length).toBeGreaterThan(0);
@@ -114,6 +175,22 @@ describe("searchKnowledge", () => {
 
   it("treats tsquery syntax in the question as plain words", async () => {
     await expect(searchKnowledge(db, "ramp & !(gedung) | :* <-> '")).resolves.toBeInstanceOf(Array);
+  });
+});
+
+describe("stemmed column", () => {
+  const stemsOf = async (citation: string) =>
+    ((await db.execute(sql`SELECT search_stem::text AS s FROM knowledge_passages WHERE citation = ${citation}`)) as unknown as { rows: { s: string }[] }).rows[0]?.s;
+
+  it("is filled from the citation, heading and body when passages are inserted", async () => {
+    expect(await stemsOf("Panduan Verifikasi, bagian 5.4")).toMatch(/'miring':\d+A/);
+  });
+
+  it("is recomputed for every passage by reindexStems", async () => {
+    await db.execute(sql`UPDATE knowledge_passages SET search_stem = ''::tsvector`);
+    expect(await stemsOf("Panduan Verifikasi, bagian 5.4")).toBe("");
+    expect(await reindexStems(db)).toBeGreaterThanOrEqual(5);
+    expect(await stemsOf("Panduan Verifikasi, bagian 5.4")).toMatch(/'miring':\d+A/);
   });
 });
 
