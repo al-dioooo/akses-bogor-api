@@ -1,15 +1,13 @@
-// Daftar alat agen rute (ADR-0042) di satu tempat: nama, deskripsi untuk model, skema input dan output, dan fungsinya.
-// Route API dan penyedia model mana pun nanti memakai daftar yang sama; definisi untuk model dibuat dari skema Zod.
+// Daftar alat untuk model agen rute (ADR-0042) di satu tempat: nama, deskripsi untuk model, skema input dan output, dan
+// fungsinya. Route API dan adapter model memakai daftar yang sama; larik `tools` format OpenAI dibuat dari skema Zod.
+// Hanya tiga alat ini yang boleh dipanggil model. Rute jalan kaki dan hambatan di rute tidak pernah menjadi alat.
 import { z } from "zod";
-import { knowledgeKind, osmFeatureKind, placeCategory, placeStatus } from "../db/schema.js";
+import { knowledgeKind, placeCategory, placeStatus } from "../db/schema.js";
 import { HttpError } from "../http/errors.js";
 import { placeDetail } from "../places/schemas.js";
-import { findPlace, placeAccessibility, routeObstacles, searchKnowledgeTool, walkingRoute, type ToolContext } from "./tools.js";
+import { findPlace, placeAccessibility, searchKnowledgeTool, type ToolContext } from "./tools.js";
 
 const location = z.object({ lat: z.number(), lng: z.number() });
-const position = z
-  .object({ lat: z.number().min(-90).max(90).describe("Lintang (derajat, WGS 84)"), lng: z.number().min(-180).max(180).describe("Bujur (derajat, WGS 84)") })
-  .describe("Posisi pengguna saat ini");
 const placeId = z.uuid().describe("Id lokasi AksesBogor dari find_place");
 
 const findPlaceTool = {
@@ -37,56 +35,8 @@ const placeAccessibilityTool = {
   description:
     "Status aksesibilitas sebuah tempat dan jawaban keempat fasilitas (ramp, toilet difabel, guiding block, lift) yang sudah diverifikasi, dengan alasan, catatan, dan tanggal verifikasi terakhir. Sampaikan jawaban apa adanya: belum_tahu berarti belum diketahui, bukan tidak tersedia, dan jangan ditebak dari sumber lain.",
   input: z.object({ placeId }),
-  output: placeDetail.omit({ photos: true }),
+  output: placeDetail.omit({ photos: true, location: true }),
   run: placeAccessibility,
-};
-
-const walkingRouteTool = {
-  name: "walking_route",
-  description:
-    "Rute jalan kaki dari posisi pengguna ke pin tempat tujuan (biasanya pintu masuk utama): jarak, waktu, langkah, dan garis rute. Rute ini dari profil jalan kaki Mapbox yang tidak memperhitungkan tangga, kerb, atau kemiringan; jangan pernah menyebutnya aksesibel atau ramah kursi roda, dan selalu sampaikan isi `warning`.",
-  input: z.object({ from: position, placeId }),
-  output: z.object({
-    destination: z.object({ placeId: z.uuid(), name: z.string(), location }),
-    distanceMeters: z.number().int(),
-    durationSeconds: z.number().int(),
-    steps: z.array(
-      z.object({ instruction: z.string(), distanceMeters: z.number().int(), durationSeconds: z.number().int(), name: z.string().nullable(), maneuver: z.string(), location }),
-    ),
-    geometry: z.object({ type: z.literal("LineString"), coordinates: z.array(z.tuple([z.number(), z.number()])) }).describe("GeoJSON [bujur, lintang]"),
-    polyline: z.string().describe("Garis rute sebagai polyline presisi 6, untuk route_obstacles"),
-    warning: z.string(),
-    attribution: z.string(),
-  }),
-  run: walkingRoute,
-};
-
-const routeObstaclesTool = {
-  name: "route_obstacles",
-  description:
-    "Fitur OpenStreetMap di dekat garis rute yang penting untuk kursi roda dan tunanetra: tangga, kerb, ramp, lift, pintu masuk, dan guiding block, urut dari awal rute. Sebut sebagai data OpenStreetMap yang bisa tidak lengkap; daftar kosong bukan berarti jalannya bebas hambatan.",
-  input: z.object({
-    polyline: z.string().min(2).max(60_000).describe("Nilai `polyline` dari hasil walking_route"),
-    bufferMeters: z.number().int().min(5).max(50).optional().describe("Jarak paling jauh dari garis rute, dalam meter; bawaan 20"),
-  }),
-  output: z.object({
-    bufferMeters: z.number().int(),
-    truncated: z.boolean().describe("Benar bila lebih dari 50 fitur cocok dan hanya 50 pertama yang dikirim"),
-    features: z.array(
-      z.object({
-        kind: z.enum(osmFeatureKind.enumValues),
-        description: z.string(),
-        name: z.string().nullable(),
-        tags: z.record(z.string(), z.string()),
-        distanceFromRouteMeters: z.number().int(),
-        alongRouteMeters: z.number().int().describe("Jarak dari awal rute ke titik terdekat dengan fitur ini"),
-        osm: z.object({ type: z.string(), id: z.number().int(), url: z.url() }),
-      }),
-    ),
-    note: z.string(),
-    attribution: z.string(),
-  }),
-  run: routeObstacles,
 };
 
 const knowledgeTool = {
@@ -120,19 +70,23 @@ const knowledgeTool = {
   run: searchKnowledgeTool,
 };
 
-export const AGENT_TOOLS = [findPlaceTool, placeAccessibilityTool, walkingRouteTool, routeObstaclesTool, knowledgeTool] as const;
+export const AGENT_TOOLS = [findPlaceTool, placeAccessibilityTool, knowledgeTool] as const;
 export type AgentTool = (typeof AGENT_TOOLS)[number];
 export type ToolName = AgentTool["name"];
 
-export type ToolDefinition = { name: string; description: string; inputSchema: Record<string, unknown> };
+/** Satu alat dalam larik `tools` format OpenAI chat completions, yang juga dipakai OpenRouter. */
+export type ToolDefinition = {
+  type: "function";
+  function: { name: string; description: string; parameters: Record<string, unknown> };
+};
 
-/** Definisi alat untuk penyedia model yang mendukung tool calling: nama, deskripsi, dan JSON Schema input. */
+/** Larik `tools` untuk penyedia model yang mendukung tool calling: nama, deskripsi, dan JSON Schema parameter. */
 export function toolDefinitions(): ToolDefinition[] {
   return AGENT_TOOLS.map((tool) => {
     // `$schema` dibuang: penyedia model hanya meminta objek skemanya.
-    const inputSchema = z.toJSONSchema(tool.input, { io: "input" }) as Record<string, unknown>;
-    delete inputSchema.$schema;
-    return { name: tool.name, description: tool.description, inputSchema };
+    const parameters = z.toJSONSchema(tool.input, { io: "input" }) as Record<string, unknown>;
+    delete parameters.$schema;
+    return { type: "function", function: { name: tool.name, description: tool.description, parameters } };
   });
 }
 
