@@ -54,6 +54,15 @@ const schema = z
     R2_BUCKET_PUBLIK: optional(z.string().min(3)),
     /** Folder foto di development tanpa R2. Bawaan `.data/foto`. */
     PHOTO_STORAGE_DIR: optional(z.string().min(1)),
+    /**
+     * Route agen rute `/agent/*` dan rute jalan kaki `/route/*` (ADR-0042). Mati sampai syarat peluncurannya terpenuhi,
+     * termasuk Kebijakan Privasi yang menyebut Mapbox Directions, OpenRouter, dan penyedia model.
+     */
+    ROUTE_AGENT_ENABLED: z.stringbool().default(false),
+    /** API key OpenRouter untuk model agen rute (ADR-0042). Kosong berarti agen menjawab sibuk; API tetap jalan. */
+    OPENROUTER_API_KEY: optional(z.string().startsWith("sk-or-")),
+    /** Model OpenRouter berurutan, dipisah koma; yang pertama dicoba dulu. Kosong berarti daftar bawaan API. */
+    OPENROUTER_MODELS: csv(),
     /** Rahasia bersama dengan server Next.js, minimal 32 karakter. Kosong berarti header IP pengunjung diabaikan. */
     WEB_SERVER_SECRET: optional(z.string().min(32)),
   })

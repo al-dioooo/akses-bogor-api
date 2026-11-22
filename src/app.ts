@@ -16,12 +16,14 @@ import { createDb, type Db } from "./db/client.js";
 import { logMailer, resendMailer, type Mailer } from "./email/mailer.js";
 import { HttpError } from "./http/errors.js";
 import { createRateLimitKey, WEB_SERVER_SECRET_HEADER } from "./http/rate-limit.js";
+import { mapboxWalking } from "./map/directions.js";
 import { mapboxSearch } from "./map/search.js";
 import { mapTokenSource } from "./map/token.js";
 import { schedulePhotoCleanup } from "./photos/cleanup.js";
 import { scheduleVerificationJobs } from "./verification/jobs.js";
 import { localStore, r2Store, type PhotoStore } from "./photos/storage.js";
 import { adminRoutes } from "./routes/admin.js";
+import { agentRoutes } from "./routes/agent.js";
 import { authRoutes } from "./routes/auth.js";
 import { districtRoutes } from "./routes/districts.js";
 import { healthRoutes } from "./routes/health.js";
@@ -162,6 +164,13 @@ export async function buildApp(env: Env, deps: { db?: Db; now?: () => Date; fetc
   // Tautan di email status laporan memakai origin web pertama (ADR-0039).
   const reportEmail = { mailer, webUrl: env.FRONTEND_ORIGINS[0] ?? "http://localhost:3000" };
   await app.register(verifierRoutes, { auth, photoBaseUrl: env.PHOTO_PUBLIC_URL, store: photoStore, email: reportEmail, now });
+  // Alat agen rute (ADR-0042): rute jalan kaki memakai token Mapbox yang sama dengan pencarian tempat.
+  await app.register(agentRoutes, {
+    auth,
+    enabled: env.ROUTE_AGENT_ENABLED,
+    walking: secretToken ? mapboxWalking({ token: secretToken, now, fetch: deps.fetch }) : undefined,
+    now,
+  });
   if (env.NODE_ENV !== "test") {
     const stop = schedulePhotoCleanup(app.db, photoStore, now, app.log);
     app.addHook("onClose", async () => stop());

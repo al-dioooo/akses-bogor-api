@@ -50,6 +50,9 @@ erDiagram
   reports ||--o{ report_clarifications : "pertanyaan dan jawaban"
   report_clarifications |o--o{ photos : "foto dari jawaban"
   reports ||--o{ report_emails : "email yang menunggu"
+  knowledge_sources ||--o{ knowledge_passages : "potongan teks"
+  knowledge_sources ||--o{ osm_features : "fitur OSM"
+  knowledge_sources ||--o{ transit_routes : "rute bus dan angkot"
 ```
 
 | Tabel | Isi | Keputusan |
@@ -65,6 +68,10 @@ erDiagram
 | `photo_deletions` | Berkas foto di R2 yang menunggu dihapus, mis. foto laporan belum terbit milik akun yang dihapus | ADR-0024 |
 | `audit_log` | Siapa mengubah apa dan kapan, tanpa data pribadi; pengubah kosong dengan label `sistem` atau `skrip` untuk tindakan tanpa akun, dan kosong tanpa label berarti akunnya sudah dihapus | FR-35, ADR-0024, ADR-0038 |
 | `report_emails` | Email status laporan yang menunggu dikirim atau dicoba ulang: hanya id laporan dan jenis email | ADR-0039 |
+| `knowledge_sources` | Sumber basis pengetahuan agen rute: jenis, judul, alamat, lisensi, atribusi, tanggal ambil, dan SHA-256 unduhan. Menghapus sumber menghapus semua barisnya | ADR-0042 |
+| `knowledge_passages` | Potongan teks regulasi, dokumen AksesBogor, dan rute angkutan dengan sitasi; kolom `search` (tsvector `simple`) dihitung PostgreSQL | ADR-0042 |
+| `osm_features` | Fitur OpenStreetMap di Kota Bogor (tangga, kerb, ramp, lift, pintu masuk, guiding block, halte, tempat bertag `wheelchair`) dengan tag dalam daftar izin; data ODbL | ADR-0042 |
+| `transit_routes` | Relasi rute bus dan angkot OpenStreetMap, garisnya dipotong ke Kota Bogor, dengan halte berurutan; data ODbL | ADR-0042 |
 
 Saat akun dihapus, `reporter_id` di laporan, `reviewer_id`, penanya klarifikasi, dan pengubah di log audit menjadi kosong (`ON DELETE SET NULL`); penghapusan laporan yang belum terbit beserta klarifikasi, foto, dan antrean emailnya dijalankan `src/auth/delete-account.ts` dalam satu transaksi (ADR-0024). Klarifikasi pada laporan yang sudah terbit tetap tersimpan tanpa nama pelapor dan hanya dilihat verifikator.
 
@@ -80,13 +87,15 @@ Saat akun dihapus, `reporter_id` di laporan, `reviewer_id`, penanya klarifikasi,
 | `src/places` | Skema Zod dan query baca lokasi |
 | `src/reports` | Query dan skema laporan: Laporan saya, cek kecamatan dan lokasi mirip |
 | `src/photos` | Pemeriksaan dan pemrosesan foto (sharp), penyimpanan R2 atau folder lokal, dan pembersihan berkas (ADR-0031) |
-| `src/map` | Token Mapbox sementara untuk browser (ADR-0016) dan pencarian tempat lewat Search Box (ADR-0032) |
+| `src/map` | Token Mapbox sementara untuk browser (ADR-0016), pencarian tempat lewat Search Box (ADR-0032), dan rute jalan kaki lewat Directions dengan hambatan OSM di dekatnya, hanya untuk browser pengguna (ADR-0042) |
 | `src/auth` | Konfigurasi Better Auth, pemeriksaan sesi, dan aturan akun (ADR-0029) |
 | `src/email` | Isi email dan pengirim Resend atau log (ADR-0030) |
 | `src/admin` | Peran akun: tim verifikasi, memberi dan mencabut peran (ADR-0035) |
 | `src/audit` | Penulis log audit dan pembanding nilai sebelum dan sesudah (ADR-0038) |
 | `src/verification` | Panel verifikator: antrean, laporan untuk diperiksa, dan lokasi yang perlu dicek ulang (ADR-0035, ADR-0036) |
+| `src/knowledge` | Basis pengetahuan agen rute: pengolah data OSM, regulasi, dan dokumen, penulisan per sumber, dan retrieval full-text (ADR-0042) |
+| `src/agent` | Tiga alat untuk model agen rute sebagai fungsi, daftar alat dengan skema input dan output dan larik `tools` format OpenAI, dan antarmuka model (ADR-0042) |
 | `src/routes` | Route Fastify, satu berkas per kelompok |
-| `scripts` | Skrip pendukung, mis. pembuat `docs/openapi.json` |
+| `scripts` | Skrip pendukung, mis. pembuat `docs/openapi.json`, dan pengambil data basis pengetahuan di `scripts/pengetahuan/` |
 | `test` | Tes Vitest dengan `app.inject`; tes database memakai PGlite + PostGIS di dalam proses |
 | `docs` | Diagram ini dan API spec |

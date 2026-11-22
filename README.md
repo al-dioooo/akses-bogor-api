@@ -109,7 +109,7 @@ Contoh lengkap ada di [.env.example](.env.example). Jangan commit `.env`.
 | `DATABASE_URL` | Ya | Koneksi PostgreSQL untuk aplikasi, `pnpm db:migrate`, dan `pnpm db:seed` |
 | `FRONTEND_ORIGINS` | Di production | Origin web yang boleh memanggil API, dipisah koma. Origin pertama juga menjadi alamat tautan di email status laporan. Di luar production, `http://localhost:*` selalu diizinkan |
 | `PHOTO_PUBLIC_URL` | Tidak | Alamat publik bucket foto Cloudflare R2. Kosong berarti `url` foto di respons bernilai `null` |
-| `MAPBOX_SECRET_TOKEN` | Tidak | Token rahasia Mapbox (`sk.`) ber-scope `tokens:write`, `styles:read`, `styles:tiles`, dan `fonts:read`, untuk `GET /map/token` (ADR-0016) dan `POST /map/search` (ADR-0032). Diisi bersama `MAPBOX_USERNAME` |
+| `MAPBOX_SECRET_TOKEN` | Tidak | Token rahasia Mapbox (`sk.`) ber-scope `tokens:write`, `styles:read`, `styles:tiles`, dan `fonts:read`, untuk `GET /map/token` (ADR-0016), `POST /map/search` (ADR-0032), dan `POST /route/walking` (Mapbox Directions tidak butuh scope tambahan; ADR-0042). Diisi bersama `MAPBOX_USERNAME` |
 | `MAPBOX_USERNAME` | Tidak | Username akun Mapbox pemilik token rahasia |
 | `BETTER_AUTH_SECRET` | Di production | Rahasia Better Auth, minimal 32 karakter: tanda tangan token sesi dan kunci HMAC kode email (ADR-0029). Kosong di development berarti memakai rahasia tetap khusus lokal; kosong di production berarti route akun menjawab 503. Mengganti nilainya mengakhiri semua sesi |
 | `BETTER_AUTH_URL` | Di production | Alamat publik API |
@@ -122,6 +122,9 @@ Contoh lengkap ada di [.env.example](.env.example). Jangan commit `.env`.
 | `R2_BUCKET_PUBLIK` | Untuk foto di production | Bucket publik di balik `PHOTO_PUBLIC_URL` untuk foto yang sudah terbit |
 | `PHOTO_STORAGE_DIR` | Tidak | Folder foto di development tanpa R2, bawaan `.data/foto`. Di production tanpa R2, unggah foto menjawab 503 |
 | `WEB_SERVER_SECRET` | Di production | Rahasia bersama dengan server Next.js, minimal 32 karakter. Bila cocok, rate limit dihitung per IP pengunjung yang dikirim web, bukan per IP Vercel |
+| `ROUTE_AGENT_ENABLED` | Tidak | `true` membuka route agen rute `/agent/*` dan rute jalan kaki `/route/*` (ADR-0042). Bawaan `false`: route menjawab 503. Biarkan mati di production sampai syarat peluncuran di ADR-0042 terpenuhi |
+| `OPENROUTER_API_KEY` | Tidak | API key OpenRouter untuk model agen rute (ADR-0042). Kosong berarti agen menjawab sibuk; API tetap jalan |
+| `OPENROUTER_MODELS` | Tidak | Model OpenRouter berurutan, dipisah koma; model pertama dicoba dulu. Kosong berarti daftar bawaan API |
 
 ## Endpoint
 
@@ -160,10 +163,18 @@ Contoh lengkap ada di [.env.example](.env.example). Jangan commit `.env`.
 | `POST /verifier/reports/{id}/reject` | Tolak dengan alasan R1–R5; foto laporan dihapus; email ke pelapor | FR-32, FR-40 |
 | `GET /verifier/places/recheck` | Lokasi yang terakhir diverifikasi lebih dari 12 bulan lalu, terlama dulu | FR-38 |
 | `POST /reports` | Kirim laporan baru, perubahan, atau kekurangan ke antrean verifikasi dengan foto yang sudah diunggah; kecamatan dihitung ulang; kunci draf mencegah laporan ganda; 20 laporan per 24 jam dan 30 laporan menunggu per akun | FR-20 sampai FR-27 |
+| `GET /agent/tools` | Larik `tools` format OpenAI untuk ketiga alat yang boleh dipanggil model | FR-60, ADR-0042 |
+| `POST /agent/tools/find_place` | Lokasi AksesBogor bernama mirip, paling banyak 5 | FR-60 |
+| `POST /agent/tools/place_accessibility` | Status, jawaban fasilitas terverifikasi, dan tanggal verifikasi terakhir sebuah lokasi, tanpa koordinat | FR-60 |
+| `POST /agent/tools/search_knowledge` | Potongan regulasi, dokumen AksesBogor, dan rute angkutan dengan sitasi, sumber, dan lisensi | FR-60 |
+| `POST /route/walking` | Rute jalan kaki Mapbox dari posisi pengguna ke pin lokasi, dengan peringatan tetap dan atribusi, hanya untuk browser pengguna; 30 per akun per jam, 1.000 per hari | FR-60, ADR-0042 |
+| `POST /route/obstacles` | Tangga, kerb, ramp, lift, pintu masuk, dan guiding block OSM dalam 20 m (maks. 50 m) dari garis rute, hanya untuk browser pengguna | FR-60, ADR-0042 |
 
 Route akun dipanggil server Next.js, bukan browser. Masuk menjawab token sesi bertanda tangan; web menyimpannya di cookie `HttpOnly` miliknya dan mengirimnya balik sebagai `Authorization: Bearer` (ADR-0029). Batas kode: 60 detik dan 5 kode per email per jam, 10 permintaan dan 30 percobaan kode per klien per 15 menit. Sesi berakhir 30 hari setelah terakhir dipakai, atau 90 hari setelah masuk. Setiap jam API menghapus akun yang tidak dilengkapi dalam 24 jam (dan tidak punya laporan), sesi kedaluwarsa, dan kode kedaluwarsa. Saat akun dihapus, berkas foto yang ikut terhapus, termasuk unggahan yang belum dipasang ke laporan, dicatat di tabel `photo_deletions`. Setiap jam API memindahkan unggahan yang tidak dipasang dalam 24 jam ke antrean itu, lalu menghapus berkas di antrean dari R2 (`src/photos/cleanup.ts`); berkas yang gagal dihapus dicoba lagi jam berikutnya. Di development tanpa `RESEND_API_KEY`, kode masuk dicetak ke log API.
 
 Panel verifikator (ADR-0035 sampai ADR-0037) membaca dan memutuskan laporan lewat route `/verifier/*`, semuanya khusus verifikator dan admin, tanpa laporan sendiri, dan hanya dengan nama tampilan pelapor. Setiap keputusan mengunci baris laporan, jadi keputusan kedua menjawab 409. Terbitkan menyalin foto yang tidak disembunyikan dari bucket privat ke `lokasi/<id lokasi>/<id foto>.webp` di bucket publik, dengan area kabur dari `src/photos/blur.ts`, lalu menghapus berkas asli; foto laporan yang ditolak ikut dihapus. Perubahan data dicatat di `audit_log` tanpa data pribadi (ADR-0038). Setiap jam API juga menolak laporan klarifikasi yang tidak dijawab sampai tenggat 7 × 24 jam dengan alasan R6 (`src/verification/jobs.ts`); tidak ada timer systemd tambahan. Email status laporan (diterbitkan, ditolak, klarifikasi) diantrekan di `report_emails` bersama keputusannya, dikirim setelah transaksi selesai, dan yang gagal dicoba lagi setiap jam selama 3 hari (ADR-0039). Tautannya memakai origin pertama di `FRONTEND_ORIGINS`.
+
+Agen rute (ADR-0042) punya dua jenis pemanggil. Alat untuk model ada di `src/agent/`: fungsinya di `tools.ts`, dan nama, deskripsi, skema input, dan skema output ketiga alat di `registry.ts`, yang juga membuat larik `tools` format OpenAI dan dipakai route `/agent/tools/*`. Tidak ada alat yang menerima posisi pengguna atau mengembalikan rute. Rute jalan kaki dan hambatan di dekatnya ada di `src/map/walking-route.ts` dan hanya dilayani untuk browser pengguna lewat `/route/*`, karena Product Terms Mapbox §1.5 melarang memakai hasil Directions untuk menjalankan AI. Rute memakai Mapbox Directions profil `walking` dengan `MAPBOX_SECRET_TOKEN`; posisi pengguna dibulatkan ke 4 desimal, dan jawaban Mapbox tidak disimpan atau dicatat di log. Semua route ini hanya untuk akun yang sudah dilengkapi, mati selama `ROUTE_AGENT_ENABLED` tidak `true`, dan berbagi batas 120 permintaan per akun per jam. `model.ts` berisi antarmuka model yang diisi adapter OpenRouter.
 
 Status lokasi dan ringkasannya dihitung dengan aturan "pintu masuk dulu" di `src/domain/status.ts` (ADR-0018) dan disimpan di tabel `places`; panggil `refreshPlaceStatus` setiap kali jawaban fasilitas berubah. Respons memakai nilai enum produk (mis. `sebagian`, `tidak_tersedia`); teks untuk pengguna disusun di web.
 
