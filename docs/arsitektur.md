@@ -1,10 +1,10 @@
 # Arsitektur
 
-Sumber keputusan: [ADR-0013](https://github.com/al-dioooo/akses-bogor-docs/blob/main/decisions/0013-tech-stack-nextjs-fastify.md), [ADR-0025](https://github.com/al-dioooo/akses-bogor-docs/blob/main/decisions/0025-api-dan-postgresql-di-vps-sendiri.md), [ADR-0026](https://github.com/al-dioooo/akses-bogor-docs/blob/main/decisions/0026-api-dan-postgresql-di-evergarden-oci.md), [ADR-0029](https://github.com/al-dioooo/akses-bogor-docs/blob/main/decisions/0029-akun-better-auth-dan-sesi-lewat-server-web.md), dan [ADR-0030](https://github.com/al-dioooo/akses-bogor-docs/blob/main/decisions/0030-email-transaksional-resend.md). Diagram di bawah memuat bagian yang sudah ada dan yang direncanakan; yang direncanakan ditandai garis putus-putus.
+Sumber keputusan: [ADR-0013](https://github.com/al-dioooo/akses-bogor-docs/blob/main/decisions/0013-tech-stack-nextjs-fastify.md), [ADR-0025](https://github.com/al-dioooo/akses-bogor-docs/blob/main/decisions/0025-api-dan-postgresql-di-vps-sendiri.md), [ADR-0026](https://github.com/al-dioooo/akses-bogor-docs/blob/main/decisions/0026-api-dan-postgresql-di-evergarden-oci.md), [ADR-0029](https://github.com/al-dioooo/akses-bogor-docs/blob/main/decisions/0029-akun-better-auth-dan-sesi-lewat-server-web.md), [ADR-0030](https://github.com/al-dioooo/akses-bogor-docs/blob/main/decisions/0030-email-transaksional-resend.md), dan [ADR-0048](https://github.com/al-dioooo/akses-bogor-docs/blob/main/decisions/0048-web-di-host-sendiri-di-evergarden-oci.md). Diagram di bawah memuat bagian yang sudah ada dan yang direncanakan; yang direncanakan ditandai garis putus-putus.
 
 ```mermaid
 flowchart LR
-  B[Browser / PWA] -->|halaman + cookie sesi| W[akses-bogor-web<br/>Next.js di Vercel]
+  B[Browser / PWA] -->|halaman + cookie sesi| W[akses-bogor-web<br/>Next.js di Evergarden, lewat Cloudflare Tunnel]
   W -->|render di server, Bearer sesi| F[akses-bogor-api<br/>Fastify + Better Auth di Evergarden, lewat Cloudflare Tunnel]
   F --> DB[(PostgreSQL 17 + PostGIS di Evergarden)]
   DB -.->|pg_dump tiap malam| BK[(R2 privat: cadangan)]
@@ -15,7 +15,7 @@ flowchart LR
 ```
 
 - Browser tidak pernah terhubung langsung ke API, database, atau R2. Server web menyimpan token sesi di cookie miliknya dan mengirimnya ke API sebagai `Authorization: Bearer`; setiap request yang menyentuh data akun diperiksa sesi dan perannya di API ([ADR-0029](https://github.com/al-dioooo/akses-bogor-docs/blob/main/decisions/0029-akun-better-auth-dan-sesi-lewat-server-web.md)).
-- Aplikasi, migrasi, dan seed memakai satu koneksi (`DATABASE_URL`) ke PostgreSQL di mesin yang sama, lewat Unix socket dengan autentikasi peer. Produksi berjalan di Evergarden, VM OCI region Batam; cara deploy ada di [README](../README.md#deployment).
+- Aplikasi, migrasi, dan seed memakai satu koneksi (`DATABASE_URL`) ke PostgreSQL di mesin yang sama, lewat Unix socket dengan autentikasi peer. Produksi berjalan di Evergarden, VM OCI region Batam, bersama web; cara deploy ada di [README](../README.md#deployment).
 - Foto diperkecil di browser, lalu diperiksa ulang, disandikan ulang dengan sharp, dan dihapus metadata EXIF-nya di API sebelum disimpan ke bucket R2 privat ([ADR-0023](https://github.com/al-dioooo/akses-bogor-docs/blob/main/decisions/0023-hingga-sepuluh-foto-bertag-per-laporan.md), [ADR-0031](https://github.com/al-dioooo/akses-bogor-docs/blob/main/decisions/0031-foto-laporan-di-bucket-r2-privat.md)). Di development tanpa R2, foto disimpan di folder `.data/foto`.
 
 ## Alur Request

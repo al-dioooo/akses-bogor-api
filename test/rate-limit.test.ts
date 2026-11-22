@@ -59,33 +59,33 @@ describe("rate limit key", () => {
   });
 });
 
-// Panggilan dari server Next.js lewat Cloudflare: cf-connecting-ip selalu IP egress Vercel.
+// Panggilan dari server Next.js lewat Cloudflare: cf-connecting-ip selalu IP keluar server web (Evergarden).
 describe("web server calls", () => {
   it("count by the visitor ip when the secret matches", async () => {
-    const vercel = { "cf-connecting-ip": "192.0.2.1" };
-    await request(webApp, { ...vercel, "x-web-server-secret": secret, "x-visitor-ip": "198.51.100.60" });
-    const other = await request(webApp, { ...vercel, "x-web-server-secret": secret, "x-visitor-ip": "2001:db8::61" });
+    const webServer = { "cf-connecting-ip": "192.0.2.1" };
+    await request(webApp, { ...webServer, "x-web-server-secret": secret, "x-visitor-ip": "198.51.100.60" });
+    const other = await request(webApp, { ...webServer, "x-web-server-secret": secret, "x-visitor-ip": "2001:db8::61" });
     expect(remaining(other)).toBe(119);
   });
 
   it("share the cf-connecting-ip quota when the secret is wrong", async () => {
-    const vercel = { "cf-connecting-ip": "192.0.2.2" };
-    const first = await request(webApp, { ...vercel, "x-web-server-secret": "salah", "x-visitor-ip": "198.51.100.70" });
-    const second = await request(webApp, { ...vercel, "x-web-server-secret": "salah", "x-visitor-ip": "198.51.100.71" });
+    const webServer = { "cf-connecting-ip": "192.0.2.2" };
+    const first = await request(webApp, { ...webServer, "x-web-server-secret": "salah", "x-visitor-ip": "198.51.100.70" });
+    const second = await request(webApp, { ...webServer, "x-web-server-secret": "salah", "x-visitor-ip": "198.51.100.71" });
     expect(remaining(second)).toBe(remaining(first) - 1);
   });
 
   it("share the cf-connecting-ip quota when no secret is configured", async () => {
-    const vercel = { "cf-connecting-ip": "192.0.2.3" };
-    const first = await request(app, { ...vercel, "x-web-server-secret": secret, "x-visitor-ip": "198.51.100.80" });
-    const second = await request(app, { ...vercel, "x-web-server-secret": secret, "x-visitor-ip": "198.51.100.81" });
+    const webServer = { "cf-connecting-ip": "192.0.2.3" };
+    const first = await request(app, { ...webServer, "x-web-server-secret": secret, "x-visitor-ip": "198.51.100.80" });
+    const second = await request(app, { ...webServer, "x-web-server-secret": secret, "x-visitor-ip": "198.51.100.81" });
     expect(remaining(second)).toBe(remaining(first) - 1);
   });
 
   it("fall back to cf-connecting-ip when the visitor ip is not an ip address", async () => {
-    const vercel = { "cf-connecting-ip": "192.0.2.4" };
-    const first = await request(webApp, { ...vercel, "x-web-server-secret": secret, "x-visitor-ip": "bukan-ip" });
-    const second = await request(webApp, { ...vercel, "x-web-server-secret": secret });
+    const webServer = { "cf-connecting-ip": "192.0.2.4" };
+    const first = await request(webApp, { ...webServer, "x-web-server-secret": secret, "x-visitor-ip": "bukan-ip" });
+    const second = await request(webApp, { ...webServer, "x-web-server-secret": secret });
     expect(remaining(second)).toBe(remaining(first) - 1);
   });
 });
@@ -93,7 +93,7 @@ describe("web server calls", () => {
 // Batas per route (kode masuk, pencarian) dan unggah foto memakai kunci yang sama dengan batas global. Tanpa akun dan
 // Mapbox, route-route ini menjawab 503, tetapi hook rate limit sudah berjalan sebelumnya.
 describe("route limits for web server calls", () => {
-  const vercel = { "cf-connecting-ip": "192.0.2.10", "x-web-server-secret": secret };
+  const webServer = { "cf-connecting-ip": "192.0.2.10", "x-web-server-secret": secret };
   const codeRequest = (headers: Record<string, string>, email: string) =>
     webApp.inject({ method: "POST", url: "/auth/code", payload: { email }, headers });
   const search = (headers: Record<string, string>) =>
@@ -102,18 +102,18 @@ describe("route limits for web server calls", () => {
     webApp.inject({ method: "POST", url: "/reports/photos", payload: Buffer.from("foto"), headers: { ...headers, "content-type": "image/jpeg" } });
 
   it("count sign-in code requests per visitor", async () => {
-    const first = await codeRequest({ ...vercel, "x-visitor-ip": "198.51.100.90" }, "satu@contoh.id");
-    const second = await codeRequest({ ...vercel, "x-visitor-ip": "198.51.100.90" }, "dua@contoh.id");
-    const other = await codeRequest({ ...vercel, "x-visitor-ip": "198.51.100.91" }, "tiga@contoh.id");
+    const first = await codeRequest({ ...webServer, "x-visitor-ip": "198.51.100.90" }, "satu@contoh.id");
+    const second = await codeRequest({ ...webServer, "x-visitor-ip": "198.51.100.90" }, "dua@contoh.id");
+    const other = await codeRequest({ ...webServer, "x-visitor-ip": "198.51.100.91" }, "tiga@contoh.id");
     expect(first.headers["x-ratelimit-limit"]).toBe("10");
     expect(remaining(second)).toBe(remaining(first) - 1);
     expect(remaining(other)).toBe(9);
   });
 
   it("answer 429 to one visitor while another visitor behind the same server still gets through", async () => {
-    for (let i = 0; i < 10; i++) await codeRequest({ ...vercel, "x-visitor-ip": "198.51.100.92" }, `orang${i}@contoh.id`);
-    const blocked = await codeRequest({ ...vercel, "x-visitor-ip": "198.51.100.92" }, "lagi@contoh.id");
-    const other = await codeRequest({ ...vercel, "x-visitor-ip": "198.51.100.93" }, "lain@contoh.id");
+    for (let i = 0; i < 10; i++) await codeRequest({ ...webServer, "x-visitor-ip": "198.51.100.92" }, `orang${i}@contoh.id`);
+    const blocked = await codeRequest({ ...webServer, "x-visitor-ip": "198.51.100.92" }, "lagi@contoh.id");
+    const other = await codeRequest({ ...webServer, "x-visitor-ip": "198.51.100.93" }, "lain@contoh.id");
     expect(blocked.statusCode).toBe(429);
     expect(blocked.json()).toMatchObject({ galat: "terlalu_sering" });
     expect(other.statusCode).not.toBe(429);
@@ -127,16 +127,16 @@ describe("route limits for web server calls", () => {
   });
 
   it("count place searches per visitor", async () => {
-    const first = await search({ ...vercel, "x-visitor-ip": "198.51.100.96" });
-    const other = await search({ ...vercel, "x-visitor-ip": "2001:db8::97" });
+    const first = await search({ ...webServer, "x-visitor-ip": "198.51.100.96" });
+    const other = await search({ ...webServer, "x-visitor-ip": "2001:db8::97" });
     expect(first.headers["x-ratelimit-limit"]).toBe("30");
     expect(remaining(other)).toBe(29);
   });
 
   it("count photo uploads per visitor", async () => {
-    const first = await upload({ ...vercel, "x-visitor-ip": "198.51.100.98" });
-    const second = await upload({ ...vercel, "x-visitor-ip": "198.51.100.98" });
-    const other = await upload({ ...vercel, "x-visitor-ip": "198.51.100.99" });
+    const first = await upload({ ...webServer, "x-visitor-ip": "198.51.100.98" });
+    const second = await upload({ ...webServer, "x-visitor-ip": "198.51.100.98" });
+    const other = await upload({ ...webServer, "x-visitor-ip": "198.51.100.99" });
     expect(remaining(second)).toBe(remaining(first) - 1);
     expect(remaining(other)).toBe(119);
   });
