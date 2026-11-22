@@ -43,6 +43,24 @@ describe("stem", () => {
     for (const word of ["ram", "uu", "wc", "2016", "k1"]) expect(stem(word)).toBe(word);
   });
 
+  it("uses the root word list when a nasal prefix hides the first letter", () => {
+    expectStems({
+      menilai: "nilai",
+      penilaian: "nilai",
+      pengunjung: "kunjung",
+      memiliki: "milik",
+      pemilik: "milik",
+      berupa: "rupa",
+      memaksimalkan: "maksimal",
+      menyediakan: "sedia",
+      ketersediaan: "sedia",
+    });
+  });
+
+  it("uses the root word list for roots that end like a suffix", () => {
+    expectStems({ jalan: "jalan", pegangan: "pegang", dipakai: "pakai", kerusakan: "rusak", membatasi: "batas", kereta: "kereta", disabilitas: "disabilitas" });
+  });
+
   it("keeps function words that look affixed apart from their roots", () => {
     expectStems({ termasuk: "termasuk", keluar: "keluar", dikeluarkan: "keluar", sebelumnya: "sebelum" });
   });
@@ -56,7 +74,7 @@ describe("stemText", () => {
 
 describe("ROOT_WORDS", () => {
   it("holds lowercase words only", () => {
-    expect(ROOT_WORDS.size).toBeGreaterThan(0);
+    expect(ROOT_WORDS.size).toBeGreaterThan(100);
     for (const word of ROOT_WORDS) expect(word).toMatch(/^[a-z]+$/);
   });
 });
