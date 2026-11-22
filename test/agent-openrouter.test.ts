@@ -123,11 +123,24 @@ describe("openRouterModel", () => {
     await expect(openRouterModel({ apiKey: "sk-or-tes", models, fetch: failing }).next(step)).rejects.toMatchObject({ reason: "semua_gagal" });
     expect(failing).toHaveBeenCalledTimes(2);
 
-    const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValueOnce(failure(503)).mockResolvedValueOnce(answer("Oke."));
     let left = 1;
-    const take = () => left-- > 0;
-    await expect(openRouterModel({ apiKey: "sk-or-tes", models, fetch, take }).next(step)).rejects.toMatchObject({ reason: "kuota" });
+    const budget = { take: () => left-- > 0, give: () => {} };
+    const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValueOnce(failure(503)).mockResolvedValueOnce(answer("Oke."));
+    await expect(openRouterModel({ apiKey: "sk-or-tes", models, fetch, budget }).next(step)).rejects.toMatchObject({ reason: "kuota" });
     expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("gives the budget back for failed requests, since OpenRouter only counts successful ones", async () => {
+    let used = 0;
+    const budget = { take: () => (used += 1) <= 10, give: () => (used -= 1) };
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(failure(503))
+      .mockRejectedValueOnce(new TypeError("fetch failed"))
+      .mockResolvedValueOnce(answer("Oke."));
+    await openRouterModel({ apiKey: "sk-or-tes", models: ["a/satu:free", "b/dua:free", "c/tiga:free", "d/empat:free", "e/lima:free", "f/enam:free", "g/tujuh:free"], fetch, budget }).next(step);
+    expect(fetch).toHaveBeenCalledTimes(3);
+    expect(used).toBe(1);
   });
 
   it("tries the whole list once more after a short wait when providers were only rate-limiting", async () => {

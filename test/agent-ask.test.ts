@@ -79,6 +79,19 @@ describe("askAgent", () => {
     expect(JSON.parse((tool as { content: string }).content).passages[0].citation).toContain("B.2 Ram");
   });
 
+  it("looks the regulation up and asks again when the model cites one from memory", async () => {
+    const { model, steps } = scripted(
+      { kind: "answer", text: "Menurut Permen PUPR, kemiringan ram paling besar 1:12." },
+      { kind: "answer", text: "Menurut Permen PUPR No. 14/PRT/M/2017, Lampiran II, B.2 Ram, kemiringan ram paling besar 1:12." },
+    );
+    const result = await askAgent({ model, ctx: ctx() }, { placeId: halteId, question: "Berapa kemiringan ram menurut peraturan?" });
+    expect(model.next).toHaveBeenCalledTimes(2);
+    expect(steps[1]!.messages.at(-2)).toMatchObject({ role: "assistant", toolCalls: [{ name: "search_knowledge", input: { query: "Berapa kemiringan ram menurut peraturan?" } }] });
+    expect(steps[1]!.messages.at(-1)).toMatchObject({ role: "tool", name: "search_knowledge" });
+    expect(result.answer).toContain("Lampiran II, B.2 Ram");
+    expect(result.sources.some((s) => s.type === "pengetahuan")).toBe(true);
+  });
+
   it("checks tool arguments against the schema and returns errors to the model instead of running the tool", async () => {
     const { model, steps } = scripted(
       {
