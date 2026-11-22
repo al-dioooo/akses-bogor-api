@@ -14,6 +14,8 @@ import { placesNamed } from "../../src/places/queries.js";
 
 /** Pengaman supaya satu kali jalan tidak menghabiskan kuota harian. */
 const MAX_REQUESTS = 40;
+/** Jeda antarpertanyaan: di bawah batas 20 permintaan per menit, dan memberi waktu bila model gratis sedang dibatasi. */
+const PAUSE_MS = 15_000;
 
 type Question = { id: string; jenis: string; tempat: string; pertanyaan: string; riwayat?: Turn[]; kriteria: string; harus: string[]; tidak_boleh: string[] };
 
@@ -48,7 +50,8 @@ const { db, pool } = createDb(env.DATABASE_URL);
 const ctx = { db, now: () => new Date() };
 const summary: string[] = [];
 
-for (const q of questions) {
+for (const [index, q] of questions.entries()) {
+  if (index > 0) await new Promise((resolve) => setTimeout(resolve, PAUSE_MS));
   const place = (await placesNamed(db, q.tempat, 5)).find((p) => p.name === q.tempat);
   if (!place) throw new Error(`Tempat "${q.tempat}" tidak ada di database. Jalankan pnpm db:seed dulu.`);
   const before = requests;
