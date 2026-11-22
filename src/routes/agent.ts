@@ -1,6 +1,9 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
+import { askAgent } from "../agent/ask.js";
+import { QUESTIONS_PER_ACCOUNT_PER_DAY, dailyLimit } from "../agent/limits.js";
+import { AgentBusyError, type AgentModel } from "../agent/model.js";
 import { AGENT_TOOLS, toolDefinitions } from "../agent/registry.js";
 import type { ToolContext } from "../agent/tools.js";
 import type { Auth } from "../auth/auth.js";
@@ -25,6 +28,8 @@ export type AgentRouteOptions = {
   enabled: boolean;
   /** Kosong bila `MAPBOX_SECRET_TOKEN` belum diatur. */
   walking?: WalkingRouter;
+  /** Model agen; kosong bila `OPENROUTER_API_KEY` belum diatur, dan `POST /agent/ask` menjawab sibuk. */
+  model?: AgentModel;
   now: () => Date;
 };
 
@@ -78,6 +83,28 @@ const obstaclesResponse = z.object({
   attribution: z.string(),
 });
 
+const askBody = z.object({
+  placeId: z.uuid().optional().describe("Id lokasi AksesBogor bila pengguna bertanya dari halaman tempat itu"),
+  question: z.string().trim().min(2).max(500).describe("Pertanyaan pengguna"),
+  history: z
+    .array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().trim().min(1).max(1000) }))
+    .max(6)
+    .optional()
+    .describe("Giliran sebelumnya yang disimpan browser selama halaman terbuka; server tidak menyimpannya"),
+});
+const askResponse = z.object({
+  answer: z.string().describe("Jawaban agen dalam bahasa Indonesia"),
+  sources: z
+    .array(
+      z.discriminatedUnion("type", [
+        z.object({ type: z.literal("lokasi"), placeId: z.uuid(), name: z.string(), lastVerifiedAt: z.iso.datetime() }),
+        z.object({ type: z.literal("pengetahuan"), citation: z.string(), title: z.string(), url: z.url(), license: z.string(), attribution: z.string().nullable() }),
+      ]),
+    )
+    .describe("Data terverifikasi AksesBogor dan potongan basis pengetahuan yang dibaca agen untuk jawaban ini"),
+  model: z.string().nullable().describe("Model OpenRouter yang menjawab"),
+});
+
 const errors = { 400: errorSchema, 401: errorSchema, 403: errorSchema, 404: errorSchema, 422: errorSchema, 429: errorSchema, 502: errorSchema, 503: errorSchema };
 const COMMON =
   "Hanya untuk akun yang sudah masuk dan melengkapi akun (ADR-0042). Menjawab 503 `agen_rute_belum_aktif` selama `ROUTE_AGENT_ENABLED` mati. Semua route agen dan rute berbagi batas 120 permintaan per akun per jam. Data dikirim di badan permintaan supaya tidak tercatat di log.";
@@ -93,6 +120,8 @@ export const agentRoutes: FastifyPluginAsyncZod<AgentRouteOptions> = async (app,
   const accountOf = new WeakMap<FastifyRequest, string>();
   const limit = (name: string, max: number) => app.createRateLimit({ max, timeWindow: HOUR_MS, keyGenerator: (request) => `${name}:${accountOf.get(request)}` });
   const agentLimit = limit("agen", AGENT_CALLS_PER_HOUR);
+  const questionLimit = dailyLimit(QUESTIONS_PER_ACCOUNT_PER_DAY, opts.now, 7);
+  const busy = () => new HttpError(503, "agen_sibuk", "Agen sedang sibuk, coba lagi nanti.");
   const walkingLimit = limit("agen-rute", WALKING_ROUTES_PER_HOUR);
 
   /** Akun yang boleh memakai agen rute, lalu batas per akun. */
@@ -174,6 +203,38 @@ export const agentRoutes: FastifyPluginAsyncZod<AgentRouteOptions> = async (app,
     async (request, reply) => {
       await member(request, reply, [agentLimit]);
       return routeObstacles(routeCtx, request.body);
+    },
+  );
+
+  app.post(
+    "/agent/ask",
+    {
+      schema: {
+        tags: [TAG_AGENT],
+        summary: "Bertanya kepada agen AksesBogor untuk kontributor",
+        description: `Pertanyaan kontributor: tempat yang perlu dipetakan, jawaban fasilitas terverifikasi, regulasi, aturan AksesBogor, dan cara melapor (ADR-0043). Penyandang disabilitas yang menanyakan rute aksesibel atau tempat tanpa data terverifikasi mendapat jawaban bahwa datanya belum tersedia. Model hanya menerima pertanyaan, giliran sebelumnya, data tempat, dan hasil alat, tidak pernah posisi pengguna atau rute. Tidak ada percakapan yang disimpan. Menjawab 503 \`agen_sibuk\` bila kuota OpenRouter habis atau semua model gagal, dan 429 setelah ${QUESTIONS_PER_ACCOUNT_PER_DAY} pertanyaan per akun per hari WIB.\n\n${COMMON}`,
+        body: askBody,
+        response: { 200: askResponse, ...errors },
+      },
+    },
+    async (request, reply) => {
+      await member(request, reply, [agentLimit]);
+      if (!opts.model) throw busy();
+      const account = accountOf.get(request)!;
+      if (!questionLimit.take(account)) {
+        throw new HttpError(429, "agen_terlalu_sering", `Batas ${QUESTIONS_PER_ACCOUNT_PER_DAY} pertanyaan per hari untuk akun Anda tercapai. Coba lagi besok.`);
+      }
+      try {
+        return await askAgent({ model: opts.model, ctx: toolCtx }, request.body);
+      } catch (error) {
+        // Pertanyaan yang tidak terjawab tidak memakai jatah harian akun.
+        questionLimit.give(account);
+        if (error instanceof AgentBusyError) {
+          request.log.warn({ alasan: error.reason }, "agen rute sibuk");
+          throw busy();
+        }
+        throw error;
+      }
     },
   );
 };
