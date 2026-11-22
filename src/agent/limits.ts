@@ -1,11 +1,12 @@
-// Batas harian agen rute (ADR-0043). Hitungannya di memori proses, seperti batas Mapbox Directions, jadi kembali ke nol
-// saat hari berganti atau API di-restart. Batas akun di OpenRouter tetap menjadi pengaman terakhir.
+// Batas harian agen rute (ADR-0043, ADR-0047). Hitungannya di memori proses, seperti batas Mapbox Directions, jadi
+// kembali ke nol saat hari berganti atau API di-restart. Batas dan saldo akun di penyedia model tetap menjadi pengaman
+// terakhir.
 
 /**
- * Permintaan OpenRouter yang berhasil untuk semua pengguna per hari UTC: di bawah 50 per hari untuk model gratis tanpa
- * kredit. Permintaan yang gagal mengembalikan jatahnya, karena OpenRouter juga tidak menghitungnya.
+ * Bawaan `AGENT_REQUESTS_PER_DAY`: permintaan ke model yang berhasil untuk semua pengguna per hari UTC. Angka 45 berasal
+ * dari kuota model gratis OpenRouter (di bawah 50 per hari tanpa kredit). Permintaan yang gagal mengembalikan jatahnya.
  */
-export const OPENROUTER_REQUESTS_PER_DAY = 45;
+export const DEFAULT_REQUESTS_PER_DAY = 45;
 /** Pertanyaan per akun per hari WIB. */
 export const QUESTIONS_PER_ACCOUNT_PER_DAY = 5;
 

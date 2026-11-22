@@ -16,8 +16,8 @@ import { createDb, type Db } from "./db/client.js";
 import { logMailer, resendMailer, type Mailer } from "./email/mailer.js";
 import { HttpError } from "./http/errors.js";
 import { createRateLimitKey, WEB_SERVER_SECRET_HEADER } from "./http/rate-limit.js";
-import { OPENROUTER_REQUESTS_PER_DAY, dailyLimit } from "./agent/limits.js";
-import { DEFAULT_MODELS, openRouterModel } from "./agent/openrouter.js";
+import { dailyLimit } from "./agent/limits.js";
+import { agentModel } from "./agent/provider.js";
 import { mapboxWalking } from "./map/directions.js";
 import { mapboxSearch } from "./map/search.js";
 import { mapTokenSource } from "./map/token.js";
@@ -166,23 +166,15 @@ export async function buildApp(env: Env, deps: { db?: Db; now?: () => Date; fetc
   // Tautan di email status laporan memakai origin web pertama (ADR-0039).
   const reportEmail = { mailer, webUrl: env.FRONTEND_ORIGINS[0] ?? "http://localhost:3000" };
   await app.register(verifierRoutes, { auth, photoBaseUrl: env.PHOTO_PUBLIC_URL, store: photoStore, email: reportEmail, now });
-  // Agen rute (ADR-0042, ADR-0043): rute jalan kaki memakai token Mapbox yang sama dengan pencarian tempat, dan model
-  // gratis lewat OpenRouter dengan batas harian untuk semua pengguna.
-  const openRouterBudget = dailyLimit(OPENROUTER_REQUESTS_PER_DAY, now, 0);
+  // Agen rute (ADR-0042, ADR-0043, ADR-0047): rute jalan kaki memakai token Mapbox yang sama dengan pencarian tempat,
+  // dan model dari Claude API (bawaan) atau OpenRouter dengan batas harian untuk semua pengguna.
+  const agentBudget = dailyLimit(env.AGENT_REQUESTS_PER_DAY, now, 0);
   await app.register(agentRoutes, {
     auth,
     enabled: env.ROUTE_AGENT_ENABLED,
     disabilityData: env.DISABILITY_DATA_ENABLED,
     walking: secretToken ? mapboxWalking({ token: secretToken, now, fetch: deps.fetch }) : undefined,
-    model: env.OPENROUTER_API_KEY
-      ? openRouterModel({
-          apiKey: env.OPENROUTER_API_KEY,
-          models: env.OPENROUTER_MODELS.length > 0 ? env.OPENROUTER_MODELS : DEFAULT_MODELS,
-          fetch: deps.fetch,
-          budget: openRouterBudget,
-          log: app.log,
-        })
-      : undefined,
+    model: agentModel(env, { fetch: deps.fetch, budget: agentBudget, log: app.log }),
     now,
   });
   if (env.NODE_ENV !== "test") {
