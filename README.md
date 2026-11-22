@@ -283,6 +283,17 @@ sudo -u aksesbogor -H sh -c 'cd /srv/akses-bogor/current && COREPACK_ENABLE_DOWN
 
 Admin kemudian memberi dan mencabut peran verifikator di halaman Tim verifikator di web. Perintah yang sama dengan `--peran pengguna` mencabut peran admin.
 
+### Bentuk Dasar Basis Pengetahuan
+
+Kolom `search_stem` (ADR-0044) diisi API, bukan oleh migrasi. Skrip `pnpm pengetahuan:*` mengisinya sendiri saat memuat sumber. Setelah rilis yang membawa migrasi 0009, dan setiap kali `src/knowledge/stemmer.ts` atau `src/knowledge/kata-dasar.ts` berubah, jalankan sekali di Evergarden:
+
+```bash
+sudo -u aksesbogor -H sh -c 'cd /srv/akses-bogor/current && COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
+  corepack pnpm exec tsx --env-file=/etc/akses-bogor/api.env scripts/pengetahuan/indeks.ts'
+```
+
+Sebelum itu, `search_knowledge` tetap berjalan, tetapi hanya dengan kata apa adanya.
+
 ### Data Preview
 
 Sampai data lapangan pertama masuk, database produksi berisi data contoh dari `pnpm db:seed` (ADR-0026). Seed menolak `NODE_ENV=production`, jadi untuk preview dijalankan sekali dengan `NODE_ENV=development`, yang menang atas nilai di berkas environment:

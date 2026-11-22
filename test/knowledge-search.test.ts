@@ -109,6 +109,17 @@ describe("searchKnowledge", () => {
     expect(hits[0]!.score - hits[1]!.score).toBeGreaterThan(0.5);
   });
 
+  it("matches affixed forms through the stemmed column", async () => {
+    const hits = await searchKnowledge(db, "seberapa miring");
+    expect(hits[0]?.citation).toBe("Panduan Verifikasi, bagian 5.4");
+  });
+
+  it("still matches words as written when the stemmed column is empty", async () => {
+    await db.execute(sql`UPDATE knowledge_passages SET search_stem = ''::tsvector`);
+    expect((await searchKnowledge(db, "kemiringan"))[0]?.citation).toBe("Panduan Verifikasi, bagian 5.4");
+    await reindexStems(db);
+  });
+
   it("filters by source kind", async () => {
     const hits = await searchKnowledge(db, "aksesibilitas ramp", { kinds: ["dokumen_aksesbogor"] });
     expect(hits.length).toBeGreaterThan(0);

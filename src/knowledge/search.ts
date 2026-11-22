@@ -2,6 +2,7 @@
 import { sql } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import type { knowledgeKind } from "../db/schema.js";
+import { stem } from "./stemmer.js";
 
 export type KnowledgeKind = (typeof knowledgeKind.enumValues)[number];
 
@@ -86,8 +87,10 @@ const toHit = (r: Row): KnowledgeHit => ({
 /**
  * Potongan teks yang paling cocok dengan pertanyaan, beserta sumber, lisensi, dan sitasinya.
  *
- * Kata pertanyaan digabung dengan OR, lalu diurutkan menurut jumlah kata yang cocok, kemudian `ts_rank_cd` (selalu di
- * bawah 1, jadi hanya memisahkan potongan dengan jumlah kata cocok yang sama), dengan sitasi dan judul berbobot lebih
+ * Setiap kata pertanyaan cocok bila kata itu ada apa adanya di kolom `search` (kata 4 huruf atau lebih sebagai awalan)
+ * atau bentuk dasarnya ada di kolom `search_stem` (ADR-0044), jadi "miring" juga menemukan "kemiringan". Kata-kata
+ * digabung dengan OR, lalu diurutkan menurut jumlah kata yang cocok, kemudian rata-rata `ts_rank_cd` kedua kolom (selalu
+ * di bawah 1, jadi hanya memisahkan potongan dengan jumlah kata cocok yang sama), dengan sitasi dan judul berbobot lebih
  * tinggi daripada isi. Bila tidak ada yang cocok sama sekali, misalnya karena salah ketik,
  * dipakai kemiripan kata `pg_trgm`.
  */
@@ -100,15 +103,20 @@ export async function searchKnowledge(db: Db, query: string, opts: { limit?: num
   const kindFilter = kinds ? sql`AND s.kind::text IN (${list(kinds)})` : sql``;
   const columns = sql`p.citation, p.heading, p.body, s.id AS source_id, s.kind, s.title, s.url, s.license, s.attribution, s.retrieved_at`;
 
-  const tsTerms = terms.map(tsTerm);
-  const tsquery = tsTerms.join(" | ");
+  const exact = terms.map(tsTerm);
+  const stems = terms.map(stem);
+  const pairs = sql.join(
+    terms.map((_, i) => sql`(to_tsquery('simple', ${exact[i]}), to_tsquery('simple', ${stems[i]}))`),
+    sql`, `,
+  );
   const fullText = await db.execute(sql`
-    WITH q AS (SELECT to_tsquery('simple', ${tsquery}) AS query)
+    WITH t(exact, stem) AS (VALUES ${pairs}),
+      q AS (SELECT to_tsquery('simple', ${exact.join(" | ")}) AS exact, to_tsquery('simple', ${stems.join(" | ")}) AS stem)
     SELECT ${columns},
-      (SELECT count(*) FROM unnest(ARRAY[${list(tsTerms)}]::text[]) AS t(term) WHERE p.search @@ to_tsquery('simple', t.term))
-        + ts_rank_cd(p.search, q.query, ${RANK_NORMALIZATION}) AS score
+      (SELECT count(*) FROM t WHERE p.search @@ t.exact OR p.search_stem @@ t.stem)
+        + (ts_rank_cd(p.search, q.exact, ${RANK_NORMALIZATION}) + ts_rank_cd(p.search_stem, q.stem, ${RANK_NORMALIZATION})) / 2 AS score
     FROM knowledge_passages p JOIN knowledge_sources s ON s.id = p.source_id, q
-    WHERE p.search @@ q.query ${kindFilter}
+    WHERE (p.search @@ q.exact OR p.search_stem @@ q.stem) ${kindFilter}
     ORDER BY score DESC, p.source_id, p.position
     LIMIT ${limit}`);
   if (rowsOf(fullText).length > 0) return rowsOf(fullText).map(toHit);
