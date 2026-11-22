@@ -25,7 +25,7 @@ export const NO_ANSWER =
 
 export type Turn = { role: "user" | "assistant"; content: string };
 export type Source =
-  | { type: "lokasi"; placeId: string; name: string; lastVerifiedAt: string }
+  | { type: "lokasi"; placeId: string; name: string; lastVerifiedAt: string; verifiedBy: "tim" | "admin" }
   | { type: "pengetahuan"; citation: string; title: string; url: string; license: string; attribution: string | null };
 /** Kartu untuk web: tempat, rute (dihitung web dari posisi pengguna), atau prioritas kecamatan. Tidak pernah ke model. */
 export type Card = PlaceCard | RouteCard | ({ type: "prioritas" } & KecamatanPriority);
@@ -40,8 +40,8 @@ type Deps = { model: AgentModel; ctx: ToolContext; deadlineMs?: number };
 export async function askAgent({ model, ctx, deadlineMs = QUESTION_DEADLINE_MS }: Deps, input: { placeId?: string; question: string; history?: Turn[] }): Promise<AskResult> {
   const place = input.placeId ? await placeAccessibility(ctx, { placeId: input.placeId }) : undefined;
   const sources = new Map<string, Source>();
-  const addPlace = (p: { id: string; name: string; lastVerifiedAt: string }) =>
-    sources.set(`lokasi:${p.id}`, { type: "lokasi", placeId: p.id, name: p.name, lastVerifiedAt: p.lastVerifiedAt });
+  const addPlace = (p: { id: string; name: string; lastVerifiedAt: string; verifiedBy: "tim" | "admin" }) =>
+    sources.set(`lokasi:${p.id}`, { type: "lokasi", placeId: p.id, name: p.name, lastVerifiedAt: p.lastVerifiedAt, verifiedBy: p.verifiedBy });
   let searched = false;
   const addPassages = (passages: KnowledgeHit[]) => {
     searched = true;
@@ -59,7 +59,7 @@ export async function askAgent({ model, ctx, deadlineMs = QUESTION_DEADLINE_MS }
   const run = async (call: ToolCall): Promise<{ content: string; isError?: true }> => {
     try {
       const result = await runTool(ctx, call.name, call.input);
-      if (call.name === "place_accessibility") addPlace(result as { id: string; name: string; lastVerifiedAt: string });
+      if (call.name === "place_accessibility") addPlace(result as { id: string; name: string; lastVerifiedAt: string; verifiedBy: "tim" | "admin" });
       if (call.name === "search_knowledge") addPassages((result as { passages: KnowledgeHit[] }).passages);
       if (call.name === "kecamatan_priority") {
         const priority = result as KecamatanPriority;
