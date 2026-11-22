@@ -7,7 +7,6 @@ import { HttpError } from "../http/errors.js";
 import { placeDetail } from "../places/schemas.js";
 import { findPlace, placeAccessibility, searchKnowledgeTool, type ToolContext } from "./tools.js";
 
-const location = z.object({ lat: z.number(), lng: z.number() });
 const placeId = z.uuid().describe("Id lokasi AksesBogor dari find_place");
 
 const findPlaceTool = {
@@ -23,7 +22,6 @@ const findPlaceTool = {
         category: z.enum(placeCategory.enumValues),
         status: z.enum(placeStatus.enumValues),
         district: z.object({ slug: z.string(), name: z.string() }),
-        location,
       }),
     ),
   }),
