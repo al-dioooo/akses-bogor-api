@@ -78,7 +78,7 @@ const schema = z
     ANTHROPIC_API_KEY: optional(z.string().startsWith("sk-ant-")),
     /** Model Claude untuk agen. Kosong berarti `claude-haiku-5-5`. */
     ANTHROPIC_MODEL: optional(z.string().trim().min(1)),
-    /** Effort Claude (`output_config.effort`): `low`, `medium`, atau `high`. Kosong berarti bawaan API ini (ADR-0047). */
+    /** Effort Claude (`output_config.effort`): `low`, `medium`, atau `high`. Kosong berarti `low` (ADR-0047). */
     ANTHROPIC_EFFORT: optional(z.enum(["low", "medium", "high"])),
     /** API key OpenRouter bila `AGENT_PROVIDER=openrouter` (ADR-0042). Kosong berarti agen menjawab sibuk; API tetap jalan. */
     OPENROUTER_API_KEY: optional(z.string().startsWith("sk-or-")),
