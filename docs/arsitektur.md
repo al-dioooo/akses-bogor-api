@@ -87,14 +87,14 @@ Saat akun dihapus, `reporter_id` di laporan, `reviewer_id`, penanya klarifikasi,
 | `src/places` | Skema Zod dan query baca lokasi |
 | `src/reports` | Query dan skema laporan: Laporan saya, cek kecamatan dan lokasi mirip |
 | `src/photos` | Pemeriksaan dan pemrosesan foto (sharp), penyimpanan R2 atau folder lokal, dan pembersihan berkas (ADR-0031) |
-| `src/map` | Token Mapbox sementara untuk browser (ADR-0016), pencarian tempat lewat Search Box (ADR-0032), dan rute jalan kaki lewat Directions (ADR-0042) |
+| `src/map` | Token Mapbox sementara untuk browser (ADR-0016), pencarian tempat lewat Search Box (ADR-0032), dan rute jalan kaki lewat Directions dengan hambatan OSM di dekatnya, hanya untuk browser pengguna (ADR-0042) |
 | `src/auth` | Konfigurasi Better Auth, pemeriksaan sesi, dan aturan akun (ADR-0029) |
 | `src/email` | Isi email dan pengirim Resend atau log (ADR-0030) |
 | `src/admin` | Peran akun: tim verifikasi, memberi dan mencabut peran (ADR-0035) |
 | `src/audit` | Penulis log audit dan pembanding nilai sebelum dan sesudah (ADR-0038) |
 | `src/verification` | Panel verifikator: antrean, laporan untuk diperiksa, dan lokasi yang perlu dicek ulang (ADR-0035, ADR-0036) |
 | `src/knowledge` | Basis pengetahuan agen rute: pengolah data OSM, regulasi, dan dokumen, penulisan per sumber, dan retrieval full-text (ADR-0042) |
-| `src/agent` | Alat agen rute sebagai fungsi, daftar alat dengan skema input dan output, dan antarmuka model yang belum diisi (ADR-0042) |
+| `src/agent` | Tiga alat untuk model agen rute sebagai fungsi, daftar alat dengan skema input dan output dan larik `tools` format OpenAI, dan antarmuka model (ADR-0042) |
 | `src/routes` | Route Fastify, satu berkas per kelompok |
 | `scripts` | Skrip pendukung, mis. pembuat `docs/openapi.json`, dan pengambil data basis pengetahuan di `scripts/pengetahuan/` |
 | `test` | Tes Vitest dengan `app.inject`; tes database memakai PGlite + PostGIS di dalam proses |
