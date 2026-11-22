@@ -150,6 +150,7 @@ Contoh lengkap ada di [.env.example](.env.example). Jangan commit `.env`.
 | `GET /districts/priority` | Skor prioritas kecamatan untuk kontributor dari jumlah penyandang disabilitas terdaftar (Dinsos, tahun terbaru) dan kekurangan data AksesBogor, dengan catatan batas data dan sumber; 503 selama `DISABILITY_DATA_ENABLED` mati | ADR-0043 |
 | `GET /places` | Daftar lokasi: pencarian `q`, filter `category`, `district`, `facility`, `status` (dipisah koma), `limit`, `offset` | FR-02 sampai FR-04 |
 | `GET /places/map` | GeoJSON untuk Mapbox dengan filter yang sama dan `bbox` | FR-05 |
+| `GET /places/candidates` | Kandidat "Belum ada data" untuk Peta: tempat OSM empat kategori tanpa lokasi AksesBogor berkategori sama dalam 50 m, dengan kecamatan, tag `wheelchair` mentah, dan `source` (lisensi dan atribusi ODbL); filter `q`, `category`, `district`; tanpa status; cache 5 menit | ADR-0049 |
 | `GET /places/stats` | Jumlah per kategori, pintu masuk tanpa tangga, dan kontributor | FR-01 |
 | `GET /places/{id}` | Detail: jawaban, alasan, catatan, ringkasan X dari Y, fasilitas penentu status, foto, `needsRecheck` | FR-06, FR-07, FR-38 |
 | `GET /map/token` | Token Mapbox sementara untuk peta di browser; 503 bila `MAPBOX_SECRET_TOKEN` belum diatur | FR-05 |
