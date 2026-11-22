@@ -129,7 +129,7 @@ Contoh lengkap ada di [.env.example](.env.example). Jangan commit `.env`.
 | `R2_BUCKET_LAPORAN` | Untuk foto di production | Bucket privat untuk foto laporan yang belum terbit |
 | `R2_BUCKET_PUBLIK` | Untuk foto di production | Bucket publik di balik `PHOTO_PUBLIC_URL` untuk foto yang sudah terbit |
 | `PHOTO_STORAGE_DIR` | Tidak | Folder foto di development tanpa R2, bawaan `.data/foto`. Di production tanpa R2, unggah foto menjawab 503 |
-| `WEB_SERVER_SECRET` | Di production | Rahasia bersama dengan server Next.js, minimal 32 karakter. Bila cocok, rate limit dihitung per IP pengunjung yang dikirim web, bukan per IP Vercel |
+| `WEB_SERVER_SECRET` | Di production | Rahasia bersama dengan server Next.js, minimal 32 karakter. Bila cocok, rate limit dihitung per IP pengunjung yang dikirim web, bukan per IP server web |
 | `ROUTE_AGENT_ENABLED` | Tidak | `true` membuka route agen rute `/agent/*` dan rute jalan kaki `/route/*` (ADR-0042). Bawaan `false`: route menjawab 503. Biarkan mati di production sampai syarat peluncuran di ADR-0042 terpenuhi |
 | `DISABILITY_DATA_ENABLED` | Tidak | `true` membuka `GET /districts/priority` dan memakai data disabilitas Open Data Kota Bogor untuk prioritas kecamatan (ADR-0043). Bawaan `false`; biarkan mati sampai Diskominfo Kota Bogor mengizinkan pemakaiannya |
 | `AGENT_PROVIDER` | Tidak | Penyedia model agen: `anthropic` (Claude API, bawaan) atau `openrouter` (ADR-0047). Tidak ada cadangan otomatis ke penyedia lain |
