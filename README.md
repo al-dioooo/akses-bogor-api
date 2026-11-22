@@ -44,6 +44,8 @@ pnpm dev               # http://localhost:8080/healthz
 | `pnpm pengetahuan:osm [--salinan]` | Mengambil fitur dan rute angkutan Kota Bogor dari OpenStreetMap ke basis pengetahuan agen rute (ADR-0042) |
 | `pnpm pengetahuan:regulasi [--salinan]` | Mengambil teks resmi UU No. 8 Tahun 2016 dan Permen PUPR No. 14/PRT/M/2017, dipotong per pasal dan per bagian lampiran |
 | `pnpm pengetahuan:dokumen [--salinan]` | Mengambil halaman edukasi, Panduan Verifikasi, dan ADR aturan fasilitas dan status; jalankan ulang setelah dokumen itu berubah |
+| `pnpm pengetahuan:disabilitas [--salinan]` | Mengambil jumlah penyandang disabilitas terdaftar per kecamatan dari Open Data Kota Bogor (Dinas Sosial) untuk prioritas kecamatan (ADR-0043); dipakai hanya saat `DISABILITY_DATA_ENABLED` menyala |
+| `pnpm pengetahuan:fasilitas [--salinan]` | Mengambil kampus, masjid, halte, dan rumah sakit di Kota Bogor dari OpenStreetMap sebagai calon tujuan kontributor (ADR-0043) |
 | `pnpm peran --email <email> --peran <admin\|verifikator\|pengguna>` | Mengganti peran akun yang sudah dilengkapi, mis. membuat admin pertama; dicatat di log audit sebagai `skrip` (ADR-0035) |
 
 ## Database
@@ -89,6 +91,8 @@ Agen rute (ADR-0042) membaca data dari empat tabel: `knowledge_sources` (sumber,
 | --- | --- | --- |
 | `pnpm pengetahuan:osm` | Satu kueri area Overpass untuk relasi Kota Bogor (14745927) | Fitur bertag `wheelchair`, `toilets:wheelchair`, `ramp`, `kerb`, `tactile_paving`, tangga, lift, pintu masuk bertag akses, halte, dan relasi `route=bus` (BisKita dan angkot) dengan nama jalan yang dilewati |
 | `pnpm pengetahuan:regulasi` | PDF resmi UU No. 8 Tahun 2016 dari peraturan.go.id, dan ZIP resmi Permen PUPR No. 14/PRT/M/2017 dari JDIH Kementerian PU | Potongan per pasal (pasal panjang per ayat atau angka) dan per bagian Lampiran I–IV, dengan rujukan seperti "Permen PUPR No. 14/PRT/M/2017, Lampiran II, B.2 Ram" |
+| `pnpm pengetahuan:disabilitas` | Satu permintaan ke API Open Data Kota Bogor (`dinas_sosial/jmlh_pnyndng_dsblts_brdsrkn_kcmtn_jns_dsblts_d_kt_bgr`) | Jumlah terdaftar per kecamatan, tahun, dan jenis (fisik, netra, mental, lainnya; label asli sumber disimpan untuk sitasi). Syarat portal: hak pakai non-komersial pribadi, pihak ketiga perlu izin Diskominfo |
+| `pnpm pengetahuan:fasilitas` | Satu kueri area Overpass untuk relasi Kota Bogor | `amenity=university|college`, masjid (`amenity=place_of_worship` + `religion=muslim`), halte (`highway=bus_stop`, platform bus), dan `amenity=hospital`, dengan kecamatannya dari batas ADR-0034 |
 | `pnpm pengetahuan:dokumen` | Repo publik akses-bogor-web dan akses-bogor-docs di GitHub, cabang `main` | Halaman edukasi Aksesibilitas, Disabilitas, dan Tips (`messages/id.json`, masih draf menurut ADR-0041), Panduan Verifikasi, dan ADR-0017, ADR-0018, ADR-0022 tanpa bagian opsi yang tidak dipilih, dipotong per heading |
 
 - Data OSM © kontributor OpenStreetMap, berlisensi [ODbL](https://www.openstreetmap.org/copyright). Tabel `osm_features` dan `transit_routes` adalah database turunan OSM: bila isinya dibagikan ke publik dalam jumlah besar, bagikan dengan ODbL. Jawaban yang memakai data ini menyebut atribusinya.
@@ -123,6 +127,7 @@ Contoh lengkap ada di [.env.example](.env.example). Jangan commit `.env`.
 | `PHOTO_STORAGE_DIR` | Tidak | Folder foto di development tanpa R2, bawaan `.data/foto`. Di production tanpa R2, unggah foto menjawab 503 |
 | `WEB_SERVER_SECRET` | Di production | Rahasia bersama dengan server Next.js, minimal 32 karakter. Bila cocok, rate limit dihitung per IP pengunjung yang dikirim web, bukan per IP Vercel |
 | `ROUTE_AGENT_ENABLED` | Tidak | `true` membuka route agen rute `/agent/*` dan rute jalan kaki `/route/*` (ADR-0042). Bawaan `false`: route menjawab 503. Biarkan mati di production sampai syarat peluncuran di ADR-0042 terpenuhi |
+| `DISABILITY_DATA_ENABLED` | Tidak | `true` membuka `GET /districts/priority` dan memakai data disabilitas Open Data Kota Bogor untuk prioritas kecamatan (ADR-0043). Bawaan `false`; biarkan mati sampai Diskominfo Kota Bogor mengizinkan pemakaiannya |
 | `OPENROUTER_API_KEY` | Tidak | API key OpenRouter untuk model agen rute (ADR-0042). Kosong berarti agen menjawab sibuk; API tetap jalan |
 | `OPENROUTER_MODELS` | Tidak | Model OpenRouter berurutan, dipisah koma; model pertama dicoba dulu. Kosong berarti daftar bawaan API |
 
@@ -132,6 +137,8 @@ Contoh lengkap ada di [.env.example](.env.example). Jangan commit `.env`.
 | --- | --- | --- |
 | `GET /healthz` | Cek server hidup | |
 | `GET /districts` | Enam kecamatan dengan jumlah lokasi | FR-03 |
+| `GET /districts/boundaries` | Batas keenam kecamatan sebagai GeoJSON yang disederhanakan, dengan atribusi OpenStreetMap; boleh di-cache sehari | ADR-0034, ADR-0043 |
+| `GET /districts/priority` | Skor prioritas kecamatan untuk kontributor dari jumlah penyandang disabilitas terdaftar (Dinsos, tahun terbaru) dan kekurangan data AksesBogor, dengan catatan batas data dan sumber; 503 selama `DISABILITY_DATA_ENABLED` mati | ADR-0043 |
 | `GET /places` | Daftar lokasi: pencarian `q`, filter `category`, `district`, `facility`, `status` (dipisah koma), `limit`, `offset` | FR-02 sampai FR-04 |
 | `GET /places/map` | GeoJSON untuk Mapbox dengan filter yang sama dan `bbox` | FR-05 |
 | `GET /places/stats` | Jumlah per kategori, pintu masuk tanpa tangga, dan kontributor | FR-01 |

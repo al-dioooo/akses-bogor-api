@@ -53,6 +53,10 @@ erDiagram
   knowledge_sources ||--o{ knowledge_passages : "potongan teks"
   knowledge_sources ||--o{ osm_features : "fitur OSM"
   knowledge_sources ||--o{ transit_routes : "rute bus dan angkot"
+  knowledge_sources ||--o{ disability_counts : "jumlah terdaftar"
+  knowledge_sources ||--o{ osm_places : "tempat umum OSM"
+  districts ||--o{ disability_counts : "per kecamatan"
+  districts ||--o{ osm_places : "di kecamatan"
 ```
 
 | Tabel | Isi | Keputusan |
@@ -72,6 +76,8 @@ erDiagram
 | `knowledge_passages` | Potongan teks regulasi, dokumen AksesBogor, dan rute angkutan dengan sitasi; kolom `search` (tsvector `simple`) dihitung PostgreSQL | ADR-0042 |
 | `osm_features` | Fitur OpenStreetMap di Kota Bogor (tangga, kerb, ramp, lift, pintu masuk, guiding block, halte, tempat bertag `wheelchair`) dengan tag dalam daftar izin; data ODbL | ADR-0042 |
 | `transit_routes` | Relasi rute bus dan angkot OpenStreetMap, garisnya dipotong ke Kota Bogor, dengan halte berurutan; data ODbL | ADR-0042 |
+| `disability_counts` | Jumlah penyandang disabilitas terdaftar di Dinas Sosial per kecamatan, tahun, dan jenis, dari Open Data Kota Bogor; label asli sumber hanya untuk sitasi | ADR-0043 |
+| `osm_places` | Kampus, masjid, halte, dan rumah sakit di Kota Bogor dari OpenStreetMap, dengan kecamatannya; tempat tanpa lokasi AksesBogor berkategori sama dalam 50 m dihitung sebagai belum punya data; data ODbL | ADR-0004, ADR-0043 |
 
 Saat akun dihapus, `reporter_id` di laporan, `reviewer_id`, penanya klarifikasi, dan pengubah di log audit menjadi kosong (`ON DELETE SET NULL`); penghapusan laporan yang belum terbit beserta klarifikasi, foto, dan antrean emailnya dijalankan `src/auth/delete-account.ts` dalam satu transaksi (ADR-0024). Klarifikasi pada laporan yang sudah terbit tetap tersimpan tanpa nama pelapor dan hanya dilihat verifikator.
 
@@ -94,6 +100,7 @@ Saat akun dihapus, `reporter_id` di laporan, `reviewer_id`, penanya klarifikasi,
 | `src/audit` | Penulis log audit dan pembanding nilai sebelum dan sesudah (ADR-0038) |
 | `src/verification` | Panel verifikator: antrean, laporan untuk diperiksa, dan lokasi yang perlu dicek ulang (ADR-0035, ADR-0036) |
 | `src/knowledge` | Basis pengetahuan agen rute: pengolah data OSM, regulasi, dan dokumen, penulisan per sumber, dan retrieval full-text (ADR-0042) |
+| `src/contribute` | Data untuk kontributor: jumlah disabilitas terdaftar, tempat umum OSM tanpa data AksesBogor, prioritas kecamatan, dan batas kecamatan untuk peta (ADR-0043) |
 | `src/agent` | Tiga alat untuk model agen rute, daftar alat dengan larik `tools` format OpenAI, adapter OpenRouter, putaran agen untuk `POST /agent/ask`, instruksi sistem, dan batas harian (ADR-0042, ADR-0043) |
 | `src/routes` | Route Fastify, satu berkas per kelompok |
 | `scripts` | Skrip pendukung, mis. pembuat `docs/openapi.json`, dan pengambil data basis pengetahuan di `scripts/pengetahuan/` |
