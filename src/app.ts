@@ -178,7 +178,7 @@ export async function buildApp(env: Env, deps: { db?: Db; now?: () => Date; fetc
           apiKey: env.OPENROUTER_API_KEY,
           models: env.OPENROUTER_MODELS.length > 0 ? env.OPENROUTER_MODELS : DEFAULT_MODELS,
           fetch: deps.fetch,
-          take: () => openRouterBudget.take(),
+          budget: openRouterBudget,
           log: app.log,
         })
       : undefined,
