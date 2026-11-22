@@ -56,6 +56,10 @@ describe("queryTerms", () => {
     expect(queryTerms("pasal 18 UU 8/2016")).toEqual(["pasal", "18", "uu", "8", "2016"]);
   });
 
+  it("keeps belum, because Belum tahu is one of the AksesBogor answers", () => {
+    expect(queryTerms("Apa arti jawaban Belum tahu?")).toEqual(["arti", "jawaban", "belum", "tahu"]);
+  });
+
   it("returns nothing for a question made only of common words", () => {
     expect(queryTerms("apa itu yang di sana?")).toEqual(["sana"]);
     expect(queryTerms("apa itu yang")).toEqual([]);

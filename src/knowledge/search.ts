@@ -27,10 +27,13 @@ const PREFIX_FROM = 4;
  */
 const RANK_NORMALIZATION = 32;
 
-/** Kata umum bahasa Indonesia yang tidak membantu mencari. Konfigurasi `simple` tidak membuang kata apa pun. */
+/**
+ * Kata umum bahasa Indonesia yang tidak membantu mencari. Konfigurasi `simple` tidak membuang kata apa pun. "belum"
+ * sengaja tidak ada di sini karena "Belum tahu" adalah salah satu jawaban fasilitas AksesBogor (ADR-0017).
+ */
 const STOPWORDS = new Set(
   (
-    "ada adalah agar akan aku anda apa apakah atau bagaimana bagi bahwa banyak beberapa begitu belum berapa bila bisa " +
+    "ada adalah agar akan aku anda apa apakah atau bagaimana bagi bahwa banyak beberapa begitu berapa bila bisa " +
     "boleh buat dalam dan dapat dari dengan di dia harus hingga ia ini itu jadi jika juga kalau kami kamu kan karena " +
     "ke kenapa kita lagi lain maka mana masih mau mengapa nya oleh pada para perlu saat saja saya sangat sebagai " +
     "sedang sejak seperti setelah siapa sudah supaya tapi tentang tetapi tidak untuk yaitu yang"
