@@ -457,3 +457,31 @@ export const disabilityCounts = pgTable(
   (t) => [primaryKey({ columns: [t.sourceId, t.districtSlug, t.year, t.category] }), check("disability_counts_count_check", sql`${t.count} >= 0`)],
 );
 
+/**
+ * Tempat umum di Kota Bogor dari OpenStreetMap dalam empat kategori MVP (ADR-0004): calon tujuan kontributor
+ * (ADR-0043). Tempat dianggap sudah punya data AksesBogor bila ada lokasi terbit berkategori sama di dekatnya; itu
+ * dihitung saat dibaca, tidak disimpan. Data © kontributor OpenStreetMap, berlisensi ODbL.
+ */
+export const osmPlaces = pgTable(
+  "osm_places",
+  {
+    osmType: varchar("osm_type", { length: 8 }).notNull(),
+    osmId: bigint("osm_id", { mode: "number" }).notNull(),
+    sourceId: varchar("source_id", { length: 80 })
+      .notNull()
+      .references(() => knowledgeSources.id, { onDelete: "cascade" }),
+    category: placeCategory("category").notNull(),
+    name: varchar("name", { length: 200 }),
+    districtSlug: varchar("district_slug", { length: 40 })
+      .notNull()
+      .references(() => districts.slug),
+    tags: jsonb("tags").$type<Record<string, string>>().notNull(),
+    location: geometry("location", { type: "point", mode: "xy", srid: 4326 }).notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.osmType, t.osmId] }),
+    index("osm_places_location_idx").using("gist", t.location),
+    index("osm_places_district_category_idx").on(t.districtSlug, t.category),
+  ],
+);
+
