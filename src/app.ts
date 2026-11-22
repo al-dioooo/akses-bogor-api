@@ -154,7 +154,6 @@ export async function buildApp(env: Env, deps: { db?: Db; now?: () => Date; fetc
   await app.register(authRoutes, { auth, mailer, googleEnabled: Boolean(env.GOOGLE_CLIENT_ID), now });
   await app.register(meRoutes, { auth, mailer, now });
   await app.register(adminRoutes, { auth, now });
-  await app.register(adminPlaceRoutes, { auth, photoBaseUrl: env.PHOTO_PUBLIC_URL, now });
   // Foto laporan (ADR-0031): R2 bila diatur, folder lokal di development, dan tidak ada di production tanpa R2.
   const { R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_LAPORAN, R2_BUCKET_PUBLIK } = env;
   const photoStore =
@@ -165,6 +164,7 @@ export async function buildApp(env: Env, deps: { db?: Db; now?: () => Date; fetc
         ? localStore(env.PHOTO_STORAGE_DIR ?? ".data/foto")
         : undefined);
   await app.register(reportRoutes, { auth, store: photoStore, now });
+  await app.register(adminPlaceRoutes, { auth, photoBaseUrl: env.PHOTO_PUBLIC_URL, store: photoStore, now });
   // Tautan di email status laporan memakai origin web pertama (ADR-0039).
   const reportEmail = { mailer, webUrl: env.FRONTEND_ORIGINS[0] ?? "http://localhost:3000" };
   await app.register(verifierRoutes, { auth, photoBaseUrl: env.PHOTO_PUBLIC_URL, store: photoStore, email: reportEmail, now });
