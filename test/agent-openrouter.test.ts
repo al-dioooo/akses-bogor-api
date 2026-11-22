@@ -130,6 +130,18 @@ describe("openRouterModel", () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
+  it("tries the whole list once more after a short wait when providers were only rate-limiting", async () => {
+    const upstream = () => failure(429, { provider_name: "Baidu", raw: "temporarily rate-limited upstream" });
+    const fetch = vi.fn<typeof globalThis.fetch>().mockImplementationOnce(async () => upstream()).mockImplementationOnce(async () => upstream()).mockResolvedValueOnce(answer("Akhirnya."));
+    await expect(openRouterModel({ apiKey: "sk-or-tes", models, fetch, retryDelayMs: 0 }).next(step)).resolves.toMatchObject({ text: "Akhirnya." });
+    expect(fetch).toHaveBeenCalledTimes(3);
+    expect(bodyOf(fetch, 2).models).toEqual(["a/satu:free", "b/dua:free", "c/tiga:free"]);
+
+    const always = vi.fn(async () => upstream());
+    await expect(openRouterModel({ apiKey: "sk-or-tes", models, fetch: always, retryDelayMs: 0 }).next(step)).rejects.toMatchObject({ reason: "semua_gagal" });
+    expect(always).toHaveBeenCalledTimes(4);
+  });
+
   it("stops when the question's deadline has passed", async () => {
     const fetch = vi.fn(async () => answer("Oke."));
     const controller = new AbortController();
