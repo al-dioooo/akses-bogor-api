@@ -89,6 +89,303 @@
         }
       }
     },
+    "/districts/boundaries": {
+      "get": {
+        "summary": "Batas kecamatan",
+        "tags": [
+          "Lokasi"
+        ],
+        "description": "Batas keenam kecamatan (ADR-0034) sebagai GeoJSON yang disederhanakan, untuk lapisan peta. Data © kontributor OpenStreetMap (ODbL).",
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "FeatureCollection"
+                      ]
+                    },
+                    "attribution": {
+                      "type": "string"
+                    },
+                    "features": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "Feature"
+                            ]
+                          },
+                          "properties": {
+                            "type": "object",
+                            "properties": {
+                              "slug": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "slug",
+                              "name"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "geometry": {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string"
+                              },
+                              "coordinates": {}
+                            },
+                            "required": [
+                              "type",
+                              "coordinates"
+                            ],
+                            "additionalProperties": false,
+                            "description": "MultiPolygon, disederhanakan, 5 desimal"
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "properties",
+                          "geometry"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "attribution",
+                    "features"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/districts/priority": {
+      "get": {
+        "summary": "Prioritas kecamatan untuk kontributor",
+        "tags": [
+          "Lokasi"
+        ],
+        "description": "Skor 0–100 per kecamatan dari jumlah penyandang disabilitas terdaftar di Dinas Sosial (Open Data Kota Bogor, tahun terbaru) dan kekurangan data AksesBogor (ADR-0043). Menjawab 503 `data_disabilitas_belum_aktif` selama `DISABILITY_DATA_ENABLED` mati, karena syarat portal membatasi pemakaian untuk pihak ketiga tanpa izin Diskominfo.",
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "year": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Tahun terbaru di data Dinsos"
+                    },
+                    "yearTotals": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "year": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "registered": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "year",
+                          "registered"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Jumlah terdaftar per tahun, untuk menunjukkan lonjakan antartahun"
+                    },
+                    "districts": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "slug": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "registered": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Penyandang disabilitas terdaftar di Dinsos pada `year`, bukan jumlah seluruh penduduk"
+                          },
+                          "verifiedPlaces": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Lokasi AksesBogor yang sudah terbit"
+                          },
+                          "facilitiesWithoutData": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Kampus, masjid, halte, dan rumah sakit di OpenStreetMap yang belum punya data AksesBogor"
+                          },
+                          "score": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 100
+                          },
+                          "rank": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "level": {
+                            "type": "string",
+                            "enum": [
+                              "rendah",
+                              "sedang",
+                              "tinggi",
+                              "sangat_tinggi"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "slug",
+                          "name",
+                          "registered",
+                          "verifiedPlaces",
+                          "facilitiesWithoutData",
+                          "score",
+                          "rank",
+                          "level"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "caveat": {
+                      "type": "string",
+                      "description": "Kalimat yang wajib ikut setiap angka disabilitas"
+                    },
+                    "formula": {
+                      "type": "string"
+                    },
+                    "source": {
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string",
+                          "format": "uri"
+                        },
+                        "publisher": {
+                          "type": "string"
+                        },
+                        "retrievedAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                        },
+                        "terms": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "title",
+                        "url",
+                        "publisher",
+                        "retrievedAt",
+                        "terms"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "facilitiesSource": {
+                      "type": "object",
+                      "properties": {
+                        "retrievedAt": {
+                          "nullable": true,
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                        },
+                        "attribution": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "retrievedAt",
+                        "attribution"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "year",
+                    "yearTotals",
+                    "districts",
+                    "caveat",
+                    "formula",
+                    "source",
+                    "facilitiesSource"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/places": {
       "get": {
         "summary": "Daftar lokasi untuk Jelajahi",
@@ -8475,7 +8772,8 @@
                         "osm",
                         "angkutan_umum",
                         "regulasi",
-                        "dokumen_aksesbogor"
+                        "dokumen_aksesbogor",
+                        "data_disabilitas"
                       ]
                     }
                   },
@@ -8528,7 +8826,8 @@
                                   "osm",
                                   "angkutan_umum",
                                   "regulasi",
-                                  "dokumen_aksesbogor"
+                                  "dokumen_aksesbogor",
+                                  "data_disabilitas"
                                 ]
                               },
                               "title": {
