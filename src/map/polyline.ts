@@ -1,5 +1,5 @@
 // Encoded polyline presisi 6 (format yang sama dengan `geometries=polyline6` Mapbox), supaya garis rute bisa
-// dikirim ulang ke `route_obstacles` sebagai satu string pendek, bukan larik koordinat.
+// dikirim browser ke route hambatan sebagai satu string pendek, bukan larik koordinat.
 
 const FACTOR = 1e6;
 
