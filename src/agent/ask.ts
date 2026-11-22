@@ -14,6 +14,9 @@ export const MAX_CALLS_PER_ROUND = 4;
 /** Tenggat satu pertanyaan, termasuk semua permintaan ke model. */
 export const QUESTION_DEADLINE_MS = 60_000;
 
+/** Jawaban yang menyebut peraturan. Bila belum ada hasil search_knowledge, server mencarikannya dan meminta jawaban ulang. */
+const CITES_REGULATION = /\b(permen|peraturan|undang-undang|uu no|pasal \d+|lampiran [ivx]+)\b/i;
+
 /** Dikirim bila model masih meminta alat setelah putaran terakhir. */
 export const NO_ANSWER =
   "Maaf, agen belum bisa menjawab pertanyaan ini. Coba tanyakan dengan kalimat yang lebih singkat, atau lihat Detail lokasi untuk data fasilitasnya.";
@@ -32,7 +35,9 @@ export async function askAgent({ model, ctx, deadlineMs = QUESTION_DEADLINE_MS }
   const sources = new Map<string, Source>();
   const addPlace = (p: { id: string; name: string; lastVerifiedAt: string }) =>
     sources.set(`lokasi:${p.id}`, { type: "lokasi", placeId: p.id, name: p.name, lastVerifiedAt: p.lastVerifiedAt });
+  let searched = false;
   const addPassages = (passages: KnowledgeHit[]) => {
+    searched = true;
     for (const p of passages) {
       sources.set(`pengetahuan:${p.citation}`, { type: "pengetahuan", citation: p.citation, title: p.source.title, url: p.source.url, license: p.source.license, attribution: p.source.attribution });
     }
@@ -57,11 +62,20 @@ export async function askAgent({ model, ctx, deadlineMs = QUESTION_DEADLINE_MS }
   const messages: AgentMessage[] = [...(input.history ?? []), { role: "user", content: input.question }];
   const signal = AbortSignal.timeout(deadlineMs);
   let answeredBy: string | null = null;
+  let corrected = false;
 
   for (let round = 0; round <= MAX_TOOL_ROUNDS; round += 1) {
     const last = round === MAX_TOOL_ROUNDS;
     const turn = await model.next({ system, messages, tools, toolChoice: last ? "none" : "auto", signal });
     answeredBy = turn.model ?? answeredBy;
+    if (turn.kind === "answer" && !searched && !corrected && !last && CITES_REGULATION.test(turn.text)) {
+      // Model menyebut peraturan dari ingatannya. Server menjalankan search_knowledge dengan pertanyaan pengguna, lalu
+      // meminta jawaban ulang dari potongan yang ditemukan. Hanya sekali per pertanyaan.
+      corrected = true;
+      const call: ToolCall = { id: "cek-sumber", name: "search_knowledge", input: { query: input.question.slice(0, 300) } };
+      messages.push({ role: "assistant", content: "", toolCalls: [call] }, { role: "tool", toolCallId: call.id, name: call.name, content: await run(call) });
+      continue;
+    }
     if (turn.kind === "answer") return { answer: guardRouteClaims(turn.text), sources: [...sources.values()], model: answeredBy };
     if (last) break;
     messages.push({ role: "assistant", content: turn.text ?? "", toolCalls: turn.calls });
