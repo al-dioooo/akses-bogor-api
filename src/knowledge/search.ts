@@ -21,11 +21,19 @@ export const MAX_PASSAGES = 8;
 const MAX_TERMS = 12;
 /** Kata dengan panjang ini atau lebih dicocokkan sebagai awalan, mis. "akses" juga cocok dengan "aksesibilitas". */
 const PREFIX_FROM = 4;
+/**
+ * Normalisasi `ts_rank_cd` 32 (rank / (rank + 1)) menjaga nilainya di bawah 1. Tanpa itu, potongan panjang yang
+ * mengulang satu kata bisa bernilai lebih dari 10 dan mengalahkan potongan yang cocok dengan lebih banyak kata.
+ */
+const RANK_NORMALIZATION = 32;
 
-/** Kata umum bahasa Indonesia yang tidak membantu mencari. Konfigurasi `simple` tidak membuang kata apa pun. */
+/**
+ * Kata umum bahasa Indonesia yang tidak membantu mencari. Konfigurasi `simple` tidak membuang kata apa pun. "belum"
+ * sengaja tidak ada di sini karena "Belum tahu" adalah salah satu jawaban fasilitas AksesBogor (ADR-0017).
+ */
 const STOPWORDS = new Set(
   (
-    "ada adalah agar akan aku anda apa apakah atau bagaimana bagi bahwa banyak beberapa begitu belum berapa bila bisa " +
+    "ada adalah agar akan aku anda apa apakah atau bagaimana bagi bahwa banyak beberapa begitu berapa bila bisa " +
     "boleh buat dalam dan dapat dari dengan di dia harus hingga ia ini itu jadi jika juga kalau kami kamu kan karena " +
     "ke kenapa kita lagi lain maka mana masih mau mengapa nya oleh pada para perlu saat saja saya sangat sebagai " +
     "sedang sejak seperti setelah siapa sudah supaya tapi tentang tetapi tidak untuk yaitu yang"
@@ -78,8 +86,9 @@ const toHit = (r: Row): KnowledgeHit => ({
 /**
  * Potongan teks yang paling cocok dengan pertanyaan, beserta sumber, lisensi, dan sitasinya.
  *
- * Kata pertanyaan digabung dengan OR, lalu diurutkan menurut jumlah kata yang cocok dan `ts_rank_cd`, dengan sitasi dan
- * judul berbobot lebih tinggi daripada isi. Bila tidak ada yang cocok sama sekali, misalnya karena salah ketik,
+ * Kata pertanyaan digabung dengan OR, lalu diurutkan menurut jumlah kata yang cocok, kemudian `ts_rank_cd` (selalu di
+ * bawah 1, jadi hanya memisahkan potongan dengan jumlah kata cocok yang sama), dengan sitasi dan judul berbobot lebih
+ * tinggi daripada isi. Bila tidak ada yang cocok sama sekali, misalnya karena salah ketik,
  * dipakai kemiripan kata `pg_trgm`.
  */
 export async function searchKnowledge(db: Db, query: string, opts: { limit?: number; kinds?: KnowledgeKind[] } = {}): Promise<KnowledgeHit[]> {
@@ -97,7 +106,7 @@ export async function searchKnowledge(db: Db, query: string, opts: { limit?: num
     WITH q AS (SELECT to_tsquery('simple', ${tsquery}) AS query)
     SELECT ${columns},
       (SELECT count(*) FROM unnest(ARRAY[${list(tsTerms)}]::text[]) AS t(term) WHERE p.search @@ to_tsquery('simple', t.term))
-        + ts_rank_cd(p.search, q.query) AS score
+        + ts_rank_cd(p.search, q.query, ${RANK_NORMALIZATION}) AS score
     FROM knowledge_passages p JOIN knowledge_sources s ON s.id = p.source_id, q
     WHERE p.search @@ q.query ${kindFilter}
     ORDER BY score DESC, p.source_id, p.position

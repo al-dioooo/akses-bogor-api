@@ -56,6 +56,10 @@ describe("queryTerms", () => {
     expect(queryTerms("pasal 18 UU 8/2016")).toEqual(["pasal", "18", "uu", "8", "2016"]);
   });
 
+  it("keeps belum, because Belum tahu is one of the AksesBogor answers", () => {
+    expect(queryTerms("Apa arti jawaban Belum tahu?")).toEqual(["arti", "jawaban", "belum", "tahu"]);
+  });
+
   it("returns nothing for a question made only of common words", () => {
     expect(queryTerms("apa itu yang di sana?")).toEqual(["sana"]);
     expect(queryTerms("apa itu yang")).toEqual([]);
@@ -89,6 +93,19 @@ describe("searchKnowledge", () => {
   it("ranks passages that match more of the question first", async () => {
     const hits = await searchKnowledge(db, "guiding block pintu masuk");
     expect(hits[0]!.citation).toBe("Panduan Verifikasi, bagian 5.3");
+  });
+
+  it("ranks a short passage matching more words above a long passage repeating fewer words", async () => {
+    const source = { ...uu, id: "uji-peringkat", title: "Uji peringkat" };
+    await replaceSource(db, source, (tx) =>
+      insertPassages(tx, source.id, [
+        { citation: "Uji peringkat, panjang", body: "Kanstin dan bordes. ".repeat(40) },
+        { citation: "Uji peringkat, pendek", body: "Selasar dengan kanstin dan bordes." },
+      ]),
+    );
+    const hits = await searchKnowledge(db, "selasar kanstin bordes");
+    expect(hits.map((h) => h.citation).slice(0, 2)).toEqual(["Uji peringkat, pendek", "Uji peringkat, panjang"]);
+    expect(hits[0]!.score - hits[1]!.score).toBeGreaterThan(0.5);
   });
 
   it("filters by source kind", async () => {
