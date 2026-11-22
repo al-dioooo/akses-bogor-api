@@ -12,9 +12,10 @@ export type ToolContext = {
   now: () => Date;
 };
 
-/** find_place: lokasi AksesBogor yang sudah terbit dengan nama mirip, paling banyak 5. */
+/** find_place: lokasi AksesBogor yang sudah terbit dengan nama mirip, paling banyak 5, tanpa koordinat. */
 export async function findPlace(ctx: ToolContext, input: { query: string }) {
-  return { places: await placesNamed(ctx.db, input.query, 5) };
+  const places = await placesNamed(ctx.db, input.query, 5);
+  return { places: places.map((p) => ({ id: p.id, name: p.name, category: p.category, status: p.status, district: p.district })) };
 }
 
 /**
