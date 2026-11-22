@@ -15,8 +15,8 @@ function ipHeader(request: FastifyRequest, name: string) {
 
 /**
  * Kunci rate limit, diperiksa berurutan:
- * 1. Server web dengan `WEB_SERVER_SECRET` yang cocok: IP di `x-visitor-ip`. Halaman dirender di Vercel, jadi tanpa ini
- *    semua pengunjung berbagi kuota beberapa IP egress Vercel.
+ * 1. Server web dengan `WEB_SERVER_SECRET` yang cocok: IP di `x-visitor-ip`. Halaman dirender di server web, yang
+ *    memanggil API lewat Cloudflare dari IP Evergarden (ADR-0048), jadi tanpa ini semua pengunjung berbagi kuota IP itu.
  * 2. `cf-connecting-ip`. Header ini ditulis Cloudflare dan diteruskan cloudflared apa adanya; API hanya mendengar di
  *    127.0.0.1, jadi klien tidak bisa mengisinya. `X-Forwarded-For` tidak dipakai karena entri kirinya diisi klien.
  * 3. `request.ip`, untuk permintaan yang tidak lewat Cloudflare (lokal, tes).
