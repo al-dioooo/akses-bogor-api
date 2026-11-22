@@ -7764,22 +7764,6 @@
                               "name"
                             ],
                             "additionalProperties": false
-                          },
-                          "location": {
-                            "type": "object",
-                            "properties": {
-                              "lat": {
-                                "type": "number"
-                              },
-                              "lng": {
-                                "type": "number"
-                              }
-                            },
-                            "required": [
-                              "lat",
-                              "lng"
-                            ],
-                            "additionalProperties": false
                           }
                         },
                         "required": [
@@ -7787,8 +7771,7 @@
                           "name",
                           "category",
                           "status",
-                          "district",
-                          "location"
+                          "district"
                         ],
                         "additionalProperties": false
                       }
