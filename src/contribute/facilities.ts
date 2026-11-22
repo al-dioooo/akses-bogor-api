@@ -129,3 +129,13 @@ export async function getOsmPlace(db: Db, target: OsmTarget) {
   };
 }
 
+/** Kecamatan urut dari tempat tanpa data AksesBogor terbanyak; urutan cadangan bila prioritas kecamatan mati. */
+export async function districtsByMissingData(db: Db): Promise<{ slug: string; count: number }[]> {
+  return rowsOf<{ slug: string; count: number }>(
+    await db.execute(sql`
+      SELECT d.slug, count(o.osm_id)::int AS count FROM districts d
+      LEFT JOIN osm_places o ON o.district_slug = d.slug AND ${withoutAksesBogorData}
+      GROUP BY d.slug ORDER BY count DESC, d.slug`),
+  );
+}
+

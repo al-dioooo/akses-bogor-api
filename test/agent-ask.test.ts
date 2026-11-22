@@ -124,7 +124,8 @@ describe("askAgent", () => {
     await askAgent({ model, ctx: ctx() }, { placeId: halteB, question: "Ada ramp?" });
     expect(steps[0]!.system).toContain('"answer":"belum_tahu"');
     expect(steps[0]!.system).toContain('belum_tahu = belum diketahui');
-    expect(steps[0]!.tools.map((t) => t.function.name)).toEqual(["find_place", "place_accessibility", "search_knowledge"]);
+    expect(steps[0]!.tools.map((t) => t.function.name)).not.toContain("walking_route");
+    expect(steps[0]!.tools.map((t) => t.function.name)).not.toContain("route_obstacles");
   });
 
   it("stops after the round limit, asking for a final answer without tools", async () => {

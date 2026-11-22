@@ -7813,7 +7813,7 @@
         "tags": [
           "Agen rute"
         ],
-        "description": "Larik `tools` format OpenAI (type, nama, deskripsi, dan JSON Schema parameter) untuk ketiga alat yang boleh dipanggil model. Hanya untuk akun yang sudah masuk dan melengkapi akun (ADR-0042). Menjawab 503 `agen_rute_belum_aktif` selama `ROUTE_AGENT_ENABLED` mati. Semua route agen dan rute berbagi batas 120 permintaan per akun per jam. Data dikirim di badan permintaan supaya tidak tercatat di log.",
+        "description": "Larik `tools` format OpenAI (type, nama, deskripsi, dan JSON Schema parameter) untuk alat yang boleh dipanggil model. Hanya untuk akun yang sudah masuk dan melengkapi akun (ADR-0042). Menjawab 503 `agen_rute_belum_aktif` selama `ROUTE_AGENT_ENABLED` mati. Semua route agen dan rute berbagi batas 120 permintaan per akun per jam. Data dikirim di badan permintaan supaya tidak tercatat di log.",
         "responses": {
           "200": {
             "description": "Default Response",
@@ -8878,6 +8878,765 @@
                   },
                   "required": [
                     "passages"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent/tools/find_places_to_contribute": {
+      "post": {
+        "summary": "find_places_to_contribute",
+        "tags": [
+          "Agen rute"
+        ],
+        "description": "Mencari tempat umum di Kota Bogor (kampus, masjid, halte, rumah sakit) dari OpenStreetMap yang belum punya data AksesBogor, untuk didatangi dan dipetakan kontributor. Urut menurut prioritas kecamatan. Bisa dibatasi kecamatan dan kategori. Data © kontributor OpenStreetMap; sebut atribusinya.\n\nHanya untuk akun yang sudah masuk dan melengkapi akun (ADR-0042). Menjawab 503 `agen_rute_belum_aktif` selama `ROUTE_AGENT_ENABLED` mati. Semua route agen dan rute berbagi batas 120 permintaan per akun per jam. Data dikirim di badan permintaan supaya tidak tercatat di log.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "kecamatan": {
+                    "description": "Slug kecamatan, mis. bogor-barat",
+                    "type": "string",
+                    "enum": [
+                      "bogor-barat",
+                      "bogor-selatan",
+                      "bogor-tengah",
+                      "bogor-timur",
+                      "bogor-utara",
+                      "tanah-sareal"
+                    ]
+                  },
+                  "category": {
+                    "description": "kampus, masjid, halte, atau rumah_sakit",
+                    "type": "string",
+                    "enum": [
+                      "kampus",
+                      "masjid",
+                      "halte",
+                      "rumah_sakit"
+                    ]
+                  },
+                  "limit": {
+                    "description": "Jumlah tempat, bawaan 5",
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "places": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "osm": {
+                            "type": "object",
+                            "properties": {
+                              "osmType": {
+                                "type": "string"
+                              },
+                              "osmId": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              }
+                            },
+                            "required": [
+                              "osmType",
+                              "osmId"
+                            ],
+                            "additionalProperties": false,
+                            "description": "Pengenal tempat untuk show_place_card dan show_route_card"
+                          },
+                          "name": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "category": {
+                            "type": "string",
+                            "enum": [
+                              "kampus",
+                              "masjid",
+                              "halte",
+                              "rumah_sakit"
+                            ]
+                          },
+                          "district": {
+                            "type": "object",
+                            "properties": {
+                              "slug": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "slug",
+                              "name"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "priorityRank": {
+                            "nullable": true,
+                            "description": "Peringkat prioritas kecamatannya, atau null bila prioritas belum dibuka",
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "osm",
+                          "name",
+                          "category",
+                          "district",
+                          "priorityRank"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "order": {
+                      "type": "string",
+                      "enum": [
+                        "prioritas_kecamatan",
+                        "tempat_tanpa_data_terbanyak"
+                      ]
+                    },
+                    "attribution": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "places",
+                    "order",
+                    "attribution"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent/tools/kecamatan_priority": {
+      "post": {
+        "summary": "kecamatan_priority",
+        "tags": [
+          "Agen rute"
+        ],
+        "description": "Prioritas keenam kecamatan untuk kontributor: jumlah penyandang disabilitas terdaftar di Dinas Sosial (tahun terbaru), lokasi AksesBogor, tempat tanpa data, skor 0–100, dan peringkat. Selalu sampaikan `caveat` bila menyebut angka disabilitas, dan sebut sumbernya (Open Data Kota Bogor, Dinas Sosial). Jangan memakai kata \"cacat\"; pakai disabilitas fisik, netra, mental, atau lainnya.\n\nHanya untuk akun yang sudah masuk dan melengkapi akun (ADR-0042). Menjawab 503 `agen_rute_belum_aktif` selama `ROUTE_AGENT_ENABLED` mati. Semua route agen dan rute berbagi batas 120 permintaan per akun per jam. Data dikirim di badan permintaan supaya tidak tercatat di log.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "year": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Tahun terbaru di data Dinsos"
+                    },
+                    "yearTotals": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "year": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "registered": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "year",
+                          "registered"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Jumlah terdaftar per tahun, untuk menunjukkan lonjakan antartahun"
+                    },
+                    "districts": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "slug": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "registered": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Penyandang disabilitas terdaftar di Dinsos pada `year`, bukan jumlah seluruh penduduk"
+                          },
+                          "verifiedPlaces": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Lokasi AksesBogor yang sudah terbit"
+                          },
+                          "facilitiesWithoutData": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Kampus, masjid, halte, dan rumah sakit di OpenStreetMap yang belum punya data AksesBogor"
+                          },
+                          "score": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 100
+                          },
+                          "rank": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "level": {
+                            "type": "string",
+                            "enum": [
+                              "rendah",
+                              "sedang",
+                              "tinggi",
+                              "sangat_tinggi"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "slug",
+                          "name",
+                          "registered",
+                          "verifiedPlaces",
+                          "facilitiesWithoutData",
+                          "score",
+                          "rank",
+                          "level"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "caveat": {
+                      "type": "string",
+                      "description": "Kalimat yang wajib ikut setiap angka disabilitas"
+                    },
+                    "formula": {
+                      "type": "string"
+                    },
+                    "source": {
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string",
+                          "format": "uri"
+                        },
+                        "publisher": {
+                          "type": "string"
+                        },
+                        "retrievedAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                        },
+                        "terms": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "title",
+                        "url",
+                        "publisher",
+                        "retrievedAt",
+                        "terms"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "facilitiesSource": {
+                      "type": "object",
+                      "properties": {
+                        "retrievedAt": {
+                          "nullable": true,
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                        },
+                        "attribution": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "retrievedAt",
+                        "attribution"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "year",
+                    "yearTotals",
+                    "districts",
+                    "caveat",
+                    "formula",
+                    "source",
+                    "facilitiesSource"
                   ],
                   "additionalProperties": false
                 }

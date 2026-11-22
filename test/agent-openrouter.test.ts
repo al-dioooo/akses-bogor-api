@@ -33,7 +33,7 @@ describe("openRouterModel", () => {
       provider: { data_collection: "deny", require_parameters: true },
       reasoning: { exclude: true },
     });
-    expect(body.tools.map((t: { function: { name: string } }) => t.function.name)).toEqual(["find_place", "place_accessibility", "search_knowledge"]);
+    expect(body.tools.map((t: { function: { name: string } }) => t.function.name)).toEqual(toolDefinitions().map((t) => t.function.name));
     expect(body.messages).toEqual([
       { role: "system", content: "Aturan" },
       { role: "user", content: "Ada ramp?" },

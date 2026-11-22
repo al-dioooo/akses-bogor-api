@@ -28,6 +28,8 @@ export type AgentRouteOptions = {
   enabled: boolean;
   /** Kosong bila `MAPBOX_SECRET_TOKEN` belum diatur. */
   walking?: WalkingRouter;
+  /** `DISABILITY_DATA_ENABLED`: alat prioritas kecamatan boleh memakai data disabilitas (ADR-0043). */
+  disabilityData?: boolean;
   /** Model agen; kosong bila `OPENROUTER_API_KEY` belum diatur, dan `POST /agent/ask` menjawab sibuk. */
   model?: AgentModel;
   now: () => Date;
@@ -115,7 +117,7 @@ const APP_ONLY = "Dipanggil browser pengguna sendiri dan hasilnya hanya ditampil
  * `/route/*` adalah rute jalan kaki dan hambatan di dekatnya untuk browser pengguna, tidak pernah untuk model.
  */
 export const agentRoutes: FastifyPluginAsyncZod<AgentRouteOptions> = async (app, opts) => {
-  const toolCtx: ToolContext = { db: app.db, now: opts.now };
+  const toolCtx: ToolContext = { db: app.db, now: opts.now, disabilityData: opts.disabilityData };
   const routeCtx: RouteContext = { db: app.db, now: opts.now, walking: opts.walking };
   const accountOf = new WeakMap<FastifyRequest, string>();
   const limit = (name: string, max: number) => app.createRateLimit({ max, timeWindow: HOUR_MS, keyGenerator: (request) => `${name}:${accountOf.get(request)}` });
@@ -147,7 +149,7 @@ export const agentRoutes: FastifyPluginAsyncZod<AgentRouteOptions> = async (app,
       schema: {
         tags: [TAG_AGENT],
         summary: "Daftar alat untuk model",
-        description: `Larik \`tools\` format OpenAI (type, nama, deskripsi, dan JSON Schema parameter) untuk ketiga alat yang boleh dipanggil model. ${COMMON}`,
+        description: `Larik \`tools\` format OpenAI (type, nama, deskripsi, dan JSON Schema parameter) untuk alat yang boleh dipanggil model. ${COMMON}`,
         response: { 200: definitions, 401: errorSchema, 403: errorSchema, 429: errorSchema, 503: errorSchema },
       },
     },
