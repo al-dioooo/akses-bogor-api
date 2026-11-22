@@ -32,7 +32,7 @@ export type AgentRouteOptions = {
   walking?: WalkingRouter;
   /** `DISABILITY_DATA_ENABLED`: alat prioritas kecamatan boleh memakai data disabilitas (ADR-0043). */
   disabilityData?: boolean;
-  /** Model agen; kosong bila `OPENROUTER_API_KEY` belum diatur, dan `POST /agent/ask` menjawab sibuk. */
+  /** Model agen (`provider.ts`); kosong bila OpenRouter dipilih tanpa API key, dan `POST /agent/ask` menjawab sibuk. */
   model?: AgentModel;
   now: () => Date;
 };
@@ -117,7 +117,7 @@ const askResponse = z.object({
       ]),
     )
     .describe("Data terverifikasi AksesBogor dan potongan basis pengetahuan yang dibaca agen untuk jawaban ini"),
-  model: z.string().nullable().describe("Model OpenRouter yang menjawab"),
+  model: z.string().nullable().describe("Model yang menjawab, mis. claude-haiku-5-5"),
   cards: z
     .array(z.union([placeCardSchema, routeCardSchema, prioritySchema.extend({ type: z.literal("prioritas") })]))
     .describe("Kartu untuk ditampilkan web di bawah jawaban: tempat, rute (dihitung web dari posisi pengguna), atau prioritas kecamatan. Isinya tidak dikirim ke model"),
@@ -230,7 +230,7 @@ export const agentRoutes: FastifyPluginAsyncZod<AgentRouteOptions> = async (app,
       schema: {
         tags: [TAG_AGENT],
         summary: "Bertanya kepada agen AksesBogor untuk kontributor",
-        description: `Pertanyaan kontributor: tempat yang perlu dipetakan, jawaban fasilitas terverifikasi, regulasi, aturan AksesBogor, dan cara melapor (ADR-0043). Penyandang disabilitas yang menanyakan rute aksesibel atau tempat tanpa data terverifikasi mendapat jawaban bahwa datanya belum tersedia. Model hanya menerima pertanyaan, giliran sebelumnya, data tempat, dan hasil alat, tidak pernah posisi pengguna atau rute. Tidak ada percakapan yang disimpan. Menjawab 503 \`agen_sibuk\` bila kuota OpenRouter habis atau semua model gagal, dan 429 setelah ${QUESTIONS_PER_ACCOUNT_PER_DAY} pertanyaan per akun per hari WIB.\n\n${COMMON}`,
+        description: `Pertanyaan kontributor: tempat yang perlu dipetakan, jawaban fasilitas terverifikasi, regulasi, aturan AksesBogor, dan cara melapor (ADR-0043). Penyandang disabilitas yang menanyakan rute aksesibel atau tempat tanpa data terverifikasi mendapat jawaban bahwa datanya belum tersedia. Model hanya menerima pertanyaan, giliran sebelumnya, data tempat, dan hasil alat, tidak pernah posisi pengguna atau rute. Tidak ada percakapan yang disimpan. Menjawab 503 \`agen_sibuk\` bila batas harian semua pengguna atau saldo penyedia model habis, API key belum diatur, atau model gagal, dan 429 setelah ${QUESTIONS_PER_ACCOUNT_PER_DAY} pertanyaan per akun per hari WIB.\n\n${COMMON}`,
         body: askBody,
         response: { 200: askResponse, ...errors },
       },

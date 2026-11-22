@@ -7,8 +7,8 @@ import type { RequestBudget } from "./openrouter.js";
 import type { ToolDefinition } from "./registry.js";
 
 export const DEFAULT_MODEL = "claude-haiku-5-5";
-export const EFFORTS = ["low", "medium", "high"] as const;
-export type Effort = (typeof EFFORTS)[number];
+/** Effort yang boleh dipilih lewat `ANTHROPIC_EFFORT`; xhigh dan max tidak dipakai agen ini. */
+export type Effort = "low" | "medium" | "high";
 /** Dipilih dari `pnpm agen:evaluasi` (ADR-0047). Bisa diganti lewat `ANTHROPIC_EFFORT`. */
 export const DEFAULT_EFFORT: Effort = "low";
 /** Thinking ikut dihitung di `max_tokens`, jadi batasnya jauh di atas panjang jawaban (sekitar 120 kata). */

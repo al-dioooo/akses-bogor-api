@@ -11505,7 +11505,7 @@
         "tags": [
           "Agen rute"
         ],
-        "description": "Pertanyaan kontributor: tempat yang perlu dipetakan, jawaban fasilitas terverifikasi, regulasi, aturan AksesBogor, dan cara melapor (ADR-0043). Penyandang disabilitas yang menanyakan rute aksesibel atau tempat tanpa data terverifikasi mendapat jawaban bahwa datanya belum tersedia. Model hanya menerima pertanyaan, giliran sebelumnya, data tempat, dan hasil alat, tidak pernah posisi pengguna atau rute. Tidak ada percakapan yang disimpan. Menjawab 503 `agen_sibuk` bila kuota OpenRouter habis atau semua model gagal, dan 429 setelah 5 pertanyaan per akun per hari WIB.\n\nHanya untuk akun yang sudah masuk dan melengkapi akun (ADR-0042). Menjawab 503 `agen_rute_belum_aktif` selama `ROUTE_AGENT_ENABLED` mati. Semua route agen dan rute berbagi batas 120 permintaan per akun per jam. Data dikirim di badan permintaan supaya tidak tercatat di log.",
+        "description": "Pertanyaan kontributor: tempat yang perlu dipetakan, jawaban fasilitas terverifikasi, regulasi, aturan AksesBogor, dan cara melapor (ADR-0043). Penyandang disabilitas yang menanyakan rute aksesibel atau tempat tanpa data terverifikasi mendapat jawaban bahwa datanya belum tersedia. Model hanya menerima pertanyaan, giliran sebelumnya, data tempat, dan hasil alat, tidak pernah posisi pengguna atau rute. Tidak ada percakapan yang disimpan. Menjawab 503 `agen_sibuk` bila batas harian semua pengguna atau saldo penyedia model habis, API key belum diatur, atau model gagal, dan 429 setelah 5 pertanyaan per akun per hari WIB.\n\nHanya untuk akun yang sudah masuk dan melengkapi akun (ADR-0042). Menjawab 503 `agen_rute_belum_aktif` selama `ROUTE_AGENT_ENABLED` mati. Semua route agen dan rute berbagi batas 120 permintaan per akun per jam. Data dikirim di badan permintaan supaya tidak tercatat di log.",
         "requestBody": {
           "required": true,
           "content": {
@@ -11649,7 +11649,7 @@
                     },
                     "model": {
                       "nullable": true,
-                      "description": "Model OpenRouter yang menjawab",
+                      "description": "Model yang menjawab, mis. claude-haiku-5-5",
                       "type": "string"
                     },
                     "cards": {
