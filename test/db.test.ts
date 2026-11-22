@@ -38,6 +38,7 @@ describe("migrations", () => {
       "knowledge_passages",
       "knowledge_sources",
       "osm_features",
+      "osm_places",
       "photo_deletions",
       "photos",
       "place_facilities",
