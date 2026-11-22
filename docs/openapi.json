@@ -4623,7 +4623,7 @@
         "tags": [
           "Laporkan"
         ],
-        "description": "Laporan baru, perubahan (Edit lokasi), atau kekurangan (Laporkan kekurangan) masuk antrean verifikasi dengan status menunggu (FR-20 sampai FR-27). Data lokasi tidak berubah sampai laporan diterbitkan. Kecamatan dihitung ulang dari titik; titik di luar Kota Bogor menjawab 422. Laporan kekurangan memakai nama, kategori, titik, dan patokan lokasi saat ini. Foto harus diunggah akun ini lewat `POST /reports/photos` dan belum terpasang; bila tidak, 400 `foto_tidak_ditemukan`. Kirim ulang dengan kunci draf yang sama menjawab 201 dengan laporan yang sudah ada, tanpa membuat laporan kedua. Per akun 20 laporan per 24 jam dan 30 laporan menunggu.",
+        "description": "Laporan baru, perubahan (Edit lokasi), atau kekurangan (Laporkan kekurangan) masuk antrean verifikasi dengan status menunggu (FR-20 sampai FR-27). Data lokasi tidak berubah sampai laporan diterbitkan. Kecamatan dihitung ulang dari titik; titik di luar Kota Bogor menjawab 422. Laporan kekurangan memakai nama, kategori, titik, dan patokan lokasi saat ini. Foto harus diunggah akun ini lewat `POST /reports/photos` dan belum terpasang; bila tidak, 400 `foto_tidak_ditemukan`. Kirim ulang dengan kunci draf yang sama menjawab 201 dengan laporan yang sudah ada, tanpa membuat laporan kedua. Per akun 20 laporan per 24 jam dan 30 laporan menunggu. Admin boleh mengirim `publishDirectly` dengan `publishReason`: laporan langsung diterbitkan lewat validasi yang sama dengan verifikasi, tempatnya berlabel admin, Tersedia dan Tidak perlu tanpa foto bertag fasilitas itu disimpan sebagai Belum tahu (`downgraded`), dan batas per akun tidak berlaku; akun lain 403 `bukan_admin` (ADR-0050).",
         "requestBody": {
           "required": true,
           "content": {
@@ -4795,6 +4795,17 @@
                         "tag"
                       ]
                     }
+                  },
+                  "publishDirectly": {
+                    "description": "Khusus admin: terbitkan langsung tanpa pemeriksaan orang kedua; akun lain 403 `bukan_admin` (ADR-0050)",
+                    "type": "boolean"
+                  },
+                  "publishReason": {
+                    "description": "Wajib bila `publishDirectly`: alasan admin, masuk log audit",
+                    "type": "string",
+                    "minLength": 5,
+                    "maxLength": 500,
+                    "pattern": "^(?:[^\\p{C}]|[\\n\\r\\t])+$"
                   }
                 },
                 "required": [
@@ -4835,7 +4846,7 @@
                         "diterbitkan",
                         "ditolak"
                       ],
-                      "description": "Selalu menunggu untuk laporan baru masuk"
+                      "description": "Menunggu untuk laporan yang masuk antrean; diterbitkan untuk terbit langsung oleh admin"
                     },
                     "placeId": {
                       "nullable": true,
@@ -4874,6 +4885,19 @@
                       "type": "string",
                       "format": "date-time",
                       "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                    },
+                    "downgraded": {
+                      "description": "Hanya untuk terbit langsung: fasilitas Tersedia atau Tidak perlu tanpa foto bertag fasilitas itu, jadi disimpan sebagai Belum tahu",
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "ramp",
+                          "toilet_difabel",
+                          "guiding_block",
+                          "lift"
+                        ]
+                      }
                     }
                   },
                   "required": [
@@ -4996,6 +5020,32 @@
               }
             }
           },
+          "409": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Galat",
             "content": {
@@ -5023,6 +5073,32 @@
             }
           },
           "429": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          },
+          "502": {
             "description": "Galat",
             "content": {
               "application/json": {
