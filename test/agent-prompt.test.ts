@@ -23,7 +23,7 @@ describe("guardRouteClaims", () => {
 describe("systemPrompt", () => {
   it("tells disabled users plainly that the data is not available yet", () => {
     const prompt = systemPrompt();
-    expect(prompt).toContain("katakan dengan jelas bahwa datanya belum tersedia di AksesBogor");
+    expect(prompt).toContain('buka jawaban dengan kalimat "Maaf, data itu belum tersedia di AksesBogor."');
     expect(prompt).toContain("Jangan menebak atau menyiratkan aksesibilitas");
   });
 

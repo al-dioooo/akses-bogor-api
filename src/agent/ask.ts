@@ -61,7 +61,18 @@ export async function askAgent({ model, ctx, deadlineMs = QUESTION_DEADLINE_MS }
       const result = await runTool(ctx, call.name, call.input);
       if (call.name === "place_accessibility") addPlace(result as { id: string; name: string; lastVerifiedAt: string });
       if (call.name === "search_knowledge") addPassages((result as { passages: KnowledgeHit[] }).passages);
-      if (call.name === "kecamatan_priority") cards.push({ type: "prioritas", ...(result as KecamatanPriority) });
+      if (call.name === "kecamatan_priority") {
+        const priority = result as KecamatanPriority;
+        cards.push({ type: "prioritas", ...priority });
+        sources.set("prioritas", {
+          type: "pengetahuan",
+          citation: `${priority.source.title}, ${priority.year}`,
+          title: priority.source.title,
+          url: priority.source.url,
+          license: priority.source.terms,
+          attribution: priority.source.publisher,
+        });
+      }
       if (CARD_TOOLS.has(call.name)) {
         const { pesan, kartu } = result as { pesan: string; kartu: PlaceCard | RouteCard };
         cards.push(kartu);
