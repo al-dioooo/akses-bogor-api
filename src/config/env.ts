@@ -59,6 +59,11 @@ const schema = z
      * termasuk Kebijakan Privasi yang menyebut Mapbox Directions, OpenRouter, dan penyedia model.
      */
     ROUTE_AGENT_ENABLED: z.stringbool().default(false),
+    /**
+     * Data penyandang disabilitas terdaftar dari Open Data Kota Bogor untuk prioritas kecamatan (ADR-0043). Mati sampai
+     * Diskominfo Kota Bogor mengizinkan pemakaiannya, karena syarat portal membatasi pemakaian untuk pihak ketiga.
+     */
+    DISABILITY_DATA_ENABLED: z.stringbool().default(false),
     /** API key OpenRouter untuk model agen rute (ADR-0042). Kosong berarti agen menjawab sibuk; API tetap jalan. */
     OPENROUTER_API_KEY: optional(z.string().startsWith("sk-or-")),
     /** Model OpenRouter berurutan, dipisah koma; yang pertama dicoba dulu. Kosong berarti daftar bawaan API. */
