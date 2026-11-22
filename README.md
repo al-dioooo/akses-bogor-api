@@ -46,6 +46,7 @@ pnpm dev               # http://localhost:8080/healthz
 | `pnpm pengetahuan:dokumen [--salinan]` | Mengambil halaman edukasi, Panduan Verifikasi, dan ADR aturan fasilitas dan status; jalankan ulang setelah dokumen itu berubah |
 | `pnpm pengetahuan:disabilitas [--salinan]` | Mengambil jumlah penyandang disabilitas terdaftar per kecamatan dari Open Data Kota Bogor (Dinas Sosial) untuk prioritas kecamatan (ADR-0043); dipakai hanya saat `DISABILITY_DATA_ENABLED` menyala |
 | `pnpm pengetahuan:fasilitas [--salinan]` | Mengambil kampus, masjid, halte, dan rumah sakit di Kota Bogor dari OpenStreetMap sebagai calon tujuan kontributor (ADR-0043) |
+| `pnpm agen:evaluasi [K01 …]` | Menjalankan pertanyaan uji agen kontributor (`scripts/agen/pertanyaan-uji.json`) sekali ke model gratis OpenRouter sungguhan; butuh `OPENROUTER_API_KEY` di environment lokal dan memakai kuota harian, jadi jalankan seperlunya. Berhenti setelah `EVALUASI_MAKS_BERHASIL` (bawaan 14) permintaan berhasil |
 | `pnpm peran --email <email> --peran <admin\|verifikator\|pengguna>` | Mengganti peran akun yang sudah dilengkapi, mis. membuat admin pertama; dicatat di log audit sebagai `skrip` (ADR-0035) |
 
 ## Database
