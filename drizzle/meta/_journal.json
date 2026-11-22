@@ -50,6 +50,20 @@
       "when": 1794821714143,
       "tag": "0006_pengetahuan",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1795340333505,
+      "tag": "0007_data_disabilitas",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1795340461035,
+      "tag": "0008_fasilitas_osm",
+      "breakpoints": true
     }
   ]
 }

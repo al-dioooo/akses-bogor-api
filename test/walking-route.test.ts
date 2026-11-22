@@ -6,6 +6,7 @@ import { loadOsm } from "../src/knowledge/osm-store.js";
 import { DirectionsQuotaError, NoRouteError, type WalkingRouter } from "../src/map/directions.js";
 import { decodePolyline, encodePolyline } from "../src/map/polyline.js";
 import { ROUTE_WARNING, describeFeature, routeObstacles, walkingRoute, type RouteContext } from "../src/map/walking-route.js";
+import { loadFacilities, parseFacilities } from "../src/contribute/facilities.js";
 import { placesNamed } from "../src/places/queries.js";
 import { createTestDb } from "./helpers/db.js";
 
@@ -69,13 +70,26 @@ describe("walkingRoute", () => {
     const route = await walkingRoute(context(walking), { from: { lat: -6.596512345, lng: 106.797187654 }, placeId: halteId });
     expect(walking).toHaveBeenCalledWith({ lat: -6.5965, lng: 106.7972 }, { lat: -6.5958, lng: 106.7942 });
     expect(route).toMatchObject({
-      destination: { placeId: halteId, name: "Halte contoh", location: { lat: -6.5958, lng: 106.7942 } },
+      destination: { placeId: halteId, osm: null, name: "Halte contoh", location: { lat: -6.5958, lng: 106.7942 } },
       distanceMeters: 352,
       durationSeconds: 254,
       warning: ROUTE_WARNING,
       attribution: "© Mapbox © OpenStreetMap",
     });
     expect(decodePolyline(route.polyline)).toEqual(line);
+  });
+
+  it("routes to an OpenStreetMap place without AksesBogor data for contributors", async () => {
+    await loadFacilities(db, parseFacilities({ elements: [{ type: "node", id: 88, lat: -6.5961, lon: 106.7951, tags: { highway: "bus_stop" } }] }), {
+      url: "https://overpass-api.de/api/interpreter",
+      retrievedAt: now(),
+      sha256: "b".repeat(64),
+    });
+    const walking = fakeRouter();
+    const route = await walkingRoute(context(walking), { from: { lat: -6.5965, lng: 106.7972 }, osm: { type: "node", id: 88 } });
+    expect(walking).toHaveBeenCalledWith({ lat: -6.5965, lng: 106.7972 }, { lat: -6.5961, lng: 106.7951 });
+    expect(route.destination).toEqual({ placeId: null, osm: { type: "node", id: 88 }, name: null, location: { lat: -6.5961, lng: 106.7951 } });
+    await expect(walkingRoute(context(walking), { from: { lat: -6.5965, lng: 106.7972 }, osm: { type: "node", id: 89 } })).rejects.toMatchObject({ statusCode: 404 });
   });
 
   it("refuses positions outside Kota Bogor or too far away, before calling Mapbox", async () => {

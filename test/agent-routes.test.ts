@@ -122,11 +122,11 @@ describe("access", () => {
 });
 
 describe("GET /agent/tools", () => {
-  it("lists the three model tools as an OpenAI-style tools array", async () => {
+  it("lists the model tools as an OpenAI-style tools array", async () => {
     const res = await app.inject({ method: "GET", url: "/agent/tools", headers: { authorization: `Bearer ${sari.token}` } });
     expect(res.statusCode).toBe(200);
     const { tools } = res.json() as { tools: { type: string; function: { name: string; description: string; parameters: { type: string; required: string[]; $schema?: string } } }[] };
-    expect(tools.map((t) => t.function.name)).toEqual(["find_place", "place_accessibility", "search_knowledge"]);
+    expect(tools.map((t) => t.function.name)).toEqual(["find_place", "place_accessibility", "search_knowledge", "find_places_to_contribute", "kecamatan_priority", "show_place_card", "show_route_card"]);
     expect(tools.every((t) => t.type === "function" && t.function.description.length > 40 && !t.function.parameters.$schema)).toBe(true);
     expect(tools.find((t) => t.function.name === "place_accessibility")!.function.parameters).toMatchObject({ type: "object", required: ["placeId"] });
   });
@@ -164,6 +164,12 @@ describe("app routes", () => {
     expect(obstacles.json().attribution).toContain("OpenStreetMap");
   });
 
+  it("needs exactly one destination", async () => {
+    expect((await post("/route/walking", sari.token, { from })).statusCode).toBe(400);
+    expect((await post("/route/walking", sari.token, { from, placeId: halteId, osm: { type: "node", id: 1 } })).statusCode).toBe(400);
+    expect((await post("/route/walking", sari.token, { from, osm: { type: "node", id: 1 } })).statusCode).toBe(404);
+  });
+
   it("refuses a start point outside Kota Bogor", async () => {
     const res = await post("/route/walking", sari.token, { from: { lat: -6.2, lng: 106.82 }, placeId: halteId });
     expect(res.statusCode).toBe(422);
@@ -175,14 +181,15 @@ describe("per-account limits", () => {
   it("limits walking routes per account without affecting other accounts", async () => {
     fetch.mockClear();
     const results: number[] = [];
-    // Sari sudah memakai dua rute di tes sebelumnya: satu berhasil, satu ditolak karena di luar Kota Bogor.
-    for (let i = 0; i < WALKING_ROUTES_PER_HOUR - 2; i += 1) results.push((await post("/route/walking", sari.token, { from, placeId: halteId })).statusCode);
+    // Sari sudah memakai tiga rute di tes sebelumnya: satu berhasil, satu ke tempat OSM yang tidak ada, dan satu ditolak
+    // karena di luar Kota Bogor.
+    for (let i = 0; i < WALKING_ROUTES_PER_HOUR - 3; i += 1) results.push((await post("/route/walking", sari.token, { from, placeId: halteId })).statusCode);
     expect(results.every((s) => s === 200)).toBe(true);
     const refused = await post("/route/walking", sari.token, { from, placeId: halteId });
     expect(refused.statusCode).toBe(429);
     expect(refused.json().galat).toBe("agen_terlalu_sering");
     expect(Number(refused.headers["retry-after"])).toBeGreaterThan(0);
-    expect(fetch).toHaveBeenCalledTimes(WALKING_ROUTES_PER_HOUR - 2);
+    expect(fetch).toHaveBeenCalledTimes(WALKING_ROUTES_PER_HOUR - 3);
     expect((await post("/route/walking", budi.token, { from, placeId: halteId })).statusCode).toBe(200);
   });
 

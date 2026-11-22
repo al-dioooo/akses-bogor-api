@@ -5,6 +5,7 @@ import { ROUTE_CLAIM_NOTE } from "../src/agent/prompt.js";
 import type { Db } from "../src/db/client.js";
 import { seedSampleData } from "../src/db/seed.js";
 import { insertPassages, replaceSource } from "../src/knowledge/store.js";
+import { loadFacilities, parseFacilities } from "../src/contribute/facilities.js";
 import { placesNamed } from "../src/places/queries.js";
 import { createTestDb } from "./helpers/db.js";
 
@@ -48,6 +49,7 @@ describe("askAgent", () => {
       answer: "Ramp tersedia (data terverifikasi AksesBogor, diverifikasi 2026-10-18).",
       model: "a/satu:free",
       sources: [{ type: "lokasi", placeId: halteId, name: "Halte contoh", lastVerifiedAt: "2026-10-18T03:00:00.000Z" }],
+      cards: [],
     });
     expect(steps[0]!.system).toContain('"name":"Halte contoh"');
     expect(steps[0]!.system).not.toMatch(/"(location|lat|lng)"/);
@@ -57,6 +59,14 @@ describe("askAgent", () => {
       { role: "user", content: "Ada ramp?" },
     ]);
     expect(steps[0]!.toolChoice).toBe("auto");
+  });
+
+  it("answers a contributor without a chosen place", async () => {
+    const { model, steps } = scripted({ kind: "answer", text: "Coba mulai dari kecamatan prioritas." });
+    const result = await askAgent({ model, ctx: ctx() }, { question: "Saya mau bantu memetakan, mulai dari mana?" });
+    expect(result).toEqual({ answer: "Coba mulai dari kecamatan prioritas.", sources: [], model: null, cards: [] });
+    expect(steps[0]!.system).toContain("untuk kontributor");
+    expect(steps[0]!.system).not.toContain("Tempat yang sedang dilihat");
   });
 
   it("runs tool rounds and collects knowledge sources", async () => {
@@ -116,7 +126,8 @@ describe("askAgent", () => {
     await askAgent({ model, ctx: ctx() }, { placeId: halteB, question: "Ada ramp?" });
     expect(steps[0]!.system).toContain('"answer":"belum_tahu"');
     expect(steps[0]!.system).toContain('belum_tahu = belum diketahui');
-    expect(steps[0]!.tools.map((t) => t.function.name)).toEqual(["find_place", "place_accessibility", "search_knowledge"]);
+    expect(steps[0]!.tools.map((t) => t.function.name)).not.toContain("walking_route");
+    expect(steps[0]!.tools.map((t) => t.function.name)).not.toContain("route_obstacles");
   });
 
   it("stops after the round limit, asking for a final answer without tools", async () => {
@@ -149,4 +160,55 @@ describe("askAgent", () => {
     await expect(askAgent({ model, ctx: ctx() }, { placeId: "00000000-0000-4000-8000-000000000000", question: "Ada lift?" })).rejects.toMatchObject({ statusCode: 404 });
     expect(model.next).not.toHaveBeenCalled();
   });
+
+  it("shows place and route cards to the web while the model only gets a short confirmation", async () => {
+    await loadFacilities(db, parseFacilities({ elements: [{ type: "node", id: 77, lat: -6.5705, lon: 106.7645, tags: { amenity: "hospital", name: "RS Barat" } }] }), {
+      url: "https://overpass-api.de/api/interpreter",
+      retrievedAt: now(),
+      sha256: "a".repeat(64),
+    });
+    const { model, steps } = scripted(
+      {
+        kind: "tool_calls",
+        calls: [
+          { id: "k1", name: "show_place_card", input: { osmType: "node", osmId: 77 } },
+          { id: "k2", name: "show_route_card", input: { placeId: halteId } },
+        ],
+      },
+      { kind: "answer", text: "Kartu tempat dan rute sudah tampil." },
+    );
+    const result = await askAgent({ model, ctx: ctx() }, { question: "Tunjukkan RS Barat dan rute ke Halte contoh" });
+    expect(result.cards).toEqual([
+      {
+        type: "tempat",
+        target: { kind: "osm", osmType: "node", osmId: 77 },
+        name: "RS Barat",
+        category: "rumah_sakit",
+        district: { slug: "bogor-barat", name: "Bogor Barat" },
+        location: { lat: -6.5705, lng: 106.7645 },
+        osmUrl: "https://www.openstreetmap.org/node/77",
+        attribution: expect.stringContaining("OpenStreetMap"),
+      },
+      { type: "rute", target: { kind: "aksesbogor", placeId: halteId }, name: "Halte contoh" },
+    ]);
+    const toolResults = steps[1]!.messages.filter((m) => m.role === "tool").map((m) => JSON.parse((m as { content: string }).content));
+    expect(toolResults).toEqual([{ pesan: "Kartu tempat ditampilkan untuk RS Barat." }, { pesan: expect.stringContaining("Kartu rute ditampilkan untuk Halte contoh") }]);
+    expect(JSON.stringify(steps[1]!.messages)).not.toMatch(/-6\.57|106\.76|"location"/);
+  });
+
+  it("accepts the model's text with card calls without another model step", async () => {
+    const { model } = scripted({ kind: "tool_calls", text: "Ini kartunya.", calls: [{ id: "k1", name: "show_place_card", input: { placeId: halteId } }] });
+    const result = await askAgent({ model, ctx: ctx() }, { question: "Tunjukkan Halte contoh" });
+    expect(model.next).toHaveBeenCalledTimes(1);
+    expect(result.answer).toBe("Ini kartunya.");
+    expect(result.cards).toMatchObject([{ type: "tempat", target: { kind: "aksesbogor", placeId: halteId }, status: "sebagian" }]);
+  });
+
+  it("rejects a card call without exactly one target", async () => {
+    const { model, steps } = scripted({ kind: "tool_calls", calls: [{ id: "k1", name: "show_route_card", input: { placeId: halteId, osmType: "node", osmId: 77 } }] }, { kind: "answer", text: "Maaf." });
+    const result = await askAgent({ model, ctx: ctx() }, { question: "Rute" });
+    expect(result.cards).toEqual([]);
+    expect(JSON.parse((steps[1]!.messages.at(-1) as { content: string }).content).galat).toBe("input_tidak_valid");
+  });
 });
+

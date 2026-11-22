@@ -43,6 +43,7 @@ let keyless: Awaited<ReturnType<typeof buildApp>>;
 let sari: { token: string };
 let budi: { token: string };
 let dewi: { token: string };
+let rina: { token: string };
 let halteId: string;
 const sent: Email[] = [];
 const mailer: Mailer = async (email) => {
@@ -63,6 +64,7 @@ beforeAll(async () => {
   sari = await helpers.reporter("sari@contoh.id", "Sari");
   budi = await helpers.reporter("budi@contoh.id", "Budi");
   dewi = await helpers.reporter("dewi@contoh.id", "Dewi");
+  rina = await helpers.reporter("rina@contoh.id", "Rina");
   halteId = (await placesNamed(db, "Halte contoh", 5)).find((p) => p.name === "Halte contoh")!.id;
 }, 60_000);
 
@@ -113,6 +115,14 @@ describe("POST /agent/ask", () => {
     expect(sentBody(1).messages.at(-1)).toMatchObject({ role: "tool", tool_call_id: "c1" });
   });
 
+  it("returns cards for the web and only a confirmation to the model", async () => {
+    replies = [toolCall("show_route_card", JSON.stringify({ placeId: halteId })), answer("Kartu rute ke Halte contoh sudah tampil.")];
+    const res = await ask(rina.token, { question: "Tunjukkan rute ke Halte contoh" });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().cards).toEqual([{ type: "rute", target: { kind: "aksesbogor", placeId: halteId }, name: "Halte contoh" }]);
+    expect(JSON.parse(sentBody(1).messages.at(-1).content)).toEqual({ pesan: expect.stringContaining("Kartu rute ditampilkan untuk Halte contoh") });
+  });
+
   it("returns invalid tool arguments to the model as an error instead of running the tool", async () => {
     replies = [toolCall("place_accessibility", '{"placeId":"bukan-uuid"}'), answer("Maaf, saya tidak menemukan tempat itu.")];
     const res = await ask(sari.token, { placeId: halteId, question: "Bagaimana dengan tempat lain?" });
@@ -161,6 +171,14 @@ describe("POST /agent/ask", () => {
     const refused = await ask(budi.token, { placeId: halteId, question: "Ada ramp?" });
     expect(refused.statusCode).toBe(429);
     expect(refused.json().galat).toBe("agen_terlalu_sering");
+  });
+
+  it("answers without a chosen place", async () => {
+    replies = [answer("Mulai dari kecamatan prioritas.")];
+    const res = await ask(sari.token, { question: "Saya mau bantu memetakan, mulai dari mana?" });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ answer: "Mulai dari kecamatan prioritas.", sources: [] });
+    expect(sentBody(0).messages[0].content).not.toContain("Tempat yang sedang dilihat");
   });
 
   it("validates the question, the history and the place", async () => {

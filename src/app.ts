@@ -124,7 +124,7 @@ export async function buildApp(env: Env, deps: { db?: Db; now?: () => Date; fetc
 
   app.get("/openapi.json", { schema: { hide: true } }, async () => app.swagger());
   await app.register(healthRoutes);
-  await app.register(districtRoutes);
+  await app.register(districtRoutes, { disabilityData: env.DISABILITY_DATA_ENABLED });
   await app.register(placeRoutes, { photoBaseUrl: env.PHOTO_PUBLIC_URL, now });
   const { MAPBOX_SECRET_TOKEN: secretToken, MAPBOX_USERNAME: username } = env;
   await app.register(mapRoutes, {
@@ -172,6 +172,7 @@ export async function buildApp(env: Env, deps: { db?: Db; now?: () => Date; fetc
   await app.register(agentRoutes, {
     auth,
     enabled: env.ROUTE_AGENT_ENABLED,
+    disabilityData: env.DISABILITY_DATA_ENABLED,
     walking: secretToken ? mapboxWalking({ token: secretToken, now, fetch: deps.fetch }) : undefined,
     model: env.OPENROUTER_API_KEY
       ? openRouterModel({

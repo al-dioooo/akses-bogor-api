@@ -4,7 +4,9 @@ import { HttpError } from "../http/errors.js";
 import type { KnowledgeHit } from "../knowledge/search.js";
 import type { AgentMessage, AgentModel, ToolCall } from "./model.js";
 import { guardRouteClaims, systemPrompt } from "./prompt.js";
-import { runTool, toolDefinitions } from "./registry.js";
+import type { KecamatanPriority } from "../contribute/priority.js";
+import type { PlaceCard, RouteCard } from "./cards.js";
+import { CARD_TOOLS, runTool, toolDefinitions } from "./registry.js";
 import { placeAccessibility, type ToolContext } from "./tools.js";
 
 /** Putaran alat paling banyak; langkah setelahnya meminta model menjawab tanpa alat. */
@@ -25,13 +27,18 @@ export type Turn = { role: "user" | "assistant"; content: string };
 export type Source =
   | { type: "lokasi"; placeId: string; name: string; lastVerifiedAt: string }
   | { type: "pengetahuan"; citation: string; title: string; url: string; license: string; attribution: string | null };
-export type AskResult = { answer: string; sources: Source[]; model: string | null };
+/** Kartu untuk web: tempat, rute (dihitung web dari posisi pengguna), atau prioritas kecamatan. Tidak pernah ke model. */
+export type Card = PlaceCard | RouteCard | ({ type: "prioritas" } & KecamatanPriority);
+export type AskResult = { answer: string; sources: Source[]; model: string | null; cards: Card[] };
 
 type Deps = { model: AgentModel; ctx: ToolContext; deadlineMs?: number };
 
-/** Jawaban agen untuk satu pertanyaan tentang tempat yang dipilih. Melempar 404 bila tempatnya tidak ada. */
-export async function askAgent({ model, ctx, deadlineMs = QUESTION_DEADLINE_MS }: Deps, input: { placeId: string; question: string; history?: Turn[] }): Promise<AskResult> {
-  const place = await placeAccessibility(ctx, { placeId: input.placeId });
+/**
+ * Jawaban agen untuk satu pertanyaan. `placeId` diisi bila pengguna bertanya dari halaman sebuah tempat; melempar 404
+ * bila tempatnya tidak ada.
+ */
+export async function askAgent({ model, ctx, deadlineMs = QUESTION_DEADLINE_MS }: Deps, input: { placeId?: string; question: string; history?: Turn[] }): Promise<AskResult> {
+  const place = input.placeId ? await placeAccessibility(ctx, { placeId: input.placeId }) : undefined;
   const sources = new Map<string, Source>();
   const addPlace = (p: { id: string; name: string; lastVerifiedAt: string }) =>
     sources.set(`lokasi:${p.id}`, { type: "lokasi", placeId: p.id, name: p.name, lastVerifiedAt: p.lastVerifiedAt });
@@ -42,14 +49,24 @@ export async function askAgent({ model, ctx, deadlineMs = QUESTION_DEADLINE_MS }
       sources.set(`pengetahuan:${p.citation}`, { type: "pengetahuan", citation: p.citation, title: p.source.title, url: p.source.url, license: p.source.license, attribution: p.source.attribution });
     }
   };
-  addPlace(place);
+  if (place) addPlace(place);
 
-  /** Menjalankan satu panggilan alat. Galat dan argumen yang salah dikembalikan ke model sebagai hasil alat. */
+  const cards: Card[] = [];
+  /**
+   * Menjalankan satu panggilan alat. Galat dan argumen yang salah dikembalikan ke model sebagai hasil alat. Alat kartu
+   * hanya mengembalikan `pesan` ke model; kartunya disimpan untuk web.
+   */
   const run = async (call: ToolCall): Promise<string> => {
     try {
       const result = await runTool(ctx, call.name, call.input);
-      if (call.name === "place_accessibility") addPlace(result as typeof place);
+      if (call.name === "place_accessibility") addPlace(result as { id: string; name: string; lastVerifiedAt: string });
       if (call.name === "search_knowledge") addPassages((result as { passages: KnowledgeHit[] }).passages);
+      if (call.name === "kecamatan_priority") cards.push({ type: "prioritas", ...(result as KecamatanPriority) });
+      if (CARD_TOOLS.has(call.name)) {
+        const { pesan, kartu } = result as { pesan: string; kartu: PlaceCard | RouteCard };
+        cards.push(kartu);
+        return JSON.stringify({ pesan });
+      }
       return JSON.stringify(result);
     } catch (error) {
       if (error instanceof HttpError) return JSON.stringify({ galat: error.code, pesan: error.message });
@@ -76,8 +93,13 @@ export async function askAgent({ model, ctx, deadlineMs = QUESTION_DEADLINE_MS }
       messages.push({ role: "assistant", content: "", toolCalls: [call] }, { role: "tool", toolCallId: call.id, name: call.name, content: await run(call) });
       continue;
     }
-    if (turn.kind === "answer") return { answer: guardRouteClaims(turn.text), sources: [...sources.values()], model: answeredBy };
+    if (turn.kind === "answer") return { answer: guardRouteClaims(turn.text), sources: [...sources.values()], model: answeredBy, cards };
     if (last) break;
+    if (turn.text && turn.calls.every((call) => CARD_TOOLS.has(call.name))) {
+      // Model sudah menulis jawabannya dan hanya meminta kartu: kartu ditampilkan tanpa langkah model tambahan.
+      for (const call of turn.calls.slice(0, MAX_CALLS_PER_ROUND)) await run(call);
+      return { answer: guardRouteClaims(turn.text), sources: [...sources.values()], model: answeredBy, cards };
+    }
     messages.push({ role: "assistant", content: turn.text ?? "", toolCalls: turn.calls });
     for (const [index, call] of turn.calls.entries()) {
       const content =
@@ -87,5 +109,5 @@ export async function askAgent({ model, ctx, deadlineMs = QUESTION_DEADLINE_MS }
       messages.push({ role: "tool", toolCallId: call.id, name: call.name, content });
     }
   }
-  return { answer: NO_ANSWER, sources: [...sources.values()], model: answeredBy };
+  return { answer: NO_ANSWER, sources: [...sources.values()], model: answeredBy, cards };
 }

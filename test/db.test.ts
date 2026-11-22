@@ -33,10 +33,12 @@ describe("migrations", () => {
     expect(rows.map((r) => r.table_name)).toEqual([
       "accounts",
       "audit_log",
+      "disability_counts",
       "districts",
       "knowledge_passages",
       "knowledge_sources",
       "osm_features",
+      "osm_places",
       "photo_deletions",
       "photos",
       "place_facilities",

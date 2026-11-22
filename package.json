@@ -22,6 +22,8 @@
     "pengetahuan:osm": "tsx --env-file-if-exists=.env scripts/pengetahuan/osm.ts",
     "pengetahuan:regulasi": "tsx --env-file-if-exists=.env scripts/pengetahuan/regulasi.ts",
     "pengetahuan:dokumen": "tsx --env-file-if-exists=.env scripts/pengetahuan/dokumen.ts",
+    "pengetahuan:disabilitas": "tsx --env-file-if-exists=.env scripts/pengetahuan/disabilitas.ts",
+    "pengetahuan:fasilitas": "tsx --env-file-if-exists=.env scripts/pengetahuan/fasilitas.ts",
     "agen:evaluasi": "tsx --env-file-if-exists=.env scripts/agen/evaluasi.ts"
   },
   "dependencies": {

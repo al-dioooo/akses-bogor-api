@@ -1,11 +1,13 @@
 // Daftar alat untuk model agen rute (ADR-0042) di satu tempat: nama, deskripsi untuk model, skema input dan output, dan
 // fungsinya. Route API dan adapter model memakai daftar yang sama; larik `tools` format OpenAI dibuat dari skema Zod.
-// Hanya tiga alat ini yang boleh dipanggil model. Rute jalan kaki dan hambatan di rute tidak pernah menjadi alat.
+// Hanya alat di daftar ini yang boleh dipanggil model. Rute jalan kaki dan hambatan di rute tidak pernah menjadi alat.
 import { z } from "zod";
 import { knowledgeKind, placeCategory, placeStatus } from "../db/schema.js";
 import { HttpError } from "../http/errors.js";
 import { placeDetail } from "../places/schemas.js";
-import { findPlace, placeAccessibility, searchKnowledgeTool, type ToolContext } from "./tools.js";
+import { prioritySchema } from "../routes/districts.js";
+import { cardInput, placeCardSchema, routeCardSchema, showPlaceCard, showRouteCard } from "./cards.js";
+import { findPlace, findPlacesToContribute, kecamatanPriorityTool, placeAccessibility, searchKnowledgeTool, type ToolContext } from "./tools.js";
 
 const placeId = z.uuid().describe("Id lokasi AksesBogor dari find_place");
 
@@ -68,7 +70,63 @@ const knowledgeTool = {
   run: searchKnowledgeTool,
 };
 
-export const AGENT_TOOLS = [findPlaceTool, placeAccessibilityTool, knowledgeTool] as const;
+const kecamatan = z.enum(["bogor-barat", "bogor-selatan", "bogor-tengah", "bogor-timur", "bogor-utara", "tanah-sareal"]);
+
+const contributeTool = {
+  name: "find_places_to_contribute",
+  description:
+    "Mencari tempat umum di Kota Bogor (kampus, masjid, halte, rumah sakit) dari OpenStreetMap yang belum punya data AksesBogor, untuk didatangi dan dipetakan kontributor. Urut menurut prioritas kecamatan. Bisa dibatasi kecamatan dan kategori. Data © kontributor OpenStreetMap; sebut atribusinya.",
+  input: z.object({
+    kecamatan: kecamatan.optional().describe("Slug kecamatan, mis. bogor-barat"),
+    category: z.enum(placeCategory.enumValues).optional().describe("kampus, masjid, halte, atau rumah_sakit"),
+    limit: z.number().int().min(1).max(10).optional().describe("Jumlah tempat, bawaan 5"),
+  }),
+  output: z.object({
+    places: z.array(
+      z.object({
+        osm: z.object({ osmType: z.string(), osmId: z.number().int() }).describe("Pengenal tempat untuk show_place_card dan show_route_card"),
+        name: z.string().nullable(),
+        category: z.enum(placeCategory.enumValues),
+        district: z.object({ slug: z.string(), name: z.string() }),
+        priorityRank: z.number().int().nullable().describe("Peringkat prioritas kecamatannya, atau null bila prioritas belum dibuka"),
+      }),
+    ),
+    order: z.enum(["prioritas_kecamatan", "tempat_tanpa_data_terbanyak"]),
+    attribution: z.string(),
+  }),
+  run: findPlacesToContribute,
+};
+
+const priorityTool = {
+  name: "kecamatan_priority",
+  description:
+    "Prioritas keenam kecamatan untuk kontributor: jumlah penyandang disabilitas terdaftar di Dinas Sosial (tahun terbaru), lokasi AksesBogor, tempat tanpa data, skor 0–100, dan peringkat. Selalu sampaikan `caveat` bila menyebut angka disabilitas, dan sebut sumbernya (Open Data Kota Bogor, Dinas Sosial). Jangan memakai kata \"cacat\"; pakai disabilitas fisik, netra, mental, atau lainnya.",
+  input: z.object({}),
+  output: prioritySchema,
+  run: kecamatanPriorityTool,
+};
+
+const placeCardTool = {
+  name: "show_place_card",
+  description:
+    "Menampilkan kartu sebuah tempat di layar pengguna: lokasi AksesBogor (placeId dari find_place) atau tempat OpenStreetMap (osmType dan osmId dari find_places_to_contribute). Hasilnya hanya konfirmasi; isi kartu tidak dikirim kepada Anda.",
+  input: cardInput,
+  output: z.object({ pesan: z.string(), kartu: placeCardSchema }),
+  run: showPlaceCard,
+};
+
+const routeCardTool = {
+  name: "show_route_card",
+  description:
+    "Menampilkan kartu rute jalan kaki ke sebuah tempat di layar pengguna. Aplikasi menghitung rutenya sendiri dari posisi pengguna, dengan peringatan tetap; Anda tidak menerima rute itu dan tidak boleh menilai rutenya. Input sama dengan show_place_card. Hasilnya hanya konfirmasi.",
+  input: cardInput,
+  output: z.object({ pesan: z.string(), kartu: routeCardSchema }),
+  run: showRouteCard,
+};
+
+export const AGENT_TOOLS = [findPlaceTool, placeAccessibilityTool, knowledgeTool, contributeTool, priorityTool, placeCardTool, routeCardTool] as const;
+/** Alat yang hanya menampilkan kartu di web; model menerima `pesan`-nya saja. */
+export const CARD_TOOLS: ReadonlySet<string> = new Set([placeCardTool.name, routeCardTool.name]);
 export type AgentTool = (typeof AGENT_TOOLS)[number];
 export type ToolName = AgentTool["name"];
 
