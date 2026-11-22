@@ -3,6 +3,7 @@
 // Directions, garis rute, atau hambatan yang dicari dari garis rute (Product Terms Mapbox §1.5).
 import { sql } from "drizzle-orm";
 import type { Db } from "../db/client.js";
+import type { osmFeatureKind } from "../db/schema.js";
 import { HttpError } from "../http/errors.js";
 import { OSM_ATTRIBUTION } from "../knowledge/osm.js";
 import { getPlace } from "../places/queries.js";
@@ -104,7 +105,7 @@ export function describeFeature(kind: string, tags: Record<string, string>): str
   return parts.join(", ");
 }
 
-type ObstacleRow = { osm_type: string; osm_id: number | string; kind: string; name: string | null; tags: Record<string, string>; distance: number; along: number };
+type ObstacleRow = { osm_type: string; osm_id: number | string; kind: (typeof osmFeatureKind.enumValues)[number]; name: string | null; tags: Record<string, string>; distance: number; along: number };
 
 /**
  * Fitur OSM di dekat garis rute (tangga, kerb, ramp, lift, pintu masuk, guiding block), urut dari awal rute. Hanya yang
