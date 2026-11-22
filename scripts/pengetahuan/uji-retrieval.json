@@ -1,0 +1,278 @@
+[
+  {
+    "id": "R01",
+    "jenis": "ram",
+    "pertanyaan": "Berapa kemiringan maksimal ramp di dalam gedung?",
+    "relevan": [
+      "Permen PUPR No. 14/PRT/M/2017, Lampiran II, B.2 Ram (bagian 1 dari 2)"
+    ]
+  },
+  {
+    "id": "R02",
+    "jenis": "ram, imbuhan",
+    "pertanyaan": "Seberapa miring ramp di luar bangunan yang dibolehkan?",
+    "relevan": [
+      "Permen PUPR No. 14/PRT/M/2017, Lampiran II, B.2 Ram (bagian 1 dari 2)"
+    ]
+  },
+  {
+    "id": "R03",
+    "jenis": "ram",
+    "pertanyaan": "Menurut peraturan, berapa lebar minimal ram?",
+    "relevan": [
+      "Permen PUPR No. 14/PRT/M/2017, Lampiran II, B.2 Ram (bagian 1 dari 2)"
+    ]
+  },
+  {
+    "id": "R04",
+    "jenis": "ram, sinonim, imbuhan",
+    "pertanyaan": "Apakah jalur landai yang panjang harus punya tempat beristirahat?",
+    "relevan": [
+      "Permen PUPR No. 14/PRT/M/2017, Lampiran II, B.2 Ram (bagian 1 dari 2)"
+    ]
+  },
+  {
+    "id": "R05",
+    "jenis": "ram, salah ketik",
+    "pertanyaan": "kemiringan rmap di luar gedung",
+    "relevan": [
+      "Permen PUPR No. 14/PRT/M/2017, Lampiran II, B.2 Ram (bagian 1 dari 2)"
+    ]
+  },
+  {
+    "id": "R06",
+    "jenis": "toilet",
+    "pertanyaan": "Berapa ukuran minimal toilet untuk penyandang disabilitas?",
+    "relevan": [
+      "Permen PUPR No. 14/PRT/M/2017, Lampiran III, 5 Toilet (bagian 1 dari 5)"
+    ]
+  },
+  {
+    "id": "R07",
+    "jenis": "toilet, sinonim",
+    "pertanyaan": "Ukuran WC difabel menurut aturan berapa?",
+    "relevan": [
+      "Permen PUPR No. 14/PRT/M/2017, Lampiran III, 5 Toilet (bagian 1 dari 5)"
+    ]
+  },
+  {
+    "id": "R08",
+    "jenis": "toilet, sinonim",
+    "pertanyaan": "Lebar pintu kamar mandi untuk pengguna kursi roda",
+    "relevan": [
+      "Permen PUPR No. 14/PRT/M/2017, Lampiran III, 5 Toilet (bagian 1 dari 5)"
+    ]
+  },
+  {
+    "id": "R09",
+    "jenis": "toilet, salah ketik",
+    "pertanyaan": "ukuran toliet disabilitas",
+    "relevan": [
+      "Permen PUPR No. 14/PRT/M/2017, Lampiran III, 5 Toilet (bagian 1 dari 5)"
+    ]
+  },
+  {
+    "id": "R10",
+    "jenis": "verifikasi, toilet",
+    "pertanyaan": "Kapan toilet difabel boleh dijawab Tersedia?",
+    "relevan": [
+      "Panduan Verifikasi, 4. Daftar Periksa › 4.2 Fasilitas › Toilet Difabel"
+    ]
+  },
+  {
+    "id": "R11",
+    "jenis": "guiding block",
+    "pertanyaan": "Di mana saja guiding block wajib dipasang?",
+    "relevan": [
+      "Permen PUPR No. 14/PRT/M/2017, Lampiran II, A.5 Jalur Pemandu (bagian 1 dari 2)"
+    ]
+  },
+  {
+    "id": "R12",
+    "jenis": "guiding block, sinonim",
+    "pertanyaan": "Apa beda ubin pemandu bergaris dan berbintik?",
+    "relevan": [
+      [
+        "Permen PUPR No. 14/PRT/M/2017, Lampiran II, A.5 Jalur Pemandu (bagian 1 dari 2)",
+        "Panduan Verifikasi, 4. Daftar Periksa › 4.2 Fasilitas › Guiding Block",
+        "Halaman \"Mengenal aksesibilitas\" (draf), Empat fasilitas yang kami catat"
+      ]
+    ]
+  },
+  {
+    "id": "R13",
+    "jenis": "verifikasi, guiding block",
+    "pertanyaan": "Kapan guiding block dinilai tidak tersedia oleh verifikator?",
+    "relevan": [
+      "Panduan Verifikasi, 4. Daftar Periksa › 4.2 Fasilitas › Guiding Block"
+    ]
+  },
+  {
+    "id": "R14",
+    "jenis": "hak, uu",
+    "pertanyaan": "Apa saja hak aksesibilitas penyandang disabilitas menurut UU 8 Tahun 2016?",
+    "relevan": [
+      "UU No. 8 Tahun 2016, Pasal 18"
+    ]
+  },
+  {
+    "id": "R15",
+    "jenis": "hak, uu, imbuhan",
+    "pertanyaan": "Apakah pemilik gedung yang tidak menyediakan fasilitas untuk difabel bisa dikenai sanksi?",
+    "relevan": [
+      "UU No. 8 Tahun 2016, Pasal 98"
+    ]
+  },
+  {
+    "id": "R16",
+    "jenis": "hak, uu",
+    "pertanyaan": "Apa definisi aksesibilitas dalam undang-undang?",
+    "relevan": [
+      [
+        "UU No. 8 Tahun 2016, Pasal 1 angka 8–14",
+        "Halaman \"Mengenal aksesibilitas\" (draf), Arti aksesibilitas"
+      ]
+    ]
+  },
+  {
+    "id": "R17",
+    "jenis": "hak, uu, imbuhan",
+    "pertanyaan": "Apakah pemerintah wajib menyediakan angkutan umum yang mudah diakses penyandang disabilitas?",
+    "relevan": [
+      [
+        "UU No. 8 Tahun 2016, Pasal 105",
+        "UU No. 8 Tahun 2016, Pasal 107"
+      ]
+    ]
+  },
+  {
+    "id": "R18",
+    "jenis": "status",
+    "pertanyaan": "Bagaimana status lokasi ditentukan dari jawaban fasilitas?",
+    "relevan": [
+      [
+        "ADR-0018, Keputusan › Aturan status, diperiksa berurutan",
+        "Halaman \"Mengenal aksesibilitas\" (draf), Status dimulai dari pintu masuk"
+      ]
+    ]
+  },
+  {
+    "id": "R19",
+    "jenis": "status, imbuhan",
+    "pertanyaan": "Kenapa tempat yang rampnya tidak tersedia langsung dianggap tidak aksesibel?",
+    "relevan": [
+      [
+        "ADR-0018, Keputusan › Aturan status, diperiksa berurutan",
+        "Panduan Verifikasi, 4. Daftar Periksa › 4.2 Fasilitas › Ramp / Jalur Landai (penentu pintu masuk)",
+        "Halaman \"Mengenal aksesibilitas\" (draf), Status dimulai dari pintu masuk"
+      ]
+    ]
+  },
+  {
+    "id": "R20",
+    "jenis": "belum tahu",
+    "pertanyaan": "Apa arti jawaban Belum tahu?",
+    "relevan": [
+      [
+        "ADR-0017, Keputusan",
+        "Halaman \"Mengenal aksesibilitas\" (draf), Empat jawaban untuk setiap fasilitas"
+      ]
+    ]
+  },
+  {
+    "id": "R21",
+    "jenis": "belum tahu, verifikasi, imbuhan",
+    "pertanyaan": "Verifikator harus bagaimana kalau jawaban pelapor tidak bisa dibuktikan?",
+    "relevan": [
+      [
+        "Panduan Verifikasi, 6. Keputusan › 6.1 Terbitkan",
+        "Panduan Verifikasi, 1. Prinsip"
+      ]
+    ]
+  },
+  {
+    "id": "R22",
+    "jenis": "foto",
+    "pertanyaan": "Foto ramp seperti apa yang diterima verifikator?",
+    "relevan": [
+      [
+        "Panduan Verifikasi, 5. Bukti Foto › 5.2 Foto yang Diterima dan yang Kurang",
+        "Halaman \"Tips berkunjung dan melapor\" (draf), Foto yang membantu verifikasi"
+      ]
+    ]
+  },
+  {
+    "id": "R23",
+    "jenis": "foto",
+    "pertanyaan": "Berapa banyak foto yang boleh dikirim dalam satu laporan?",
+    "relevan": [
+      [
+        "Halaman \"Tips berkunjung dan melapor\" (draf), Foto yang membantu verifikasi",
+        "Panduan Verifikasi, 5. Bukti Foto › 5.1 Foto Minimum"
+      ]
+    ]
+  },
+  {
+    "id": "R24",
+    "jenis": "foto, imbuhan",
+    "pertanyaan": "Apakah wajah orang di foto akan dikaburkan?",
+    "relevan": [
+      [
+        "Panduan Verifikasi, 8. Privasi dan Moderasi Foto",
+        "Halaman \"Tips berkunjung dan melapor\" (draf), Foto yang membantu verifikasi"
+      ]
+    ]
+  },
+  {
+    "id": "R25",
+    "jenis": "angkutan",
+    "pertanyaan": "Halte apa saja yang dilewati BisKita K1?",
+    "relevan": [
+      "OpenStreetMap, relasi rute 20237323"
+    ]
+  },
+  {
+    "id": "R26",
+    "jenis": "angkutan, sinonim",
+    "pertanyaan": "Bus apa yang berhenti di halte Kebun Raya?",
+    "relevan": [
+      "OpenStreetMap, relasi rute 20237323"
+    ]
+  },
+  {
+    "id": "R27",
+    "jenis": "angkutan, sinonim",
+    "pertanyaan": "Angkutan kota dari Sukasari ke Bubulak lewat jalan apa saja?",
+    "relevan": [
+      "OpenStreetMap, relasi rute 20236084"
+    ]
+  },
+  {
+    "id": "R28",
+    "jenis": "angkutan",
+    "pertanyaan": "rute angkot ke Pasar Anyar",
+    "relevan": [
+      [
+        "OpenStreetMap, relasi rute 15587765",
+        "OpenStreetMap, relasi rute 20397715",
+        "OpenStreetMap, relasi rute 20397717"
+      ]
+    ]
+  },
+  {
+    "id": "R29",
+    "jenis": "lift, sinonim",
+    "pertanyaan": "Berapa tinggi tombol lift dari lantai?",
+    "relevan": [
+      "Permen PUPR No. 14/PRT/M/2017, Lampiran II, B.3 Lif (bagian 2 dari 5)"
+    ]
+  },
+  {
+    "id": "R30",
+    "jenis": "lift, sinonim",
+    "pertanyaan": "Apakah gedung dua lantai wajib punya elevator?",
+    "relevan": [
+      "Permen PUPR No. 14/PRT/M/2017, Lampiran II, B.3 Lif (bagian 1 dari 5)"
+    ]
+  }
+]
