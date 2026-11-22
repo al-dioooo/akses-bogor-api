@@ -18,14 +18,24 @@ afterAll(async () => {
 });
 
 describe("tool registry", () => {
-  it("has one definition per tool, with a plain JSON Schema object", () => {
+  it("offers only the three model tools, never a route or the user's position", () => {
+    expect(AGENT_TOOLS.map((t) => t.name)).toEqual(["find_place", "place_accessibility", "search_knowledge"]);
+    expect(JSON.stringify(toolDefinitions())).not.toMatch(/"(from|lat|lng|polyline|geometry)"/);
+  });
+
+  it("builds an OpenAI-style tools array with plain JSON Schema parameters", () => {
     const definitions = toolDefinitions();
-    expect(definitions.map((d) => d.name)).toEqual(AGENT_TOOLS.map((t) => t.name));
+    expect(definitions.map((d) => d.function.name)).toEqual(AGENT_TOOLS.map((t) => t.name));
     for (const d of definitions) {
-      expect(d.inputSchema).toMatchObject({ type: "object" });
-      expect(d.inputSchema).not.toHaveProperty("$schema");
+      expect(d.type).toBe("function");
+      expect(d.function.description.length).toBeGreaterThan(40);
+      expect(d.function.parameters).toMatchObject({ type: "object" });
+      expect(d.function.parameters).not.toHaveProperty("$schema");
     }
-    expect(definitions.find((d) => d.name === "route_obstacles")!.inputSchema).toMatchObject({ required: ["polyline"] });
+    expect(definitions.find((d) => d.function.name === "place_accessibility")!.function.parameters).toMatchObject({
+      required: ["placeId"],
+      properties: { placeId: { type: "string", format: "uuid" } },
+    });
   });
 
   it("runs a tool by name after checking its input", async () => {
@@ -36,6 +46,7 @@ describe("tool registry", () => {
   it("rejects unknown tools and input that does not match the schema", async () => {
     await expect(runTool(ctx(), "hapus_semua", {})).rejects.toMatchObject({ statusCode: 404, code: "alat_tidak_dikenal" });
     await expect(runTool(ctx(), "find_place", { query: "x" })).rejects.toMatchObject({ statusCode: 400, code: "input_tidak_valid" });
-    await expect(runTool(ctx(), "walking_route", { from: { lat: "utara" }, placeId: "1" })).rejects.toMatchObject({ statusCode: 400 });
+    await expect(runTool(ctx(), "walking_route", { from: { lat: -6.6, lng: 106.8 }, placeId: "1" })).rejects.toMatchObject({ statusCode: 404 });
+    await expect(runTool(ctx(), "place_accessibility", { placeId: "1" })).rejects.toMatchObject({ statusCode: 400 });
   });
 });

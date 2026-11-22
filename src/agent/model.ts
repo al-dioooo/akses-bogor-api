@@ -1,6 +1,7 @@
-// Antarmuka kecil untuk model bahasa agen rute (ADR-0042). Fase 1 sengaja tanpa implementasi karena penyedia model
-// belum dipilih. Implementasi nanti (mis. model lewat OpenRouter, atau Claude) cukup memenuhi tipe ini: alat, route,
-// dan basis pengetahuan tidak berubah.
+// Antarmuka kecil untuk model bahasa agen rute (ADR-0042). Penyedianya model gratis lewat OpenRouter; adapternya cukup
+// memenuhi tipe ini, jadi alat, route, dan basis pengetahuan tidak berubah bila model atau penyedianya diganti.
+// Model hanya menerima pertanyaan, giliran sebelumnya, tempat yang dipilih, dan hasil alat di `registry.ts`; tidak
+// pernah koordinat pengguna atau rute.
 import type { ToolDefinition } from "./registry.js";
 
 export type ToolCall = { id: string; name: string; input: unknown };

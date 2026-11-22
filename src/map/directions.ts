@@ -1,6 +1,7 @@
-// Rute jalan kaki untuk agen rute (ADR-0042): Mapbox Directions profil `walking`, dipanggil dari server dengan token
-// rahasia yang sama dengan pencarian tempat. Jawaban Mapbox tidak disimpan di database atau log (Product Terms Mapbox
-// melarang menyimpan hasil Navigation API) dan profil ini tidak mengenal kebutuhan kursi roda.
+// Rute jalan kaki untuk halaman agen rute (ADR-0042): Mapbox Directions profil `walking`, dipanggil dari server dengan
+// token rahasia yang sama dengan pencarian tempat. Hasilnya hanya untuk ditampilkan kepada pengguna, tidak pernah
+// dikirim ke model (Product Terms Mapbox §1.5). Jawaban Mapbox tidak disimpan di database atau log (Product Terms
+// Mapbox melarang menyimpan hasil Navigation API) dan profil ini tidak mengenal kebutuhan kursi roda.
 
 export type LatLng = { lat: number; lng: number };
 
@@ -25,7 +26,11 @@ export type WalkingRoute = {
 
 export type WalkingRouter = (from: LatLng, to: LatLng) => Promise<WalkingRoute>;
 
-/** Batas harian bawaan untuk seluruh pengguna, supaya pemakaian tetap jauh di bawah kuota gratis bulanan Mapbox. */
+/**
+ * Batas harian bawaan untuk seluruh pengguna, supaya pemakaian tetap jauh di bawah kuota gratis bulanan Mapbox.
+ * Hitungannya disimpan di memori proses, jadi kembali ke nol setiap API di-restart atau di-deploy. Untuk satu proses
+ * API dengan restart yang jarang, itu cukup; bila nanti ada beberapa proses, hitungannya perlu pindah ke database.
+ */
 export const DIRECTIONS_PER_DAY = 1000;
 
 /** Batas harian tercapai; dihitung ulang tengah malam WIB. */
