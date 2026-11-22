@@ -41,6 +41,12 @@ pnpm dev               # http://localhost:8080/healthz
 | `pnpm db:generate` | Membuat migrasi Drizzle dari `src/db/schema.ts` |
 | `pnpm db:migrate` | Menjalankan migrasi ke database di `DATABASE_URL` |
 | `pnpm db:seed` | Mengosongkan data lokasi dan laporan, lalu mengisi tujuh lokasi contoh; kecamatan dan batasnya tidak dihapus; ditolak di production |
+| `pnpm pengetahuan:osm [--salinan]` | Mengambil fitur dan rute angkutan Kota Bogor dari OpenStreetMap ke basis pengetahuan agen rute (ADR-0042) |
+| `pnpm pengetahuan:regulasi [--salinan]` | Mengambil teks resmi UU No. 8 Tahun 2016 dan Permen PUPR No. 14/PRT/M/2017, dipotong per pasal dan per bagian lampiran |
+| `pnpm pengetahuan:dokumen [--salinan]` | Mengambil halaman edukasi, Panduan Verifikasi, dan ADR aturan fasilitas dan status; jalankan ulang setelah dokumen itu berubah |
+| `pnpm pengetahuan:disabilitas [--salinan]` | Mengambil jumlah penyandang disabilitas terdaftar per kecamatan dari Open Data Kota Bogor (Dinas Sosial) untuk prioritas kecamatan (ADR-0043); dipakai hanya saat `DISABILITY_DATA_ENABLED` menyala |
+| `pnpm pengetahuan:fasilitas [--salinan]` | Mengambil kampus, masjid, halte, dan rumah sakit di Kota Bogor dari OpenStreetMap sebagai calon tujuan kontributor (ADR-0043) |
+| `pnpm agen:evaluasi [K01 …]` | Menjalankan pertanyaan uji agen kontributor (`scripts/agen/pertanyaan-uji.json`) sekali ke model gratis OpenRouter sungguhan; butuh `OPENROUTER_API_KEY` di environment lokal dan memakai kuota harian, jadi jalankan seperlunya. Berhenti setelah `EVALUASI_MAKS_BERHASIL` (bawaan 14) permintaan berhasil |
 | `pnpm peran --email <email> --peran <admin\|verifikator\|pengguna>` | Mengganti peran akun yang sudah dilengkapi, mis. membuat admin pertama; dicatat di log audit sebagai `skrip` (ADR-0035) |
 
 ## Database
@@ -78,6 +84,24 @@ Kecamatan laporan dihitung dari batas enam kecamatan di `districts.boundary` (FR
 - Poligon dibangun dari garis anggota setiap relasi dengan `ST_MakeValid(ST_BuildArea(ST_Collect(...)))`, tanpa penyederhanaan, lalu ditulis dengan `ST_AsText(..., 6)`. Sebelum dipakai, periksa bahwa keenam poligon valid, tidak saling bertumpuk, dan gabungannya sama dengan batas kota.
 - Untuk memperbarui, buat migrasi baru yang menimpa `boundary` dengan `ON CONFLICT ("slug") DO UPDATE`, dan bandingkan dulu dengan batas lama.
 
+### Basis Pengetahuan Agen Rute
+
+Agen rute (ADR-0042) membaca data dari empat tabel: `knowledge_sources` (sumber, lisensi, tanggal ambil, SHA-256 unduhan), `knowledge_passages` (potongan teks untuk retrieval), `osm_features`, dan `transit_routes`. Isinya dari skrip di `scripts/pengetahuan/`, bukan dari migrasi. Setiap skrip mengganti sumbernya dalam satu transaksi, jadi aman dijalankan ulang, dan menyimpan salinan mentah unduhan di `.data/pengetahuan/` beserta alamat dan waktu ambilnya. Dengan `--salinan`, skrip memuat salinan terakhir itu tanpa mengunduh lagi dan tanpa mengubah tanggal ambil.
+
+| Perintah | Sumber | Isi |
+| --- | --- | --- |
+| `pnpm pengetahuan:osm` | Satu kueri area Overpass untuk relasi Kota Bogor (14745927) | Fitur bertag `wheelchair`, `toilets:wheelchair`, `ramp`, `kerb`, `tactile_paving`, tangga, lift, pintu masuk bertag akses, halte, dan relasi `route=bus` (BisKita dan angkot) dengan nama jalan yang dilewati |
+| `pnpm pengetahuan:regulasi` | PDF resmi UU No. 8 Tahun 2016 dari peraturan.go.id, dan ZIP resmi Permen PUPR No. 14/PRT/M/2017 dari JDIH Kementerian PU | Potongan per pasal (pasal panjang per ayat atau angka) dan per bagian Lampiran I–IV, dengan rujukan seperti "Permen PUPR No. 14/PRT/M/2017, Lampiran II, B.2 Ram" |
+| `pnpm pengetahuan:disabilitas` | Satu permintaan ke API Open Data Kota Bogor (`dinas_sosial/jmlh_pnyndng_dsblts_brdsrkn_kcmtn_jns_dsblts_d_kt_bgr`) | Jumlah terdaftar per kecamatan, tahun, dan jenis (fisik, netra, mental, lainnya; label asli sumber disimpan untuk sitasi). Syarat portal: hak pakai non-komersial pribadi, pihak ketiga perlu izin Diskominfo |
+| `pnpm pengetahuan:fasilitas` | Satu kueri area Overpass untuk relasi Kota Bogor | `amenity=university|college`, masjid (`amenity=place_of_worship` + `religion=muslim`), halte (`highway=bus_stop`, platform bus), dan `amenity=hospital`, dengan kecamatannya dari batas ADR-0034 |
+| `pnpm pengetahuan:dokumen` | Repo publik akses-bogor-web dan akses-bogor-docs di GitHub, cabang `main` | Halaman edukasi Aksesibilitas, Disabilitas, dan Tips (`messages/id.json`, masih draf menurut ADR-0041), Panduan Verifikasi, dan ADR-0017, ADR-0018, ADR-0022 tanpa bagian opsi yang tidak dipilih, dipotong per heading |
+
+- Data OSM © kontributor OpenStreetMap, berlisensi [ODbL](https://www.openstreetmap.org/copyright). Tabel `osm_features` dan `transit_routes` adalah database turunan OSM: bila isinya dibagikan ke publik dalam jumlah besar, bagikan dengan ODbL. Jawaban yang memakai data ini menyebut atribusinya.
+- Kueri tanpa `meta`, jadi tidak ada nama penyunting atau changeset. Hanya tag dalam daftar izin di `src/knowledge/osm.ts` yang disimpan; kontak, situs, dan catatan bebas dibuang.
+- Fitur di luar batas kecamatan (ADR-0034) dibuang, dan garis rute dipotong ke Kota Bogor.
+- Peraturan perundang-undangan tidak dilindungi hak cipta (UU No. 28 Tahun 2014, Pasal 42 huruf b). Salinan Berita Negara Permen PUPR di peraturan.go.id tidak dipakai karena lampirannya berupa gambar pindaian tanpa teks. Skrip berhenti tanpa mengubah data lama bila jumlah pasal yang terbaca tidak sesuai (153 dan 59), dan tidak pernah memakai salinan tidak resmi.
+- Kebijakan Overpass: jalankan paling sering sekali sehari, satu skrip pada satu waktu. Server FOSSGIS meminta User-Agent yang menyebut nama aplikasi; isi `PENGETAHUAN_USER_AGENT` sebelum menjalankan skrip secara rutin.
+
 ## Environment Variables
 
 Contoh lengkap ada di [.env.example](.env.example). Jangan commit `.env`.
@@ -90,7 +114,7 @@ Contoh lengkap ada di [.env.example](.env.example). Jangan commit `.env`.
 | `DATABASE_URL` | Ya | Koneksi PostgreSQL untuk aplikasi, `pnpm db:migrate`, dan `pnpm db:seed` |
 | `FRONTEND_ORIGINS` | Di production | Origin web yang boleh memanggil API, dipisah koma. Origin pertama juga menjadi alamat tautan di email status laporan. Di luar production, `http://localhost:*` selalu diizinkan |
 | `PHOTO_PUBLIC_URL` | Tidak | Alamat publik bucket foto Cloudflare R2. Kosong berarti `url` foto di respons bernilai `null` |
-| `MAPBOX_SECRET_TOKEN` | Tidak | Token rahasia Mapbox (`sk.`) ber-scope `tokens:write`, `styles:read`, `styles:tiles`, dan `fonts:read`, untuk `GET /map/token` (ADR-0016) dan `POST /map/search` (ADR-0032). Diisi bersama `MAPBOX_USERNAME` |
+| `MAPBOX_SECRET_TOKEN` | Tidak | Token rahasia Mapbox (`sk.`) ber-scope `tokens:write`, `styles:read`, `styles:tiles`, dan `fonts:read`, untuk `GET /map/token` (ADR-0016), `POST /map/search` (ADR-0032), dan `POST /route/walking` (Mapbox Directions tidak butuh scope tambahan; ADR-0042). Diisi bersama `MAPBOX_USERNAME` |
 | `MAPBOX_USERNAME` | Tidak | Username akun Mapbox pemilik token rahasia |
 | `BETTER_AUTH_SECRET` | Di production | Rahasia Better Auth, minimal 32 karakter: tanda tangan token sesi dan kunci HMAC kode email (ADR-0029). Kosong di development berarti memakai rahasia tetap khusus lokal; kosong di production berarti route akun menjawab 503. Mengganti nilainya mengakhiri semua sesi |
 | `BETTER_AUTH_URL` | Di production | Alamat publik API |
@@ -103,6 +127,10 @@ Contoh lengkap ada di [.env.example](.env.example). Jangan commit `.env`.
 | `R2_BUCKET_PUBLIK` | Untuk foto di production | Bucket publik di balik `PHOTO_PUBLIC_URL` untuk foto yang sudah terbit |
 | `PHOTO_STORAGE_DIR` | Tidak | Folder foto di development tanpa R2, bawaan `.data/foto`. Di production tanpa R2, unggah foto menjawab 503 |
 | `WEB_SERVER_SECRET` | Di production | Rahasia bersama dengan server Next.js, minimal 32 karakter. Bila cocok, rate limit dihitung per IP pengunjung yang dikirim web, bukan per IP Vercel |
+| `ROUTE_AGENT_ENABLED` | Tidak | `true` membuka route agen rute `/agent/*` dan rute jalan kaki `/route/*` (ADR-0042). Bawaan `false`: route menjawab 503. Biarkan mati di production sampai syarat peluncuran di ADR-0042 terpenuhi |
+| `DISABILITY_DATA_ENABLED` | Tidak | `true` membuka `GET /districts/priority` dan memakai data disabilitas Open Data Kota Bogor untuk prioritas kecamatan (ADR-0043). Bawaan `false`; biarkan mati sampai Diskominfo Kota Bogor mengizinkan pemakaiannya |
+| `OPENROUTER_API_KEY` | Tidak | API key OpenRouter untuk model agen rute (ADR-0042). Kosong berarti agen menjawab sibuk; API tetap jalan |
+| `OPENROUTER_MODELS` | Tidak | Model OpenRouter berurutan, dipisah koma; model pertama dicoba dulu. Kosong berarti daftar bawaan API |
 
 ## Endpoint
 
@@ -110,6 +138,8 @@ Contoh lengkap ada di [.env.example](.env.example). Jangan commit `.env`.
 | --- | --- | --- |
 | `GET /healthz` | Cek server hidup | |
 | `GET /districts` | Enam kecamatan dengan jumlah lokasi | FR-03 |
+| `GET /districts/boundaries` | Batas keenam kecamatan sebagai GeoJSON yang disederhanakan, dengan atribusi OpenStreetMap; boleh di-cache sehari | ADR-0034, ADR-0043 |
+| `GET /districts/priority` | Skor prioritas kecamatan untuk kontributor dari jumlah penyandang disabilitas terdaftar (Dinsos, tahun terbaru) dan kekurangan data AksesBogor, dengan catatan batas data dan sumber; 503 selama `DISABILITY_DATA_ENABLED` mati | ADR-0043 |
 | `GET /places` | Daftar lokasi: pencarian `q`, filter `category`, `district`, `facility`, `status` (dipisah koma), `limit`, `offset` | FR-02 sampai FR-04 |
 | `GET /places/map` | GeoJSON untuk Mapbox dengan filter yang sama dan `bbox` | FR-05 |
 | `GET /places/stats` | Jumlah per kategori, pintu masuk tanpa tangga, dan kontributor | FR-01 |
@@ -141,10 +171,19 @@ Contoh lengkap ada di [.env.example](.env.example). Jangan commit `.env`.
 | `POST /verifier/reports/{id}/reject` | Tolak dengan alasan R1–R5; foto laporan dihapus; email ke pelapor | FR-32, FR-40 |
 | `GET /verifier/places/recheck` | Lokasi yang terakhir diverifikasi lebih dari 12 bulan lalu, terlama dulu | FR-38 |
 | `POST /reports` | Kirim laporan baru, perubahan, atau kekurangan ke antrean verifikasi dengan foto yang sudah diunggah; kecamatan dihitung ulang; kunci draf mencegah laporan ganda; 20 laporan per 24 jam dan 30 laporan menunggu per akun | FR-20 sampai FR-27 |
+| `GET /agent/tools` | Larik `tools` format OpenAI untuk ketiga alat yang boleh dipanggil model | FR-60, ADR-0042 |
+| `POST /agent/tools/find_place` | Lokasi AksesBogor bernama mirip, paling banyak 5 | FR-60 |
+| `POST /agent/tools/place_accessibility` | Status, jawaban fasilitas terverifikasi, dan tanggal verifikasi terakhir sebuah lokasi, tanpa koordinat | FR-60 |
+| `POST /agent/tools/search_knowledge` | Potongan regulasi, dokumen AksesBogor, dan rute angkutan dengan sitasi, sumber, dan lisensi | FR-60 |
+| `POST /agent/ask` | Pertanyaan kontributor (tempat yang perlu dipetakan, data terverifikasi, regulasi), dijawab model gratis lewat OpenRouter dengan sumbernya; model tidak menerima posisi atau rute; 5 pertanyaan per akun per hari, 503 `agen_sibuk` bila kuota habis | FR-60, ADR-0043 |
+| `POST /route/walking` | Rute jalan kaki Mapbox dari posisi pengguna ke pin lokasi AksesBogor atau ke tempat OpenStreetMap tanpa data (kartu rute untuk kontributor), dengan peringatan tetap dan atribusi, hanya untuk browser pengguna; 30 per akun per jam, 1.000 per hari | FR-60, ADR-0042 |
+| `POST /route/obstacles` | Tangga, kerb, ramp, lift, pintu masuk, dan guiding block OSM dalam 20 m (maks. 50 m) dari garis rute, hanya untuk browser pengguna | FR-60, ADR-0042 |
 
 Route akun dipanggil server Next.js, bukan browser. Masuk menjawab token sesi bertanda tangan; web menyimpannya di cookie `HttpOnly` miliknya dan mengirimnya balik sebagai `Authorization: Bearer` (ADR-0029). Batas kode: 60 detik dan 5 kode per email per jam, 10 permintaan dan 30 percobaan kode per klien per 15 menit. Sesi berakhir 30 hari setelah terakhir dipakai, atau 90 hari setelah masuk. Setiap jam API menghapus akun yang tidak dilengkapi dalam 24 jam (dan tidak punya laporan), sesi kedaluwarsa, dan kode kedaluwarsa. Saat akun dihapus, berkas foto yang ikut terhapus, termasuk unggahan yang belum dipasang ke laporan, dicatat di tabel `photo_deletions`. Setiap jam API memindahkan unggahan yang tidak dipasang dalam 24 jam ke antrean itu, lalu menghapus berkas di antrean dari R2 (`src/photos/cleanup.ts`); berkas yang gagal dihapus dicoba lagi jam berikutnya. Di development tanpa `RESEND_API_KEY`, kode masuk dicetak ke log API.
 
 Panel verifikator (ADR-0035 sampai ADR-0037) membaca dan memutuskan laporan lewat route `/verifier/*`, semuanya khusus verifikator dan admin, tanpa laporan sendiri, dan hanya dengan nama tampilan pelapor. Setiap keputusan mengunci baris laporan, jadi keputusan kedua menjawab 409. Terbitkan menyalin foto yang tidak disembunyikan dari bucket privat ke `lokasi/<id lokasi>/<id foto>.webp` di bucket publik, dengan area kabur dari `src/photos/blur.ts`, lalu menghapus berkas asli; foto laporan yang ditolak ikut dihapus. Perubahan data dicatat di `audit_log` tanpa data pribadi (ADR-0038). Setiap jam API juga menolak laporan klarifikasi yang tidak dijawab sampai tenggat 7 × 24 jam dengan alasan R6 (`src/verification/jobs.ts`); tidak ada timer systemd tambahan. Email status laporan (diterbitkan, ditolak, klarifikasi) diantrekan di `report_emails` bersama keputusannya, dikirim setelah transaksi selesai, dan yang gagal dicoba lagi setiap jam selama 3 hari (ADR-0039). Tautannya memakai origin pertama di `FRONTEND_ORIGINS`.
+
+Agen rute (ADR-0042) punya dua jenis pemanggil. Alat untuk model ada di `src/agent/`: fungsinya di `tools.ts`, dan nama, deskripsi, skema input, dan skema output ketiga alat di `registry.ts`, yang juga membuat larik `tools` format OpenAI dan dipakai route `/agent/tools/*`. Tidak ada alat yang menerima posisi pengguna atau mengembalikan rute. Rute jalan kaki dan hambatan di dekatnya ada di `src/map/walking-route.ts` dan hanya dilayani untuk browser pengguna lewat `/route/*`, karena Product Terms Mapbox §1.5 melarang memakai hasil Directions untuk menjalankan AI. Rute memakai Mapbox Directions profil `walking` dengan `MAPBOX_SECRET_TOKEN`; posisi pengguna dibulatkan ke 4 desimal, dan jawaban Mapbox tidak disimpan atau dicatat di log. Semua route ini hanya untuk akun yang sudah dilengkapi, mati selama `ROUTE_AGENT_ENABLED` tidak `true`, dan berbagi batas 120 permintaan per akun per jam. `model.ts` berisi antarmuka model, dan `openrouter.ts` adapternya: daftar model gratis berurutan (bawaan di kode, bisa diganti `OPENROUTER_MODELS`), paling banyak 3 model per permintaan lewat parameter `models`, lalu kelompok berikutnya bila semuanya gagal (ADR-0043). Alat untuk model juga mencakup `find_places_to_contribute` dan `kecamatan_priority` (ADR-0043), serta alat kartu `show_place_card` dan `show_route_card` (`cards.ts`): model hanya menerima konfirmasi singkat, sedangkan isi kartu, termasuk lokasi tempat, dikirim ke web di `cards` jawaban `POST /agent/ask`. Kartu rute hanya berisi tujuan; web menghitung rutenya sendiri dari posisi pengguna. `POST /agent/ask` menjalankan `ask.ts`: data terverifikasi tempat yang dipilih masuk instruksi sistem (`prompt.ts`), model boleh memanggil alat paling banyak 3 putaran, argumen setiap panggilan diperiksa skema Zod, dan jawaban yang menyebut rute aksesibel dipotong. Batas harian ada di `limits.ts`: 45 permintaan OpenRouter yang berhasil per hari untuk semua pengguna (yang gagal tidak dihitung, sama dengan OpenRouter) dan 5 pertanyaan per akun, disimpan di memori proses. Tidak ada percakapan yang disimpan, dan isi pertanyaan atau jawaban tidak dicatat di log.
 
 Status lokasi dan ringkasannya dihitung dengan aturan "pintu masuk dulu" di `src/domain/status.ts` (ADR-0018) dan disimpan di tabel `places`; panggil `refreshPlaceStatus` setiap kali jawaban fasilitas berubah. Respons memakai nilai enum produk (mis. `sebagian`, `tidak_tersedia`); teks untuk pengguna disusun di web.
 
