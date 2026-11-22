@@ -5,6 +5,7 @@ import { ROUTE_CLAIM_NOTE } from "../src/agent/prompt.js";
 import type { Db } from "../src/db/client.js";
 import { seedSampleData } from "../src/db/seed.js";
 import { insertPassages, replaceSource } from "../src/knowledge/store.js";
+import { loadDisabilityCounts, parseDisabilityCounts } from "../src/contribute/disability.js";
 import { loadFacilities, parseFacilities } from "../src/contribute/facilities.js";
 import { placesNamed } from "../src/places/queries.js";
 import { createTestDb } from "./helpers/db.js";
@@ -209,6 +210,16 @@ describe("askAgent", () => {
     const result = await askAgent({ model, ctx: ctx() }, { question: "Rute" });
     expect(result.cards).toEqual([]);
     expect(JSON.parse((steps[1]!.messages.at(-1) as { content: string }).content).galat).toBe("input_tidak_valid");
+  });
+
+  it("shows the priority card and cites the open data source", async () => {
+    const slugs = ["bogor-barat", "bogor-selatan", "bogor-tengah", "bogor-timur", "bogor-utara", "tanah-sareal"];
+    const rows = slugs.map((slug) => ({ bps_nama_kecamatan: slug.replace("-", " ").toUpperCase(), jenis_disabilitas: "CACAT NETRA", jumlah: 3, tahun: 2024 }));
+    await loadDisabilityCounts(db, parseDisabilityCounts({ data: rows }, slugs), { retrievedAt: now(), sha256: "d".repeat(64) });
+    const { model } = scripted({ kind: "tool_calls", calls: [{ id: "p1", name: "kecamatan_priority", input: {} }] }, { kind: "answer", text: "Mulai dari peringkat pertama." });
+    const result = await askAgent({ model, ctx: { db, now, disabilityData: true } }, { question: "Kecamatan mana dulu?" });
+    expect(result.cards).toMatchObject([{ type: "prioritas", year: 2024 }]);
+    expect(result.sources).toContainEqual(expect.objectContaining({ type: "pengetahuan", citation: expect.stringContaining("Penyandang Disabilitas"), attribution: expect.stringContaining("Dinas Sosial") }));
   });
 });
 
