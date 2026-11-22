@@ -2,6 +2,7 @@
 import { sql } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import type { knowledgeKind } from "../db/schema.js";
+import { SYNONYM_GROUPS } from "./sinonim.js";
 import { stem } from "./stemmer.js";
 
 export type KnowledgeKind = (typeof knowledgeKind.enumValues)[number];
@@ -41,15 +42,51 @@ const STOPWORDS = new Set(
   ).split(" "),
 );
 
+const wordsOf = (text: string) => text.normalize("NFKC").toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
+const searchable = (word: string) => !STOPWORDS.has(word) && (word.length > 1 || /\d/.test(word));
+
 /** Kata dari pertanyaan: huruf kecil, hanya huruf dan angka, tanpa kata umum dan duplikat. */
 export function queryTerms(query: string): string[] {
-  const words = query.normalize("NFKC").toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
-  const terms = words.filter((word) => !STOPWORDS.has(word) && (word.length > 1 || /\d/.test(word)));
-  return [...new Set(terms)].slice(0, MAX_TERMS);
+  return [...new Set(wordsOf(query).filter(searchable))].slice(0, MAX_TERMS);
 }
 
 /** Kata hanya berisi huruf dan angka, jadi aman disusun menjadi teks `tsquery`. */
 const tsTerm = (term: string) => (term.length >= PREFIX_FROM && /^\p{L}+$/u.test(term) ? `${term}:*` : term);
+
+/** Satu hal yang dicari: teks `tsquery` untuk kolom `search` (kata apa adanya) dan `search_stem` (bentuk dasar). */
+export type Concept = { exact: string; stem: string };
+
+/** Ungkapan di daftar padanan dalam bentuk dasar, yang terpanjang lebih dulu supaya "jalur pemandu" menang atas "jalur". */
+const SYNONYMS = SYNONYM_GROUPS.flatMap((group) => group.map((phrase) => ({ group, stems: phrase.split(" ").map(stem) }))).sort(
+  (a, b) => b.stems.length - a.stems.length,
+);
+const anyOf = (queries: readonly string[]) => queries.map((q) => `(${q})`).join(" | ");
+const phraseQuery = (phrase: string, word: (w: string) => string) => phrase.split(" ").map(word).join(" <-> ");
+
+/**
+ * Hal-hal yang dicari dari pertanyaan. Ungkapan di daftar padanan (`sinonim.ts`, ADR-0044), dikenali dalam bentuk
+ * dasarnya, menjadi satu hal beserta semua padanannya: "jalur landai" dicari sebagai ram, ramp, jalur landai, atau bidang
+ * miring, dan ungkapan beberapa kata dicocokkan sebagai frasa. Kata lain menjadi satu hal masing-masing, tanpa kata
+ * umum dan duplikat.
+ */
+export function queryConcepts(query: string): Concept[] {
+  const words = wordsOf(query);
+  const stems = words.map(stem);
+  const concepts = new Map<string, Concept>();
+  for (let i = 0; i < words.length; ) {
+    const synonym = SYNONYMS.find((s) => s.stems.every((part, k) => stems[i + k] === part));
+    if (synonym) {
+      const { group } = synonym;
+      concepts.set(group[0]!, { exact: anyOf(group.map((p) => phraseQuery(p, tsTerm))), stem: anyOf(group.map((p) => phraseQuery(p, stem))) });
+      i += synonym.stems.length;
+      continue;
+    }
+    const word = words[i]!;
+    if (searchable(word)) concepts.set(word, { exact: tsTerm(word), stem: stems[i]! });
+    i += 1;
+  }
+  return [...concepts.values()].slice(0, MAX_TERMS);
+}
 
 type Row = {
   citation: string;
@@ -87,10 +124,11 @@ const toHit = (r: Row): KnowledgeHit => ({
 /**
  * Potongan teks yang paling cocok dengan pertanyaan, beserta sumber, lisensi, dan sitasinya.
  *
- * Setiap kata pertanyaan cocok bila kata itu ada apa adanya di kolom `search` (kata 4 huruf atau lebih sebagai awalan)
- * atau bentuk dasarnya ada di kolom `search_stem` (ADR-0044), jadi "miring" juga menemukan "kemiringan". Kata-kata
- * digabung dengan OR, lalu diurutkan menurut jumlah kata yang cocok, kemudian rata-rata `ts_rank_cd` kedua kolom (selalu
- * di bawah 1, jadi hanya memisahkan potongan dengan jumlah kata cocok yang sama), dengan sitasi dan judul berbobot lebih
+ * Pertanyaan dipecah menjadi hal-hal yang dicari (`queryConcepts`): kata, atau ungkapan beserta padanannya. Setiap hal
+ * cocok bila ada apa adanya di kolom `search` (kata 4 huruf atau lebih sebagai awalan) atau dalam bentuk dasarnya di
+ * kolom `search_stem` (ADR-0044), jadi "miring" juga menemukan "kemiringan" dan "WC" menemukan "toilet". Semuanya
+ * digabung dengan OR, lalu diurutkan menurut jumlah hal yang cocok, kemudian rata-rata `ts_rank_cd` kedua kolom (selalu
+ * di bawah 1, jadi hanya memisahkan potongan dengan jumlah hal cocok yang sama), dengan sitasi dan judul berbobot lebih
  * tinggi daripada isi. Bila tidak ada yang cocok sama sekali, misalnya karena salah ketik,
  * dipakai kemiripan kata `pg_trgm`.
  */
@@ -103,15 +141,14 @@ export async function searchKnowledge(db: Db, query: string, opts: { limit?: num
   const kindFilter = kinds ? sql`AND s.kind::text IN (${list(kinds)})` : sql``;
   const columns = sql`p.citation, p.heading, p.body, s.id AS source_id, s.kind, s.title, s.url, s.license, s.attribution, s.retrieved_at`;
 
-  const exact = terms.map(tsTerm);
-  const stems = terms.map(stem);
+  const concepts = queryConcepts(query);
   const pairs = sql.join(
-    terms.map((_, i) => sql`(to_tsquery('simple', ${exact[i]}), to_tsquery('simple', ${stems[i]}))`),
+    concepts.map((c) => sql`(to_tsquery('simple', ${c.exact}), to_tsquery('simple', ${c.stem}))`),
     sql`, `,
   );
   const fullText = await db.execute(sql`
     WITH t(exact, stem) AS (VALUES ${pairs}),
-      q AS (SELECT to_tsquery('simple', ${exact.join(" | ")}) AS exact, to_tsquery('simple', ${stems.join(" | ")}) AS stem)
+      q AS (SELECT to_tsquery('simple', ${anyOf(concepts.map((c) => c.exact))}) AS exact, to_tsquery('simple', ${anyOf(concepts.map((c) => c.stem))}) AS stem)
     SELECT ${columns},
       (SELECT count(*) FROM t WHERE p.search @@ t.exact OR p.search_stem @@ t.stem)
         + (ts_rank_cd(p.search, q.exact, ${RANK_NORMALIZATION}) + ts_rank_cd(p.search_stem, q.stem, ${RANK_NORMALIZATION})) / 2 AS score

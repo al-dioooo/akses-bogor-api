@@ -2,7 +2,7 @@ import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Db } from "../src/db/client.js";
 import { knowledgePassages, knowledgeSources } from "../src/db/schema.js";
-import { queryTerms, searchKnowledge } from "../src/knowledge/search.js";
+import { queryConcepts, queryTerms, searchKnowledge } from "../src/knowledge/search.js";
 import { insertPassages, reindexStems, replaceSource } from "../src/knowledge/store.js";
 import { createTestDb } from "./helpers/db.js";
 
@@ -67,6 +67,31 @@ describe("queryTerms", () => {
   });
 });
 
+describe("queryConcepts", () => {
+  it("turns a phrase from the synonym list into one concept with all its synonyms", () => {
+    const concepts = queryConcepts("Apakah jalur landai harus punya bordes?");
+    expect(concepts).toHaveLength(3);
+    expect(concepts[0]!.exact).toBe("(ram) | (ramp:*) | (jalur:* <-> landai:*) | (bidang:* <-> miring:*)");
+    expect(concepts[0]!.stem).toBe("(ram) | (ramp) | (jalur <-> landai) | (bidang <-> miring)");
+    expect(concepts.slice(1)).toEqual([
+      { exact: "punya:*", stem: "punya" },
+      { exact: "bordes:*", stem: "bordes" },
+    ]);
+  });
+
+  it("recognises synonyms in their affixed forms and keeps other words with their stems", () => {
+    const concepts = queryConcepts("Ukuran WC difabel yang dibolehkan");
+    expect(concepts.map((c) => c.stem.split(" | ")[0])).toEqual(["ukur", "(toilet)", "(difabel)", "boleh"]);
+    expect(queryConcepts("toiletnya")[0]!.stem).toContain("(kamar <-> mandi)");
+  });
+
+  it("matches regulation wording for limits, including phrases made of common words", () => {
+    const [limit, ...rest] = queryConcepts("tidak lebih dari 18 cm");
+    expect(limit!.exact).toContain("(maksimal:*)");
+    expect(rest.map((c) => c.exact)).toEqual(["18", "cm"]);
+  });
+});
+
 describe("searchKnowledge", () => {
   it("returns matching passages with source, licence, citation and retrieval date", async () => {
     const hits = await searchKnowledge(db, "hak aksesibilitas fasilitas publik");
@@ -118,6 +143,13 @@ describe("searchKnowledge", () => {
     await db.execute(sql`UPDATE knowledge_passages SET search_stem = ''::tsvector`);
     expect((await searchKnowledge(db, "kemiringan"))[0]?.citation).toBe("Panduan Verifikasi, bagian 5.4");
     await reindexStems(db);
+  });
+
+  it("finds passages that use a synonym of the question's words", async () => {
+    const source = { ...uu, id: "uji-padanan", title: "Uji padanan" };
+    await replaceSource(db, source, (tx) => insertPassages(tx, source.id, [{ citation: "Uji padanan, toilet", body: "Lebar pintu toilet paling sedikit 90 cm." }]));
+    const hits = await searchKnowledge(db, "lebar minimal pintu kamar mandi");
+    expect(hits[0]?.citation).toBe("Uji padanan, toilet");
   });
 
   it("filters by source kind", async () => {
