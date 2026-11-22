@@ -97,7 +97,7 @@ describe("loadEnv", () => {
 
   it("uses Claude for the agent by default, with optional model and effort, and a configurable daily cap", () => {
     const base = { DATABASE_URL: "postgresql://test:test@localhost:5432/test" };
-    const plain = loadEnv({ ...base, ANTHROPIC_API_KEY: "", ANTHROPIC_MODEL: "", ANTHROPIC_EFFORT: "" });
+    const plain = loadEnv({ ...base, AGENT_PROVIDER: "", AGENT_REQUESTS_PER_DAY: "", ANTHROPIC_API_KEY: "", ANTHROPIC_MODEL: "", ANTHROPIC_EFFORT: "" });
     expect(plain).toMatchObject({ AGENT_PROVIDER: "anthropic", AGENT_REQUESTS_PER_DAY: 45 });
     expect(plain.ANTHROPIC_API_KEY ?? plain.ANTHROPIC_MODEL ?? plain.ANTHROPIC_EFFORT).toBeUndefined();
     const set = loadEnv({ ...base, AGENT_PROVIDER: "openrouter", AGENT_REQUESTS_PER_DAY: "200", ANTHROPIC_API_KEY: "sk-ant-tes", ANTHROPIC_EFFORT: "medium" });

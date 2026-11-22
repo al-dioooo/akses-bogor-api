@@ -13,6 +13,8 @@ const csv = (fallback = "") =>
     );
 
 const optional = <T extends z.ZodType>(type: T) => z.preprocess((value) => (value === "" ? undefined : value), type.optional());
+/** Nilai kosong di file env, mis. `AGENT_REQUESTS_PER_DAY=`, berarti bawaan. */
+const orDefault = <T extends z.ZodType>(type: T) => z.preprocess((value) => (value === "" ? undefined : value), type);
 
 const R2_KEYS = ["R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET_LAPORAN", "R2_BUCKET_PUBLIK"] as const;
 
@@ -69,9 +71,9 @@ const schema = z
      * Penyedia model agen (ADR-0047): `anthropic` untuk Claude API, atau `openrouter`. Tidak ada cadangan otomatis ke
      * penyedia lain; pertanyaan hanya dikirim ke penyedia yang dipilih di sini.
      */
-    AGENT_PROVIDER: z.enum(["anthropic", "openrouter"]).default("anthropic"),
+    AGENT_PROVIDER: orDefault(z.enum(["anthropic", "openrouter"]).default("anthropic")),
     /** Permintaan ke model yang berhasil per hari UTC untuk semua pengguna. Bawaan 45. */
-    AGENT_REQUESTS_PER_DAY: z.coerce.number().int().min(1).default(DEFAULT_REQUESTS_PER_DAY),
+    AGENT_REQUESTS_PER_DAY: orDefault(z.coerce.number().int().min(1).default(DEFAULT_REQUESTS_PER_DAY)),
     /** API key Claude API untuk model agen (ADR-0047). Kosong berarti agen menjawab sibuk; API tetap jalan. */
     ANTHROPIC_API_KEY: optional(z.string().startsWith("sk-ant-")),
     /** Model Claude untuk agen. Kosong berarti `claude-haiku-5-5`. */
