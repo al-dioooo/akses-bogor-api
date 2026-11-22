@@ -172,6 +172,7 @@ export async function buildApp(env: Env, deps: { db?: Db; now?: () => Date; fetc
   await app.register(agentRoutes, {
     auth,
     enabled: env.ROUTE_AGENT_ENABLED,
+    disabilityData: env.DISABILITY_DATA_ENABLED,
     walking: secretToken ? mapboxWalking({ token: secretToken, now, fetch: deps.fetch }) : undefined,
     model: env.OPENROUTER_API_KEY
       ? openRouterModel({

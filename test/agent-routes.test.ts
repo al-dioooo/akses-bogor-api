@@ -122,11 +122,11 @@ describe("access", () => {
 });
 
 describe("GET /agent/tools", () => {
-  it("lists the three model tools as an OpenAI-style tools array", async () => {
+  it("lists the model tools as an OpenAI-style tools array", async () => {
     const res = await app.inject({ method: "GET", url: "/agent/tools", headers: { authorization: `Bearer ${sari.token}` } });
     expect(res.statusCode).toBe(200);
     const { tools } = res.json() as { tools: { type: string; function: { name: string; description: string; parameters: { type: string; required: string[]; $schema?: string } } }[] };
-    expect(tools.map((t) => t.function.name)).toEqual(["find_place", "place_accessibility", "search_knowledge"]);
+    expect(tools.map((t) => t.function.name)).toEqual(["find_place", "place_accessibility", "search_knowledge", "find_places_to_contribute", "kecamatan_priority"]);
     expect(tools.every((t) => t.type === "function" && t.function.description.length > 40 && !t.function.parameters.$schema)).toBe(true);
     expect(tools.find((t) => t.function.name === "place_accessibility")!.function.parameters).toMatchObject({ type: "object", required: ["placeId"] });
   });
