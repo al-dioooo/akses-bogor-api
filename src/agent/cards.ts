@@ -23,6 +23,7 @@ export const placeCardSchema = z.union([
     district,
     status: z.enum(placeStatus.enumValues),
     lastVerifiedAt: z.iso.datetime(),
+    verifiedBy: z.enum(["tim", "admin"]).describe("`admin`: diterbitkan langsung oleh admin, tanpa pemeriksaan orang kedua (ADR-0050)"),
   }),
   z.object({
     type: z.literal("tempat"),
@@ -63,6 +64,7 @@ export async function placeCard(ctx: ToolContext, input: z.infer<typeof cardInpu
       district: place.district,
       status: place.status,
       lastVerifiedAt: place.lastVerifiedAt,
+      verifiedBy: place.verifiedBy,
     };
   }
   const place = await getOsmPlace(ctx.db, { osmType: input.osmType!, osmId: input.osmId! });
