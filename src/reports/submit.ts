@@ -76,10 +76,11 @@ async function checkLimits(db: Db, reporterId: string, now: Date) {
  * untuk perubahan dan kekurangan (FR-27), dan foto yang diunggah akun ini dipasang beserta tag, keterangan, dan teks
  * alternatifnya. `created` salah berarti laporan dengan kunci draf yang sama sudah ada dan dikembalikan apa adanya.
  */
-export async function submitReport(db: Db, reporterId: string, body: ReportBody, now: Date) {
+export async function submitReport(db: Db, reporterId: string, body: ReportBody, now: Date, opts: { skipLimits?: boolean } = {}) {
   const repeat = await existing(db, reporterId, body.submissionKey);
   if (repeat) return { report: repeat, created: false };
-  await checkLimits(db, reporterId, now);
+  // Batas per akun tidak berlaku untuk admin yang menerbitkan langsung (ADR-0050).
+  if (!opts.skipLimits) await checkLimits(db, reporterId, now);
 
   let place: { name: string; category: NonNullable<ReportBody["category"]>; location: { lat: number; lng: number }; landmark: string | null } | null = null;
   if (body.placeId) {

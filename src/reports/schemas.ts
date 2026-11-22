@@ -50,7 +50,7 @@ export const paragraph = (max: number) =>
     .max(max)
     .regex(/^(?:[^\p{C}]|[\n\r\t])+$/u);
 
-const facilityInput = z
+export const facilityInput = z
   .object({
     facility: z.enum(facilityKind.enumValues),
     answer: z.enum(facilityAnswer.enumValues).describe("Bawaan di formulir: belum_tahu (ADR-0017)"),
@@ -59,7 +59,7 @@ const facilityInput = z
   })
   .refine((f) => !f.reason || f.answer === "tidak_tersedia", { message: "Alasan hanya untuk Tidak tersedia", path: ["reason"] });
 
-const photoInput = z.object({
+export const photoInput = z.object({
   id: z.uuid().describe("Id dari `POST /reports/photos`"),
   tag: z.enum(photoTag.enumValues).describe("Objek di foto (ADR-0023)"),
   caption: line(200).optional().describe("Deskripsi tambahan untuk foto"),
