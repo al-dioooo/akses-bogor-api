@@ -85,4 +85,13 @@ describe("loadEnv", () => {
     expect(() => loadEnv({ ...base, ...r2, R2_SECRET_ACCESS_KEY: "" })).toThrow(/R2_ACCOUNT_ID/);
     expect(() => loadEnv({ ...base, ...r2, R2_ACCOUNT_ID: "bukan-id" })).toThrow(/R2_ACCOUNT_ID/);
   });
+
+  it("starts without OpenRouter settings and splits the model list in order", () => {
+    const base = { DATABASE_URL: "postgresql://test:test@localhost:5432/test" };
+    const empty = loadEnv({ ...base, OPENROUTER_API_KEY: "", OPENROUTER_MODELS: "" });
+    expect(empty.OPENROUTER_API_KEY).toBeUndefined();
+    expect(empty.OPENROUTER_MODELS).toEqual([]);
+    expect(loadEnv({ ...base, OPENROUTER_MODELS: "vendor/a:free, vendor/b:free," }).OPENROUTER_MODELS).toEqual(["vendor/a:free", "vendor/b:free"]);
+    expect(() => loadEnv({ ...base, OPENROUTER_API_KEY: "sk-ant-salah-tempat" })).toThrow(/OPENROUTER_API_KEY/);
+  });
 });
