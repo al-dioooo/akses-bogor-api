@@ -47,6 +47,7 @@ export async function placeAccessibility(ctx: ToolContext, input: { placeId: str
     because: place.because,
     facilities: place.facilities,
     lastVerifiedAt: place.lastVerifiedAt,
+    verifiedBy: place.verifiedBy,
     needsRecheck: place.needsRecheck,
   };
 }

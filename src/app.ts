@@ -20,11 +20,14 @@ import { QUESTIONS_PER_ACCOUNT_PER_DAY, dailyLimit } from "./agent/limits.js";
 import { agentModel } from "./agent/provider.js";
 import { mapboxWalking } from "./map/directions.js";
 import { mapboxSearch } from "./map/search.js";
+import { googleHints } from "./hints/google.js";
+import { mapboxHints } from "./hints/mapbox.js";
 import { mapTokenSource } from "./map/token.js";
 import { schedulePhotoCleanup } from "./photos/cleanup.js";
 import { scheduleVerificationJobs } from "./verification/jobs.js";
 import { localStore, r2Store, type PhotoStore } from "./photos/storage.js";
 import { adminRoutes } from "./routes/admin.js";
+import { adminPlaceRoutes } from "./routes/admin-places.js";
 import { agentRoutes } from "./routes/agent.js";
 import { assistantRoutes } from "./routes/assistant.js";
 import { authRoutes } from "./routes/auth.js";
@@ -33,6 +36,7 @@ import { healthRoutes } from "./routes/health.js";
 import { mapRoutes } from "./routes/map.js";
 import { meRoutes } from "./routes/me.js";
 import { placeRoutes } from "./routes/places.js";
+import { hintRoutes } from "./routes/hints.js";
 import { reportRoutes } from "./routes/reports.js";
 import { verifierRoutes } from "./routes/verifier.js";
 
@@ -133,6 +137,14 @@ export async function buildApp(env: Env, deps: { db?: Db; now?: () => Date; fetc
     mapToken: secretToken && username ? mapTokenSource({ secretToken, username, now, fetch: deps.fetch }) : undefined,
     search: secretToken ? mapboxSearch({ token: secretToken, now, fetch: deps.fetch }) : undefined,
   });
+  // Petunjuk aksesibilitas langsung dari penyedia (ADR-0052): mati bawaan, Google hanya dengan kuncinya sendiri.
+  const hintProviders = env.PROVIDER_HINTS_ENABLED
+    ? [
+        ...(secretToken ? [mapboxHints({ token: secretToken, now, fetch: deps.fetch, perDay: env.PROVIDER_HINTS_MAPBOX_PER_DAY })] : []),
+        ...(env.GOOGLE_MAPS_API_KEY ? [googleHints({ apiKey: env.GOOGLE_MAPS_API_KEY, now, fetch: deps.fetch, perDay: env.PROVIDER_HINTS_GOOGLE_PER_DAY })] : []),
+      ]
+    : [];
+  await app.register(hintRoutes, { providers: hintProviders, stored: env.PROVIDER_HINTS_ENABLED, now });
 
   // Akun (ADR-0029) dan email (ADR-0030).
   const development = env.NODE_ENV === "development";
@@ -165,6 +177,7 @@ export async function buildApp(env: Env, deps: { db?: Db; now?: () => Date; fetc
         ? localStore(env.PHOTO_STORAGE_DIR ?? ".data/foto")
         : undefined);
   await app.register(reportRoutes, { auth, store: photoStore, now });
+  await app.register(adminPlaceRoutes, { auth, photoBaseUrl: env.PHOTO_PUBLIC_URL, store: photoStore, now });
   // Tautan di email status laporan memakai origin web pertama (ADR-0039).
   const reportEmail = { mailer, webUrl: env.FRONTEND_ORIGINS[0] ?? "http://localhost:3000" };
   await app.register(verifierRoutes, { auth, photoBaseUrl: env.PHOTO_PUBLIC_URL, store: photoStore, email: reportEmail, now });

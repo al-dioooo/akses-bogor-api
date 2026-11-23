@@ -88,7 +88,8 @@ export type ContributionPlace = { osm: OsmTarget; name: string | null; category:
 type CandidateRow = { osm_type: string; osm_id: number | string; name: string | null; category: PlaceCategory; slug: string; district: string };
 
 /** Syarat SQL: tidak ada lokasi AksesBogor berkategori sama dalam `SAME_PLACE_METERS` dari tempat OSM `o`. */
-export const withoutAksesBogorData = sql`NOT EXISTS (SELECT 1 FROM places p WHERE p.category = o.category AND ST_DWithin(p.location::geography, o.location::geography, ${SAME_PLACE_METERS}))`;
+// Lokasi yang diturunkan admin tidak dihitung, jadi kandidat OSM di dekatnya tampil lagi (ADR-0051).
+export const withoutAksesBogorData = sql`NOT EXISTS (SELECT 1 FROM places p WHERE p.unpublished_at IS NULL AND p.category = o.category AND ST_DWithin(p.location::geography, o.location::geography, ${SAME_PLACE_METERS}))`;
 
 /**
  * Tempat OSM yang belum punya data AksesBogor, bisa dibatasi kecamatan dan kategori. Urutannya mengikuti `districtOrder`

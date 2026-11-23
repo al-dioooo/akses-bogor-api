@@ -241,7 +241,8 @@ export const recheckBefore = (now: Date) => {
 
 /** Lokasi yang perlu dicek ulang, terlama dulu, paling banyak 100 (FR-38). */
 export async function listRecheck(db: Db, now: Date) {
-  const where = lt(places.lastVerifiedAt, recheckBefore(now));
+  // Lokasi yang diturunkan admin tidak perlu dicek ulang (ADR-0051).
+  const where = and(lt(places.lastVerifiedAt, recheckBefore(now)), isNull(places.unpublishedAt));
   const [rows, [{ total } = { total: 0 }]] = await Promise.all([
     db
       .select({ id: places.id, name: places.name, category: places.category, districtSlug: districts.slug, districtName: districts.name, status: places.status, lastVerifiedAt: places.lastVerifiedAt })

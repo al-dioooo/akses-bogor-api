@@ -16,7 +16,7 @@ describe("assistantPrompt", () => {
   });
 
   it("adds the chosen place with its date in WIB", () => {
-    const place = { id: "p1", name: "Halte contoh", lastVerifiedAt: "2026-10-17T20:00:00.000Z", checkedByTeam: true };
+    const place = { id: "p1", name: "Halte contoh", lastVerifiedAt: "2026-10-17T20:00:00.000Z", verifiedBy: "tim" as const, checkedByTeam: true };
     const prompt = assistantPrompt(place, ctx());
     expect(prompt).toContain('"name":"Halte contoh"');
     expect(prompt).toContain('"lastVerifiedAt":"2026-10-18"');

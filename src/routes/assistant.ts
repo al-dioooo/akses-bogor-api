@@ -50,7 +50,13 @@ const askResponse = z.object({
   sources: z
     .array(
       z.discriminatedUnion("type", [
-        z.object({ type: z.literal("lokasi"), placeId: z.uuid(), name: z.string(), lastVerifiedAt: z.iso.datetime() }),
+        z.object({
+          type: z.literal("lokasi"),
+          placeId: z.uuid(),
+          name: z.string(),
+          lastVerifiedAt: z.iso.datetime(),
+          verifiedBy: z.enum(["tim", "admin"]).describe("`admin`: diterbitkan langsung oleh admin, web tidak menyebutnya terverifikasi (ADR-0051)"),
+        }),
         z.object({ type: z.literal("pengetahuan"), citation: z.string(), title: z.string(), url: z.url(), license: z.string(), attribution: z.string().nullable() }),
       ]),
     )

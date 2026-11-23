@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { DEFAULT_ASSISTANT_QUESTIONS_PER_DAY, DEFAULT_REQUESTS_PER_DAY } from "../agent/limits.js";
 
+/** Batas pencarian petunjuk aksesibilitas per penyedia per hari WIB, bila env tidak mengaturnya (ADR-0052). */
+export const DEFAULT_HINTS_PER_DAY = 1000;
+
 const csv = (fallback = "") =>
   z
     .string()
@@ -72,6 +75,17 @@ const schema = z
      * AksesBogor tanpa akun. Mati sampai Kebijakan Privasi yang menyebut asisten ini dirilis.
      */
     ROUTE_ASSISTANT_ENABLED: z.stringbool().default(false),
+    /**
+     * Petunjuk aksesibilitas langsung dari Mapbox dan Google di Detail lokasi dan kartu Peta (ADR-0052). Mati bawaan:
+     * setiap petunjuk berarti panggilan berbayar ke penyedia. Mapbox memakai `MAPBOX_SECRET_TOKEN`.
+     */
+    PROVIDER_HINTS_ENABLED: z.stringbool().default(false),
+    /** API key Google Maps Platform untuk Places API (New), hanya untuk petunjuk aksesibilitas. Kosong berarti Google mati. */
+    GOOGLE_MAPS_API_KEY: optional(z.string().min(1)),
+    /** Batas pencarian petunjuk Mapbox per hari WIB, di memori proses. Bawaan 1000. */
+    PROVIDER_HINTS_MAPBOX_PER_DAY: orDefault(z.coerce.number().int().min(1).default(DEFAULT_HINTS_PER_DAY)),
+    /** Batas pencarian petunjuk Google per hari WIB, di memori proses. Bawaan 1000. */
+    PROVIDER_HINTS_GOOGLE_PER_DAY: orDefault(z.coerce.number().int().min(1).default(DEFAULT_HINTS_PER_DAY)),
     /** Pertanyaan asisten rute publik per hari WIB untuk semua penanya. Bawaan 300; satu pertanyaan paling banyak 4 permintaan ke model. */
     ROUTE_ASSISTANT_QUESTIONS_PER_DAY: orDefault(z.coerce.number().int().min(1).default(DEFAULT_ASSISTANT_QUESTIONS_PER_DAY)),
     /**

@@ -98,7 +98,10 @@ export const placeSummary = z.object({
   status,
   summary,
   location,
-  lastVerifiedAt: z.iso.datetime(),
+  lastVerifiedAt: z.iso.datetime().describe("Waktu verifikasi terakhir, atau waktu admin menerbitkan bila `verifiedBy` bernilai `admin`"),
+  verifiedBy: z
+    .enum(["tim", "admin"])
+    .describe("`tim`: diterbitkan verifikator dari laporan. `admin`: dibuat, diubah, atau diterbitkan langsung oleh admin tanpa pemeriksaan orang kedua; web menulis \"Diterbitkan langsung oleh admin\", bukan \"Diverifikasi\" (ADR-0051)"),
   coverPhoto: photo.nullable().describe("Foto tayang pertama, mendahulukan tag pintu_masuk"),
 });
 

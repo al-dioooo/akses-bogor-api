@@ -131,6 +131,10 @@ Contoh lengkap ada di [.env.example](.env.example). Jangan commit `.env`.
 | `PHOTO_STORAGE_DIR` | Tidak | Folder foto di development tanpa R2, bawaan `.data/foto`. Di production tanpa R2, unggah foto menjawab 503 |
 | `WEB_SERVER_SECRET` | Di production | Rahasia bersama dengan server Next.js, minimal 32 karakter. Bila cocok, rate limit dihitung per IP pengunjung yang dikirim web, bukan per IP server web |
 | `ROUTE_AGENT_ENABLED` | Tidak | `true` membuka route agen rute `/agent/*` dan rute jalan kaki `/route/*` (ADR-0042). Bawaan `false`: route menjawab 503. Biarkan mati di production sampai syarat peluncuran di ADR-0042 terpenuhi |
+| `PROVIDER_HINTS_ENABLED` | Tidak | `true` menyalakan petunjuk aksesibilitas langsung dari Mapbox (dengan `MAPBOX_SECRET_TOKEN`) dan Google (dengan `GOOGLE_MAPS_API_KEY`) di `GET /places/{id}/hints` dan `GET /places/candidates/{osmType}/{osmId}/hints` (ADR-0052). Bawaan `false`: setiap petunjuk berarti panggilan berbayar ke penyedia |
+| `GOOGLE_MAPS_API_KEY` | Tidak | API key Google Maps Platform untuk Places API (New), hanya untuk petunjuk aksesibilitas. Kosong berarti Google mati |
+| `PROVIDER_HINTS_MAPBOX_PER_DAY` | Tidak | Batas pencarian petunjuk Mapbox per hari WIB, di memori proses. Setelah habis, Mapbox dilaporkan `unavailable` sampai tengah malam WIB. Bawaan 1000 |
+| `PROVIDER_HINTS_GOOGLE_PER_DAY` | Tidak | Sama untuk Google. Bawaan 1000 |
 | `DISABILITY_DATA_ENABLED` | Tidak | `true` membuka `GET /districts/priority` dan memakai data disabilitas Open Data Kota Bogor untuk prioritas kecamatan (ADR-0043). Bawaan `false`; biarkan mati sampai Diskominfo Kota Bogor mengizinkan pemakaiannya |
 | `AGENT_PROVIDER` | Tidak | Penyedia model agen: `anthropic` (Claude API, bawaan) atau `openrouter` (ADR-0047). Tidak ada cadangan otomatis ke penyedia lain |
 | `AGENT_REQUESTS_PER_DAY` | Tidak | Permintaan ke model yang berhasil per hari UTC untuk semua pengguna Bantu memetakan. Bawaan 45 |
@@ -153,6 +157,8 @@ Contoh lengkap ada di [.env.example](.env.example). Jangan commit `.env`.
 | `GET /places` | Daftar lokasi: pencarian `q`, filter `category`, `district`, `facility`, `status` (dipisah koma), `limit`, `offset` | FR-02 sampai FR-04 |
 | `GET /places/map` | GeoJSON untuk Mapbox dengan filter yang sama dan `bbox` | FR-05 |
 | `GET /places/candidates` | Kandidat "Belum ada data" untuk Peta: tempat OSM empat kategori tanpa lokasi AksesBogor berkategori sama dalam 50 m, dengan kecamatan, tag `wheelchair` mentah, dan `source` (lisensi dan atribusi ODbL); filter `q`, `category`, `district`; tanpa status; cache 5 menit | ADR-0049 |
+| `GET /places/{id}/hints` | Petunjuk aksesibilitas langsung dari Mapbox dan Google untuk lokasi AksesBogor: tempat penyedia dalam 75 m dengan nama mirip (terhadap kedua nama), angka dan huruf tunggal yang sama, kata jenis tempat yang sesuai, dan kategori penyedia yang sesuai; tanda aksesibilitas, nama di penyedia, dan tautan Google Maps; belum diperiksa tim dan tidak mengubah status; tidak disimpan (`private, no-store`); 30 per menit per klien; `hints: []` tanpa memeriksa tempatnya selama `PROVIDER_HINTS_ENABLED` mati atau tidak ada penyedia yang menyala; galat penyedia dicatat dengan nama penyedia dan status saja | ADR-0052 |
+| `GET /places/candidates/{osmType}/{osmId}/hints` | Sama untuk kandidat OSM; kandidat tanpa nama tidak dicocokkan. Juga salinan tersimpan (`result: "stored"`) dari tag `aksesbogor:google_maps` (Google Maps, dengan tanggal pengambilan) dan `aksesbogor:osm_aksesibilitas` (wheelchair OSM), selama `PROVIDER_HINTS_ENABLED` menyala | ADR-0052 |
 | `GET /places/stats` | Jumlah per kategori, pintu masuk tanpa tangga, dan kontributor | FR-01 |
 | `GET /places/{id}` | Detail: jawaban, alasan, catatan, ringkasan X dari Y, fasilitas penentu status, foto, `needsRecheck` | FR-06, FR-07, FR-38 |
 | `GET /map/token` | Token Mapbox sementara untuk peta di browser; 503 bila `MAPBOX_SECRET_TOKEN` belum diatur | FR-05 |
@@ -173,6 +179,14 @@ Contoh lengkap ada di [.env.example](.env.example). Jangan commit `.env`.
 | `GET /admin/team` | Tim verifikasi (verifikator dan admin) dengan email; khusus admin | FR-36 |
 | `POST /admin/team` | Jadikan verifikator akun yang sudah dilengkapi, dengan email yang tepat; khusus admin | FR-36 |
 | `DELETE /admin/team/{userId}` | Cabut peran verifikator; peran admin hanya lewat `pnpm peran` | FR-36 |
+| `GET /admin/places` | Semua tempat termasuk yang diturunkan, berhalaman; saring `q`, `category`, `district`, `status`, `origin` (`tim`, `admin`), `published` (`ya`, `tidak`); khusus admin | ADR-0051 |
+| `GET /admin/places/{id}` | Satu tempat untuk formulir ubah: jawaban, foto tayang, dan `version`; khusus admin | ADR-0051 |
+| `GET /admin/places/{id}/history` | Riwayat tempat dari log audit dengan nama tampilan anggota tim; khusus admin | ADR-0038, ADR-0051 |
+| `GET /admin/candidates` | Kandidat OpenStreetMap tanpa lokasi AksesBogor dalam 50 m, berhalaman, untuk dibuat menjadi tempat; khusus admin | ADR-0049, ADR-0051 |
+| `POST /admin/places` | Tambah tempat yang langsung tayang dengan label admin; Tersedia dan Tidak perlu tanpa foto bertag fasilitas itu menjadi Belum tahu; alasan wajib; khusus admin | ADR-0051 |
+| `PATCH /admin/places/{id}` | Ubah data, jawaban, dan foto (tambah dan hapus) dengan `version`; tempat menjadi berlabel admin; khusus admin | ADR-0051 |
+| `DELETE /admin/places/{id}` | Turunkan tempat dari tayang dengan alasan; tidak ada yang dihapus permanen; khusus admin | ADR-0051 |
+| `POST /admin/places/{id}/restore` | Tayangkan lagi tempat yang diturunkan, dengan alasan; khusus admin | ADR-0051 |
 | `GET /verifier/reports` | Antrean verifikasi terlama dulu, atau `status=klarifikasi` untuk yang menunggu jawaban pelapor; tanpa laporan sendiri; khusus verifikator dan admin | FR-30, FR-37 |
 | `GET /verifier/reports/{id}` | Isian, foto, titik, klarifikasi, data lokasi saat ini, dan lokasi mirip untuk dibandingkan; laporan sendiri 403 | FR-31, FR-37 |
 | `GET /verifier/photos/{id}` | Foto laporan yang belum terbit dari bucket privat, `?versi=kabur` untuk pratinjau area kabur; `Cache-Control: private, no-store` | FR-34, ADR-0031, ADR-0037 |
@@ -181,7 +195,7 @@ Contoh lengkap ada di [.env.example](.env.example). Jangan commit `.env`.
 | `POST /verifier/reports/{id}/clarify` | Minta klarifikasi dengan tenggat 7 × 24 jam; email ke pelapor | FR-32, FR-41 |
 | `POST /verifier/reports/{id}/reject` | Tolak dengan alasan R1–R5; foto laporan dihapus; email ke pelapor | FR-32, FR-40 |
 | `GET /verifier/places/recheck` | Lokasi yang terakhir diverifikasi lebih dari 12 bulan lalu, terlama dulu | FR-38 |
-| `POST /reports` | Kirim laporan baru, perubahan, atau kekurangan ke antrean verifikasi dengan foto yang sudah diunggah; kecamatan dihitung ulang; kunci draf mencegah laporan ganda; 20 laporan per 24 jam dan 30 laporan menunggu per akun | FR-20 sampai FR-27 |
+| `POST /reports` | Kirim laporan baru, perubahan, atau kekurangan ke antrean verifikasi dengan foto yang sudah diunggah; kecamatan dihitung ulang; kunci draf mencegah laporan ganda; 20 laporan per 24 jam dan 30 laporan menunggu per akun; admin bisa menerbitkan langsung dengan `publishDirectly` dan `publishReason` (ADR-0051) | FR-20 sampai FR-27 |
 | `GET /agent/tools` | Larik `tools` format OpenAI untuk ketiga alat yang boleh dipanggil model | FR-60, ADR-0042 |
 | `POST /agent/tools/find_place` | Lokasi AksesBogor bernama mirip, paling banyak 5 | FR-60 |
 | `POST /agent/tools/place_accessibility` | Status, jawaban fasilitas terverifikasi, dan tanggal verifikasi terakhir sebuah lokasi, tanpa koordinat | FR-60 |

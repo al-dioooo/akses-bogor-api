@@ -76,17 +76,18 @@ async function checkLimits(db: Db, reporterId: string, now: Date) {
  * untuk perubahan dan kekurangan (FR-27), dan foto yang diunggah akun ini dipasang beserta tag, keterangan, dan teks
  * alternatifnya. `created` salah berarti laporan dengan kunci draf yang sama sudah ada dan dikembalikan apa adanya.
  */
-export async function submitReport(db: Db, reporterId: string, body: ReportBody, now: Date) {
+export async function submitReport(db: Db, reporterId: string, body: ReportBody, now: Date, opts: { skipLimits?: boolean } = {}) {
   const repeat = await existing(db, reporterId, body.submissionKey);
   if (repeat) return { report: repeat, created: false };
-  await checkLimits(db, reporterId, now);
+  // Batas per akun tidak berlaku untuk admin yang menerbitkan langsung (ADR-0051).
+  if (!opts.skipLimits) await checkLimits(db, reporterId, now);
 
   let place: { name: string; category: NonNullable<ReportBody["category"]>; location: { lat: number; lng: number }; landmark: string | null } | null = null;
   if (body.placeId) {
     const [row] = await db
       .select({ name: places.name, category: places.category, location: places.location, landmark: places.landmark })
       .from(places)
-      .where(eq(places.id, body.placeId));
+      .where(and(eq(places.id, body.placeId), isNull(places.unpublishedAt)));
     if (!row) throw new HttpError(404, "lokasi_tidak_ditemukan", "Lokasi ini tidak ditemukan. Mungkin sudah dihapus; laporkan sebagai tempat baru.");
     place = { ...row, location: { lat: row.location.y, lng: row.location.x } };
   }
