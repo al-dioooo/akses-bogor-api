@@ -2221,7 +2221,7 @@
         "tags": [
           "Lokasi"
         ],
-        "description": "Petunjuk dari penyedia peta, bukan data AksesBogor: belum diperiksa tim dan tidak mengubah status atau jawaban fasilitas (ADR-0052). Tempat penyedia diterima hanya bila paling jauh 75 m dan namanya mirip. Hasil penyedia tidak disimpan: Mapbox di-cache di memori 10 menit, dan dari Google hanya place_id. Jawaban `hints: []` berarti petunjuk dimatikan. 30 permintaan per menit per klien. Kandidat tanpa nama tidak dicocokkan.",
+        "description": "Petunjuk dari penyedia peta, bukan data AksesBogor: belum diperiksa tim dan tidak mengubah status atau jawaban fasilitas (ADR-0052). Tempat penyedia diterima hanya bila paling jauh 75 m dan namanya mirip. Hasil penyedia tidak disimpan: Mapbox di-cache di memori 10 menit, dan dari Google hanya place_id. Jawaban `hints: []` berarti petunjuk dimatikan. 30 permintaan per menit per klien. Kandidat tanpa nama tidak dicocokkan. Untuk sebagian kandidat, jawaban juga membawa salinan tersimpan (result `stored`): Google Maps dengan tanggal pengambilannya, dan keterangan wheelchair OSM.",
         "parameters": [
           {
             "schema": {
@@ -2397,10 +2397,126 @@
                               "result"
                             ],
                             "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "provider": {
+                                "type": "string",
+                                "enum": [
+                                  "google"
+                                ]
+                              },
+                              "result": {
+                                "type": "string",
+                                "enum": [
+                                  "stored"
+                                ]
+                              },
+                              "placeName": {
+                                "nullable": true,
+                                "description": "Nama tempat di Google Maps saat diambil",
+                                "type": "string"
+                              },
+                              "distanceMeters": {
+                                "nullable": true,
+                                "description": "Jarak tempat Google Maps dari titik OSM saat diambil",
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              "url": {
+                                "nullable": true,
+                                "description": "Halaman tempat di Google Maps; wajib ditautkan bersama atribusi Google Maps",
+                                "type": "string"
+                              },
+                              "retrievedAt": {
+                                "type": "string",
+                                "format": "date",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                                "description": "Tanggal salinan diambil (WIB)"
+                              },
+                              "accessibility": {
+                                "type": "object",
+                                "properties": {
+                                  "entrance": {
+                                    "nullable": true,
+                                    "description": "null: penyedia tidak tahu",
+                                    "type": "boolean"
+                                  },
+                                  "restroom": {
+                                    "nullable": true,
+                                    "description": "null: penyedia tidak tahu",
+                                    "type": "boolean"
+                                  },
+                                  "parking": {
+                                    "nullable": true,
+                                    "description": "null: penyedia tidak tahu",
+                                    "type": "boolean"
+                                  },
+                                  "seating": {
+                                    "nullable": true,
+                                    "description": "null: penyedia tidak tahu",
+                                    "type": "boolean"
+                                  }
+                                },
+                                "required": [
+                                  "entrance",
+                                  "restroom",
+                                  "parking",
+                                  "seating"
+                                ],
+                                "additionalProperties": false,
+                                "description": "Opsi aksesibilitas Google Maps saat diambil"
+                              }
+                            },
+                            "required": [
+                              "provider",
+                              "result",
+                              "placeName",
+                              "distanceMeters",
+                              "url",
+                              "retrievedAt",
+                              "accessibility"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "provider": {
+                                "type": "string",
+                                "enum": [
+                                  "openstreetmap"
+                                ]
+                              },
+                              "result": {
+                                "type": "string",
+                                "enum": [
+                                  "stored"
+                                ]
+                              },
+                              "wheelchair": {
+                                "type": "string",
+                                "enum": [
+                                  "yes",
+                                  "limited",
+                                  "no",
+                                  "designated"
+                                ],
+                                "description": "Nilai wheelchair OSM yang tersimpan, bila berbeda dari tag tempat itu sendiri"
+                              }
+                            },
+                            "required": [
+                              "provider",
+                              "result",
+                              "wheelchair"
+                            ],
+                            "additionalProperties": false
                           }
                         ]
                       },
-                      "description": "Satu baris per penyedia yang menyala; kosong bila petunjuk dimatikan"
+                      "description": "Satu baris per penyedia yang menyala, lalu salinan tersimpan (result `stored`) bila ada; kosong bila petunjuk dimatikan"
                     }
                   },
                   "required": [

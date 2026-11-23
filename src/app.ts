@@ -143,7 +143,7 @@ export async function buildApp(env: Env, deps: { db?: Db; now?: () => Date; fetc
         ...(env.GOOGLE_MAPS_API_KEY ? [googleHints({ apiKey: env.GOOGLE_MAPS_API_KEY, now, fetch: deps.fetch })] : []),
       ]
     : [];
-  await app.register(hintRoutes, { providers: hintProviders, now });
+  await app.register(hintRoutes, { providers: hintProviders, stored: env.PROVIDER_HINTS_ENABLED, now });
 
   // Akun (ADR-0029) dan email (ADR-0030).
   const development = env.NODE_ENV === "development";

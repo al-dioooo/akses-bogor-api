@@ -156,7 +156,7 @@ Contoh lengkap ada di [.env.example](.env.example). Jangan commit `.env`.
 | `GET /places/map` | GeoJSON untuk Mapbox dengan filter yang sama dan `bbox` | FR-05 |
 | `GET /places/candidates` | Kandidat "Belum ada data" untuk Peta: tempat OSM empat kategori tanpa lokasi AksesBogor berkategori sama dalam 50 m, dengan kecamatan, tag `wheelchair` mentah, dan `source` (lisensi dan atribusi ODbL); filter `q`, `category`, `district`; tanpa status; cache 5 menit | ADR-0049 |
 | `GET /places/{id}/hints` | Petunjuk aksesibilitas langsung dari Mapbox dan Google untuk lokasi AksesBogor: tempat penyedia dalam 75 m dengan nama mirip, tanda aksesibilitas, nama di penyedia, dan tautan Google Maps; belum diperiksa tim dan tidak mengubah status; tidak disimpan (`private, no-store`); 30 per menit per klien; `hints: []` selama `PROVIDER_HINTS_ENABLED` mati | ADR-0052 |
-| `GET /places/candidates/{osmType}/{osmId}/hints` | Sama untuk kandidat OSM; kandidat tanpa nama tidak dicocokkan | ADR-0052 |
+| `GET /places/candidates/{osmType}/{osmId}/hints` | Sama untuk kandidat OSM; kandidat tanpa nama tidak dicocokkan. Juga salinan tersimpan (`result: "stored"`) dari tag `aksesbogor:google_maps` (Google Maps, dengan tanggal pengambilan) dan `aksesbogor:osm_aksesibilitas` (wheelchair OSM), selama `PROVIDER_HINTS_ENABLED` menyala | ADR-0052 |
 | `GET /places/stats` | Jumlah per kategori, pintu masuk tanpa tangga, dan kontributor | FR-01 |
 | `GET /places/{id}` | Detail: jawaban, alasan, catatan, ringkasan X dari Y, fasilitas penentu status, foto, `needsRecheck` | FR-06, FR-07, FR-38 |
 | `GET /map/token` | Token Mapbox sementara untuk peta di browser; 503 bila `MAPBOX_SECRET_TOKEN` belum diatur | FR-05 |

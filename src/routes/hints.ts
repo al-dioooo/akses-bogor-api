@@ -1,7 +1,8 @@
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { getOsmPlace } from "../contribute/facilities.js";
-import { candidateHintParams, hintsResponse } from "../hints/schemas.js";
+import { candidateHintParams, candidateHintsResponse, hintsResponse } from "../hints/schemas.js";
 import { lookupHints, type HintProvider } from "../hints/provider.js";
+import { storedHints, withStored } from "../hints/stored.js";
 import { HttpError, errorSchema } from "../http/errors.js";
 import { getPlace } from "../places/queries.js";
 import { placeIdParams } from "../places/schemas.js";
@@ -9,6 +10,8 @@ import { placeIdParams } from "../places/schemas.js";
 export type HintRouteOptions = {
   /** Penyedia yang menyala; kosong bila `PROVIDER_HINTS_ENABLED` mati (ADR-0052). */
   providers: readonly HintProvider[];
+  /** Salinan tersimpan di baris kandidat OSM ikut ditampilkan; mengikuti `PROVIDER_HINTS_ENABLED`. */
+  stored: boolean;
   now: () => Date;
 };
 
@@ -51,9 +54,9 @@ export const hintRoutes: FastifyPluginAsyncZod<HintRouteOptions> = async (app, o
       schema: {
         tags: ["Lokasi"],
         summary: "Petunjuk aksesibilitas dari Mapbox dan Google untuk kandidat OpenStreetMap",
-        description: `${DESCRIPTION} Kandidat tanpa nama tidak dicocokkan.`,
+        description: `${DESCRIPTION} Kandidat tanpa nama tidak dicocokkan. Untuk sebagian kandidat, jawaban juga membawa salinan tersimpan (result \`stored\`): Google Maps dengan tanggal pengambilannya, dan keterangan wheelchair OSM.`,
         params: candidateHintParams,
-        response: { 200: hintsResponse, 400: errorSchema, 404: errorSchema, 429: errorSchema },
+        response: { 200: candidateHintsResponse, 400: errorSchema, 404: errorSchema, 429: errorSchema },
       },
       config: routeConfig,
     },
@@ -61,7 +64,8 @@ export const hintRoutes: FastifyPluginAsyncZod<HintRouteOptions> = async (app, o
       const place = await getOsmPlace(app.db, request.params);
       if (!place) throw new HttpError(404, "kandidat_tidak_ditemukan", "Tempat tidak ditemukan.");
       reply.header("cache-control", "private, no-store");
-      return { hints: await lookupHints({ name: place.name, location: place.location }, opts.providers) };
+      const live = await lookupHints({ name: place.name, location: place.location }, opts.providers);
+      return { hints: opts.stored ? withStored(live, await storedHints(app.db, request.params)) : live };
     },
   );
 };
