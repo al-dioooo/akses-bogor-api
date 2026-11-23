@@ -1,21 +1,40 @@
-// Menjalankan pertanyaan uji agen untuk kontributor (ADR-0043, ADR-0047) sekali ke penyedia model sungguhan, lalu
+// Menjalankan pertanyaan uji agen untuk kontributor (ADR-0043, ADR-0047) atau asisten rute publik (ADR-0050) sekali ke
+// penyedia model sungguhan, lalu
 // mencetak jawaban, model, sumber, kartu, hasil pemeriksaan otomatis, jumlah permintaan, dan, untuk Claude, token serta
 // perkiraan biayanya. Penyedianya mengikuti `AGENT_PROVIDER` (bawaan Claude API, effort dari `ANTHROPIC_EFFORT`). Data
 // disabilitas dipakai di sini (database dev) supaya alat prioritas kecamatan ikut diuji; di production flag-nya tetap
 // mati. Setiap kali jalan memakai kuota atau saldo penyedia, jadi jalankan seperlunya. Pemeriksaan otomatis hanya
 // bantuan; keputusan lulus atau gagal tetap dibaca manusia dari jawabannya.
 //
-//   pnpm agen:evaluasi            semua pertanyaan
-//   pnpm agen:evaluasi K01 K06    hanya pertanyaan tertentu
+//   pnpm agen:evaluasi                    semua pertanyaan agen kontributor
+//   pnpm agen:evaluasi K01 K06            hanya pertanyaan tertentu
+//   pnpm agen:evaluasi --asisten          pertanyaan asisten rute publik (pertanyaan-uji-asisten.json)
+//   pnpm agen:evaluasi --asisten R02 R07  hanya pertanyaan asisten tertentu
+//
+// Pertanyaan asisten bisa membawa `posisi`, titik awal pengunjung yang hanya dipakai server untuk nearby_places.
 import { readFileSync } from "node:fs";
 import { DEFAULT_EFFORT } from "../../src/agent/anthropic.js";
 import { askAgent, type Turn } from "../../src/agent/ask.js";
+import { ASSISTANT_PROFILE } from "../../src/agent/assistant-prompt.js";
 import { agentModel } from "../../src/agent/provider.js";
 import { loadEnv } from "../../src/config/env.js";
 import { createDb } from "../../src/db/client.js";
 import { placesNamed } from "../../src/places/queries.js";
 
-type Question = { id: string; jenis: string; tempat?: string; pertanyaan: string; riwayat?: Turn[]; kriteria: string; harus: string[]; tidak_boleh: string[]; kartu?: string };
+type Question = {
+  id: string;
+  jenis: string;
+  tempat?: string;
+  posisi?: { lat: number; lng: number };
+  pertanyaan: string;
+  riwayat?: Turn[];
+  kriteria: string;
+  harus: string[];
+  tidak_boleh: string[];
+  kartu?: string;
+  /** Benar bila jawaban ini tidak boleh membawa kartu apa pun. */
+  tanpa_kartu?: boolean;
+};
 type Tokens = { input: number; output: number; cacheRead: number; cacheWrite: number };
 
 const env = loadEnv();
@@ -31,7 +50,7 @@ if (!env[keyName]) {
 }
 
 /** Pengaman supaya satu kali jalan tidak menghabiskan kuota harian: permintaan HTTP, dan yang berhasil. */
-const MAX_REQUESTS = 40;
+const MAX_REQUESTS = 60;
 const MAX_SUCCEEDED = Number(process.env.EVALUASI_MAKS_BERHASIL ?? (claude ? 40 : 14));
 /** Jeda antarpertanyaan untuk OpenRouter: di bawah batas 20 permintaan per menit, dan memberi waktu bila model gratis dibatasi. */
 const PAUSE_MS = claude ? 0 : 15_000;
@@ -47,8 +66,10 @@ const add = (a: Tokens, b: Tokens) => {
 };
 const show = (t: Tokens) => `input ${t.input}, output ${t.output}, baca cache ${t.cacheRead}, tulis cache ${t.cacheWrite}, ~US$${cost(t).toFixed(5)}`;
 
-const all = JSON.parse(readFileSync(new URL("./pertanyaan-uji.json", import.meta.url), "utf8")) as Question[];
-const wanted = process.argv.slice(2);
+const assistant = process.argv.includes("--asisten");
+const file = assistant ? "./pertanyaan-uji-asisten.json" : "./pertanyaan-uji.json";
+const all = JSON.parse(readFileSync(new URL(file, import.meta.url), "utf8")) as Question[];
+const wanted = process.argv.slice(2).filter((arg) => arg !== "--asisten");
 const questions = wanted.length > 0 ? all.filter((q) => wanted.includes(q.id)) : all;
 
 let requests = 0;
@@ -69,10 +90,11 @@ const model = agentModel(env, {
     warn: (details, message) => console.log(`  [peringatan] ${message} ${JSON.stringify(details)}`),
   },
 })!;
+console.log(assistant ? "Agen: asisten rute publik (ADR-0050)" : "Agen: kontributor (ADR-0043)");
 console.log(claude ? `Penyedia: Claude API, model ${env.ANTHROPIC_MODEL ?? "claude-haiku-5-5"}, effort ${env.ANTHROPIC_EFFORT ?? DEFAULT_EFFORT}` : "Penyedia: OpenRouter");
 
 const { db, pool } = createDb(env.DATABASE_URL);
-const ctx = { db, now: () => new Date(), disabilityData: true };
+const baseCtx = { db, now: () => new Date(), disabilityData: !assistant };
 const summary: string[] = [];
 const total = zero();
 
@@ -86,18 +108,19 @@ for (const [index, q] of questions.entries()) {
     summary.push(`${q.id}\ttidak dijalankan\t0\t-`);
     continue;
   }
-  console.log(`\n=== ${q.id} (${q.jenis})${q.tempat ? ` · dari halaman ${q.tempat}` : ""}\nTanya: ${q.pertanyaan}\nKriteria: ${q.kriteria}`);
+  console.log(`\n=== ${q.id} (${q.jenis})${q.tempat ? ` · dari halaman ${q.tempat}` : ""}${q.posisi ? " · dengan titik awal" : ""}\nTanya: ${q.pertanyaan}\nKriteria: ${q.kriteria}`);
   steps = [];
   try {
-    const result = await askAgent({ model, ctx }, { placeId: place?.id, question: q.pertanyaan, history: q.riwayat });
+    const ctx = { ...baseCtx, position: q.posisi };
+    const result = await askAgent({ model, ctx, profile: assistant ? ASSISTANT_PROFILE : undefined }, { placeId: place?.id, question: q.pertanyaan, history: q.riwayat });
     const missing = q.harus.filter((pattern) => !new RegExp(pattern, "i").test(result.answer));
     const forbidden = q.tidak_boleh.filter((pattern) => new RegExp(pattern, "im").test(result.answer));
-    const cardMissing = q.kartu !== undefined && !result.cards.some((c) => c.type === q.kartu);
+    const cardMissing = (q.kartu !== undefined && !result.cards.some((c) => c.type === q.kartu)) || (q.tanpa_kartu === true && result.cards.length > 0);
     const check = missing.length === 0 && forbidden.length === 0 && !cardMissing ? "lolos" : "perlu dicek";
     console.log(`Model: ${result.model ?? "-"} · permintaan: ${requests - before}`);
     console.log(`Jawab:\n${result.answer}`);
     console.log(`Sumber: ${result.sources.map((s) => (s.type === "lokasi" ? `lokasi ${s.name}` : s.citation)).join("; ")}`);
-    console.log(`Kartu: ${result.cards.map((c) => (c.type === "prioritas" ? "prioritas" : `${c.type} ${c.name ?? JSON.stringify(c.target)}`)).join("; ") || "-"}${cardMissing ? ` · kartu ${q.kartu} tidak muncul` : ""}`);
+    console.log(`Kartu: ${result.cards.map((c) => (c.type === "prioritas" ? "prioritas" : `${c.type} ${c.name ?? JSON.stringify(c.target)}`)).join("; ") || "-"}${cardMissing ? (q.tanpa_kartu ? " · ada kartu padahal tidak diharapkan" : ` · kartu ${q.kartu} tidak muncul`) : ""}`);
     console.log(`Pemeriksaan otomatis: ${check}${missing.length ? ` · tidak ditemukan: ${missing.join(", ")}` : ""}${forbidden.length ? ` · terlarang: ${forbidden.join(", ")}` : ""}`);
     summary.push(`${q.id}\t${check}\t${requests - before}\t${result.model ?? "-"}`);
   } catch (error) {
