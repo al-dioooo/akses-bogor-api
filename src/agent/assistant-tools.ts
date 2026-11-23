@@ -8,7 +8,7 @@ import { HttpError } from "../http/errors.js";
 import type { LatLng } from "../map/directions.js";
 import { KOTA_BOGOR_BBOX } from "../map/search.js";
 import { MAX_ROUTE_KM } from "../map/walking-route.js";
-import { listPlaces, placesNamed } from "../places/queries.js";
+import { listPlaces, placesNamed, published, verifiedBy } from "../places/queries.js";
 import type { RouteCard } from "./cards.js";
 import { placeAccessibility, type ToolContext } from "./tools.js";
 
@@ -18,13 +18,18 @@ type District = { slug: string; name: string };
 /** Sumber data aksesibilitas lokasi yang sudah terbit. */
 export const TEAM_CHECKED_SOURCE = "Laporan kontributor yang sudah diperiksa tim verifikator AksesBogor";
 
+/** Sumber data lokasi yang diterbitkan langsung oleh admin (ADR-0051): tanpa verifikator kedua, jadi bukan "diverifikasi". */
+export const ADMIN_PUBLISHED_SOURCE = "Diterbitkan langsung oleh admin AksesBogor, tanpa pemeriksaan verifikator kedua";
+
 /**
- * Apakah jawaban fasilitas sebuah lokasi sudah diperiksa tim. Semua lokasi di tabel `places` sekarang terbit lewat
- * verifikasi tim (ADR-0035), jadi selalu benar. Lokasi hasil impor yang belum pernah diperiksa tim harus mengembalikan
- * salah di sini begitu kolom asalnya ada, supaya asisten menyebutnya "belum diperiksa tim".
+ * Apakah jawaban fasilitas sebuah lokasi sudah diperiksa tim, dan oleh siapa. Semua lokasi di tabel `places` sekarang
+ * terbit lewat verifikasi tim (ADR-0035) atau langsung oleh admin yang memeriksanya sendiri dengan aturan bukti yang
+ * sama (ADR-0051), jadi selalu benar; `verifiedBy` dan `source` membedakan keduanya. Lokasi hasil impor yang belum
+ * pernah diperiksa tim harus mengembalikan salah di sini begitu kolom asalnya ada, supaya asisten menyebutnya "belum
+ * diperiksa tim".
  */
-export function teamCheck(): { checkedByTeam: boolean; source: string } {
-  return { checkedByTeam: true, source: TEAM_CHECKED_SOURCE };
+export function teamCheck(by: "tim" | "admin" = "tim"): { checkedByTeam: boolean; verifiedBy: "tim" | "admin"; source: string } {
+  return { checkedByTeam: true, verifiedBy: by, source: by === "admin" ? ADMIN_PUBLISHED_SOURCE : TEAM_CHECKED_SOURCE };
 }
 
 /** Jarak garis lurus untuk model: dibulatkan ke 100 m, paling kecil 100 m, supaya tidak menunjuk posisi pengunjung. */
@@ -50,12 +55,13 @@ export async function findPlaceForAssistant(ctx: ToolContext, input: FindInput) 
           offset: 0,
         })
       ).items;
-  return { places: found.map((p) => ({ id: p.id, name: p.name, category: p.category, status: p.status, district: p.district, ...teamCheck() })) };
+  return { places: found.map((p) => ({ id: p.id, name: p.name, category: p.category, status: p.status, district: p.district, ...teamCheck(p.verifiedBy) })) };
 }
 
 /** place_accessibility untuk asisten: jawaban fasilitas, ditambah apakah tim sudah memeriksanya dan sumbernya. */
 export async function placeAccessibilityForAssistant(ctx: ToolContext, input: { placeId: string }) {
-  return { ...(await placeAccessibility(ctx, input)), ...teamCheck() };
+  const place = await placeAccessibility(ctx, input);
+  return { ...place, ...teamCheck(place.verifiedBy) };
 }
 
 export type NearbyInput = { category?: PlaceCategory; status?: PlaceStatus[]; limit?: number };
@@ -77,11 +83,12 @@ export async function nearbyPlaces(ctx: ToolContext, input: NearbyInput) {
   const point = sql`ST_SetSRID(ST_MakePoint(${from.lng}, ${from.lat}), 4326)::geography`;
   const meters = sql<number>`ST_Distance(${places.location}::geography, ${point})`;
   const rows = await ctx.db
-    .select({ id: places.id, name: places.name, category: places.category, status: places.status, slug: places.districtSlug, district: districts.name, meters })
+    .select({ id: places.id, name: places.name, category: places.category, status: places.status, slug: places.districtSlug, district: districts.name, adminPublishedAt: places.adminPublishedAt, meters })
     .from(places)
     .innerJoin(districts, eq(districts.slug, places.districtSlug))
     .where(
       and(
+        published,
         sql`ST_DWithin(${places.location}::geography, ${point}, ${MAX_ROUTE_KM * 1000})`,
         input.category ? eq(places.category, input.category) : undefined,
         input.status?.length ? inArray(places.status, input.status) : undefined,
@@ -97,7 +104,7 @@ export async function nearbyPlaces(ctx: ToolContext, input: NearbyInput) {
       status: r.status,
       district: { slug: r.slug, name: r.district },
       distanceMeters: roundDistance(Number(r.meters)),
-      ...teamCheck(),
+      ...teamCheck(verifiedBy(r.adminPublishedAt)),
     })),
     note: `Jarak garis lurus dari titik awal pengunjung, dibulatkan ke 100 m, paling jauh ${MAX_ROUTE_KM} km. Bukan jarak atau waktu jalan kaki.`,
   };

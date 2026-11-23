@@ -36,7 +36,7 @@ describe("find_place for the assistant", () => {
     expect((await findPlaceForAssistant(context(), { kecamatan: "tanah-sareal" })).places.map((p) => p.name)).toEqual(["Halte contoh B", "Kampus contoh A"]);
     const { places } = await findPlaceForAssistant(context(), { query: "contoh", category: "halte", kecamatan: "tanah-sareal" });
     expect(places).toEqual([
-      { id: expect.any(String), name: "Halte contoh B", category: "halte", status: expect.any(String), district: { slug: "tanah-sareal", name: "Tanah Sareal" }, checkedByTeam: true, source: TEAM_CHECKED_SOURCE },
+      { id: expect.any(String), name: "Halte contoh B", category: "halte", status: expect.any(String), district: { slug: "tanah-sareal", name: "Tanah Sareal" }, checkedByTeam: true, verifiedBy: "tim", source: TEAM_CHECKED_SOURCE },
     ]);
     expect(JSON.stringify(places)).not.toMatch(COORDINATE);
   });
@@ -49,7 +49,7 @@ describe("find_place for the assistant", () => {
 describe("place_accessibility for the assistant", () => {
   it("adds whether the team checked the answers and where they come from", async () => {
     const place = await placeAccessibilityForAssistant(context(), { placeId: halteId });
-    expect(place).toMatchObject({ name: "Halte contoh", status: "sebagian", checkedByTeam: true, source: TEAM_CHECKED_SOURCE });
+    expect(place).toMatchObject({ name: "Halte contoh", status: "sebagian", checkedByTeam: true, verifiedBy: "tim", source: TEAM_CHECKED_SOURCE });
     expect(place).not.toHaveProperty("location");
   });
 });
@@ -65,6 +65,7 @@ describe("nearby_places", () => {
       district: { slug: "bogor-tengah", name: "Bogor Tengah" },
       distanceMeters: 100,
       checkedByTeam: true,
+      verifiedBy: "tim",
       source: TEAM_CHECKED_SOURCE,
     });
     expect(result.places.length).toBeLessThanOrEqual(5);

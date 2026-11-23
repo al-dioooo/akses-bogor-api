@@ -191,7 +191,7 @@ export async function placesNamed(db: Db, query: string, limit = 3) {
   const words = q.split(/\s+/).filter(Boolean);
   const allWords = and(...words.map((word) => sql`strpos(lower(${places.name}), ${word}) > 0`));
   const rows = await db
-    .select({ id: places.id, name: places.name, category: places.category, status: places.status, districtSlug: places.districtSlug, districtName: districts.name, location: places.location })
+    .select({ id: places.id, name: places.name, category: places.category, status: places.status, districtSlug: places.districtSlug, districtName: districts.name, location: places.location, adminPublishedAt: places.adminPublishedAt })
     .from(places)
     .innerJoin(districts, eq(districts.slug, places.districtSlug))
     .where(and(published, or(allWords, sql`${score} >= 0.5`)))
@@ -204,5 +204,6 @@ export async function placesNamed(db: Db, query: string, limit = 3) {
     status: r.status,
     district: { slug: r.districtSlug, name: r.districtName },
     location: { lat: r.location.y, lng: r.location.x },
+    verifiedBy: verifiedBy(r.adminPublishedAt),
   }));
 }
