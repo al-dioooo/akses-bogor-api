@@ -54,7 +54,7 @@ export async function nearbyPlaces(db: Db, point: Point, name?: string, excludeP
     .select({ id: places.id, name: places.name, category: places.category, status: places.status, distance })
     .from(places)
     .where(
-      sql`ST_DWithin(${places.location}::geography, ${here}, ${NEARBY_METERS}) AND ${similar}${excludePlaceId ? sql` AND ${places.id} <> ${excludePlaceId}` : sql``}`,
+      sql`${places.unpublishedAt} IS NULL AND ST_DWithin(${places.location}::geography, ${here}, ${NEARBY_METERS}) AND ${similar}${excludePlaceId ? sql` AND ${places.id} <> ${excludePlaceId}` : sql``}`,
     )
     .orderBy(distance)
     .limit(5);

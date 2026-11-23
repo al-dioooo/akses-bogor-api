@@ -14,6 +14,7 @@ const district = z.object({ slug: z.string(), name: z.string() });
 const kecamatan = z.enum(["bogor-barat", "bogor-selatan", "bogor-tengah", "bogor-timur", "bogor-utara", "tanah-sareal"]);
 const checked = {
   checkedByTeam: z.boolean().describe("Benar bila jawaban fasilitasnya sudah diperiksa tim AksesBogor"),
+  verifiedBy: z.enum(["tim", "admin"]).describe("tim: diperiksa verifikator; admin: diterbitkan langsung oleh admin tanpa verifikator kedua"),
   source: z.string().describe("Asal data aksesibilitasnya"),
 };
 const placeItem = z.union([

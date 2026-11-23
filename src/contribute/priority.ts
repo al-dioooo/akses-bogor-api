@@ -72,7 +72,7 @@ export async function kecamatanPriority(db: Db): Promise<KecamatanPriority | nul
     await db.execute(sql`
       SELECT d.slug, d.name,
         coalesce((SELECT sum(c.count) FROM disability_counts c WHERE c.district_slug = d.slug AND c.year = ${year} AND c.source_id = ${DISABILITY_SOURCE.id}), 0)::int AS "registered",
-        (SELECT count(*) FROM places p WHERE p.district_slug = d.slug)::int AS "verifiedPlaces",
+        (SELECT count(*) FROM places p WHERE p.district_slug = d.slug AND p.unpublished_at IS NULL)::int AS "verifiedPlaces",
         (SELECT count(*) FROM osm_places o WHERE o.district_slug = d.slug AND ${withoutAksesBogorData})::int AS "facilitiesWithoutData"
       FROM districts d ORDER BY d.slug`),
   );

@@ -584,7 +584,16 @@
                           "lastVerifiedAt": {
                             "type": "string",
                             "format": "date-time",
-                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                            "description": "Waktu verifikasi terakhir, atau waktu admin menerbitkan bila `verifiedBy` bernilai `admin`"
+                          },
+                          "verifiedBy": {
+                            "type": "string",
+                            "enum": [
+                              "tim",
+                              "admin"
+                            ],
+                            "description": "`tim`: diterbitkan verifikator dari laporan. `admin`: dibuat, diubah, atau diterbitkan langsung oleh admin tanpa pemeriksaan orang kedua; web menulis \"Diterbitkan langsung oleh admin\", bukan \"Diverifikasi\" (ADR-0051)"
                           },
                           "coverPhoto": {
                             "nullable": true,
@@ -639,6 +648,7 @@
                           "summary",
                           "location",
                           "lastVerifiedAt",
+                          "verifiedBy",
                           "coverPhoto"
                         ],
                         "additionalProperties": false
@@ -1337,7 +1347,16 @@
                     "lastVerifiedAt": {
                       "type": "string",
                       "format": "date-time",
-                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                      "description": "Waktu verifikasi terakhir, atau waktu admin menerbitkan bila `verifiedBy` bernilai `admin`"
+                    },
+                    "verifiedBy": {
+                      "type": "string",
+                      "enum": [
+                        "tim",
+                        "admin"
+                      ],
+                      "description": "`tim`: diterbitkan verifikator dari laporan. `admin`: dibuat, diubah, atau diterbitkan langsung oleh admin tanpa pemeriksaan orang kedua; web menulis \"Diterbitkan langsung oleh admin\", bukan \"Diverifikasi\" (ADR-0051)"
                     },
                     "landmark": {
                       "nullable": true,
@@ -1499,6 +1518,7 @@
                     "summary",
                     "location",
                     "lastVerifiedAt",
+                    "verifiedBy",
                     "landmark",
                     "description",
                     "facilities",
@@ -8650,7 +8670,16 @@
                     "lastVerifiedAt": {
                       "type": "string",
                       "format": "date-time",
-                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                      "description": "Waktu verifikasi terakhir, atau waktu admin menerbitkan bila `verifiedBy` bernilai `admin`"
+                    },
+                    "verifiedBy": {
+                      "type": "string",
+                      "enum": [
+                        "tim",
+                        "admin"
+                      ],
+                      "description": "`tim`: diterbitkan verifikator dari laporan. `admin`: dibuat, diubah, atau diterbitkan langsung oleh admin tanpa pemeriksaan orang kedua; web menulis \"Diterbitkan langsung oleh admin\", bukan \"Diverifikasi\" (ADR-0051)"
                     },
                     "landmark": {
                       "nullable": true,
@@ -8766,6 +8795,7 @@
                     "status",
                     "summary",
                     "lastVerifiedAt",
+                    "verifiedBy",
                     "landmark",
                     "description",
                     "facilities",
@@ -10224,6 +10254,14 @@
                               "type": "string",
                               "format": "date-time",
                               "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                            },
+                            "verifiedBy": {
+                              "type": "string",
+                              "enum": [
+                                "tim",
+                                "admin"
+                              ],
+                              "description": "`admin`: diterbitkan langsung oleh admin, tanpa pemeriksaan orang kedua (ADR-0051)"
                             }
                           },
                           "required": [
@@ -10233,7 +10271,8 @@
                             "category",
                             "district",
                             "status",
-                            "lastVerifiedAt"
+                            "lastVerifiedAt",
+                            "verifiedBy"
                           ],
                           "additionalProperties": false
                         },
@@ -11842,13 +11881,22 @@
                                 "type": "string",
                                 "format": "date-time",
                                 "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                              },
+                              "verifiedBy": {
+                                "type": "string",
+                                "enum": [
+                                  "tim",
+                                  "admin"
+                                ],
+                                "description": "`admin`: diterbitkan langsung oleh admin, web tidak menyebutnya terverifikasi (ADR-0051)"
                               }
                             },
                             "required": [
                               "type",
                               "placeId",
                               "name",
-                              "lastVerifiedAt"
+                              "lastVerifiedAt",
+                              "verifiedBy"
                             ],
                             "additionalProperties": false
                           },
@@ -11975,6 +12023,14 @@
                                     "type": "string",
                                     "format": "date-time",
                                     "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                                  },
+                                  "verifiedBy": {
+                                    "type": "string",
+                                    "enum": [
+                                      "tim",
+                                      "admin"
+                                    ],
+                                    "description": "`admin`: diterbitkan langsung oleh admin, tanpa pemeriksaan orang kedua (ADR-0051)"
                                   }
                                 },
                                 "required": [
@@ -11984,7 +12040,8 @@
                                   "category",
                                   "district",
                                   "status",
-                                  "lastVerifiedAt"
+                                  "lastVerifiedAt",
+                                  "verifiedBy"
                                 ],
                                 "additionalProperties": false
                               },
@@ -12725,13 +12782,22 @@
                                 "type": "string",
                                 "format": "date-time",
                                 "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                              },
+                              "verifiedBy": {
+                                "type": "string",
+                                "enum": [
+                                  "tim",
+                                  "admin"
+                                ],
+                                "description": "`admin`: diterbitkan langsung oleh admin, web tidak menyebutnya terverifikasi (ADR-0051)"
                               }
                             },
                             "required": [
                               "type",
                               "placeId",
                               "name",
-                              "lastVerifiedAt"
+                              "lastVerifiedAt",
+                              "verifiedBy"
                             ],
                             "additionalProperties": false
                           },
