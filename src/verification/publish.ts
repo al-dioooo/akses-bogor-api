@@ -2,7 +2,7 @@
 // foto yang lolos moderasi ke bucket publik (dengan area kabur), lalu membuat atau memperbarui lokasi yang sama. Laporan
 // perubahan dan kekurangan tidak pernah membuat lokasi kedua.
 import { randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { audit, diff, type AuditEntry } from "../audit/log.js";
 import type { Db } from "../db/client.js";
 import { photoDeletions, placeFacilities, places, photos, reports } from "../db/schema.js";
@@ -29,6 +29,18 @@ export type PublishInput = {
 };
 
 type Log = { warn: (obj: object, msg: string) => void };
+
+/**
+ * Terbit langsung oleh admin (ADR-0051): laporan milik admin itu sendiri boleh diterbitkan, tempat diberi label admin,
+ * alasan masuk log audit, dan tidak ada email status. Jawaban sudah diberi bukti oleh pemanggil (`directAnswers`).
+ */
+export type DirectPublish = {
+  reason: string;
+  /** Foto tayang tempat ini yang dihapus admin di transaksi yang sama. */
+  removePhotoIds?: string[];
+  /** Kandidat OpenStreetMap asal tempat baru, dicatat di log audit. */
+  osm?: { type: string; id: number };
+};
 
 const invalid = (code: string, message: string) => new HttpError(400, code, message);
 
@@ -59,12 +71,13 @@ const snapshot = (p: { name: string; category: string; districtSlug: string; loc
   facilities: Object.fromEntries(facilities.map((f) => [f.facility, { answer: f.answer, reason: f.reason, note: f.note }])),
 });
 
-export async function publishReport(db: Db, store: PhotoStore | undefined, viewerId: string, id: string, input: PublishInput, now: Date, log?: Log) {
+export async function publishReport(db: Db, store: PhotoStore | undefined, viewerId: string, id: string, input: PublishInput, now: Date, log?: Log, direct?: DirectPublish) {
   // Berkas publik yang sudah disalin; dihapus lagi bila transaksi gagal.
   const copied: string[] = [];
   try {
     const result = await db.transaction(async (tx) => {
-      const report = await lockReport(tx, id, viewerId);
+      // FR-37 berlaku untuk verifikator; admin yang menerbitkan langsung menerbitkan laporannya sendiri (ADR-0051).
+      const report = await lockReport(tx, id, direct ? null : viewerId);
       const facilities = finalAnswers(input.facilities);
 
       const [place] = report.placeId
@@ -126,9 +139,9 @@ export async function publishReport(db: Db, store: PhotoStore | undefined, viewe
         facilitiesRelevant: status.relevant,
         facilitiesUnknown: status.unknown,
         lastVerifiedAt: now,
-        // Diterbitkan verifikator: label "langsung oleh admin" tidak berlaku lagi (ADR-0051).
-        adminPublishedAt: null,
-        adminPublishedBy: null,
+        // Diterbitkan verifikator: label "langsung oleh admin" tidak berlaku lagi; terbit langsung memasangnya (ADR-0051).
+        adminPublishedAt: direct ? now : null,
+        adminPublishedBy: direct ? viewerId : null,
         updatedAt: now,
       };
       let before: Snapshot | null = null;
@@ -154,6 +167,11 @@ export async function publishReport(db: Db, store: PhotoStore | undefined, viewe
       const privateKeys = published.map(({ photo }) => photo.storageKey);
       if (privateKeys.length) await tx.insert(photoDeletions).values(privateKeys.map((storageKey) => ({ storageKey }))).onConflictDoNothing();
       const hiddenKeys = await dropReportPhotos(tx, { ids: hidden.map((p) => p.id) });
+      // Foto tempat yang dihapus admin: barisnya dibuang dan berkas publiknya diantrekan untuk dihapus.
+      const removed = direct?.removePhotoIds?.length && place
+        ? await tx.select({ id: photos.id, storageKey: photos.storageKey, tag: photos.tag }).from(photos).where(and(inArray(photos.id, direct.removePhotoIds), eq(photos.placeId, placeId), eq(photos.moderation, "tayang")))
+        : [];
+      const removedKeys = removed.length ? await dropReportPhotos(tx, { ids: removed.map((p) => p.id) }) : [];
 
       await tx
         .update(reports)
@@ -171,15 +189,21 @@ export async function publishReport(db: Db, store: PhotoStore | undefined, viewe
 
       const actor = { userId: viewerId };
       const after = snapshot({ ...values, location }, facilities);
+      const why = direct ? { alasan: direct.reason, ...(direct.osm ? { osm: direct.osm } : {}) } : {};
+      const placeAction = direct ? (place ? "diubah_admin" : "dibuat_admin") : place ? "diubah" : "dibuat";
+      // Foto yang ditambah atau dihapus pada tempat yang sudah ada ikut tercatat di riwayat tempat; rinciannya di entri `foto`.
+      const photoChange = place && (published.length > 0 || removed.length > 0) ? { photos: { ditambah: published.length, dihapus: removed.length } } : {};
       const entries: AuditEntry[] = [
-        { entity: "lokasi", entityId: placeId, actor, action: place ? "diubah" : "dibuat", changes: { ...diff(before, after), laporan: id }, at: now },
-        { entity: "laporan", entityId: id, actor, action: "diterbitkan", changes: { status: { sebelum: report.status, sesudah: "diterbitkan" }, lokasi: placeId }, at: now },
+        { entity: "lokasi", entityId: placeId, actor, action: placeAction, changes: { ...diff(before, after), ...photoChange, laporan: id, ...why }, at: now },
+        { entity: "laporan", entityId: id, actor, action: direct ? "terbit_langsung" : "diterbitkan", changes: { status: { sebelum: report.status, sesudah: "diterbitkan" }, lokasi: placeId, ...why }, at: now },
+        ...removed.map((photo): AuditEntry => ({ entity: "foto", entityId: photo.id, actor, action: "dihapus", changes: { lokasi: placeId, tag: photo.tag, alasan: direct!.reason }, at: now })),
         ...published.map(({ photo }): AuditEntry => ({ entity: "foto", entityId: photo.id, actor, action: "diterbitkan", changes: { laporan: id, tag: photo.tag, areaKabur: photo.blurRegions?.length ?? 0 }, at: now })),
         ...hidden.map((photo): AuditEntry => ({ entity: "foto", entityId: photo.id, actor, action: "dihapus", changes: { laporan: id, disembunyikan: true }, at: now })),
       ];
       await audit(tx, ...entries);
-      await queueEmail(tx, id, "diterbitkan", now);
-      return { placeId, status: status.status, removeKeys: [...privateKeys, ...hiddenKeys] };
+      // Admin yang menerbitkan laporannya sendiri tidak perlu email "laporan Anda diterbitkan".
+      if (!direct) await queueEmail(tx, id, "diterbitkan", now);
+      return { placeId, status: status.status, removeKeys: [...privateKeys, ...hiddenKeys, ...removedKeys] };
     });
     await removeQueuedFiles(db, store, result.removeKeys, log);
     return { placeId: result.placeId, status: result.status };

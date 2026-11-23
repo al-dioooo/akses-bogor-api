@@ -2,6 +2,7 @@
 import { z } from "zod";
 import { facilityAnswer, facilityKind, placeCategory, placeStatus, unavailableReason } from "../db/schema.js";
 import { photo } from "../places/schemas.js";
+import { facilityInput, line, paragraph, photoInput, point } from "../reports/schemas.js";
 
 const category = z.enum(placeCategory.enumValues);
 const status = z.enum(placeStatus.enumValues);
@@ -98,4 +99,50 @@ export const candidateList = z.object({
     }),
   ),
   attribution: z.string(),
+});
+
+/** Alasan admin untuk setiap tindakan, masuk log audit (ADR-0051). Boleh beberapa baris, tanpa karakter kontrol lain. */
+const reason = z
+  .string()
+  .trim()
+  .min(5)
+  .max(500)
+  .regex(/^(?:[^\p{C}]|[\n\r\t])+$/u)
+  .describe("Alasan tindakan, 5 sampai 500 karakter; masuk log audit, tidak tampil untuk publik");
+
+export const adminPlaceBody = z.object({
+  name: line(120),
+  category,
+  location: point,
+  landmark: line(140).nullable().optional(),
+  description: paragraph(1000).nullable().optional(),
+  facilities: z
+    .array(facilityInput)
+    .length(4)
+    .refine((items) => new Set(items.map((f) => f.facility)).size === 4, "Setiap fasilitas dijawab tepat sekali")
+    .describe("Keempat jawaban. Tersedia dan Tidak perlu tanpa foto bertag fasilitas itu disimpan sebagai Belum tahu"),
+  photos: z
+    .array(photoInput)
+    .max(10)
+    .default([])
+    .refine((items) => new Set(items.map((p) => p.id)).size === items.length, "Foto tidak boleh dobel")
+    .describe("Foto baru dari `POST /reports/photos` milik akun ini; tayang tanpa penyunting kaburkan"),
+  reason,
+  osm: z
+    .object({ type: z.enum(["node", "way", "relation"]), id: z.number().int().positive() })
+    .optional()
+    .describe("Kandidat OpenStreetMap asal tempat baru, dicatat di log audit (ADR-0049)"),
+});
+
+export const adminPlaceUpdateBody = adminPlaceBody.omit({ osm: true }).extend({
+  version: z.iso.datetime().describe("`version` dari `GET /admin/places/{id}`"),
+  removePhotos: z.array(z.uuid()).max(20).default([]).describe("Id foto tayang tempat ini yang dihapus"),
+});
+
+export const reasonBody = z.object({ reason });
+
+export const saveResult = z.object({
+  placeId: z.uuid(),
+  status,
+  downgraded: z.array(z.enum(facilityKind.enumValues)).describe("Fasilitas yang dijawab Tersedia atau Tidak perlu tanpa foto, jadi disimpan sebagai Belum tahu"),
 });
