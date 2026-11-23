@@ -3,11 +3,11 @@
 import { HttpError } from "../http/errors.js";
 import type { KnowledgeHit } from "../knowledge/search.js";
 import type { AgentMessage, AgentModel, ToolCall } from "./model.js";
-import { guardRouteClaims, systemPrompt } from "./prompt.js";
+import { guardRouteClaims, systemPrompt, type ChosenPlace } from "./prompt.js";
 import type { KecamatanPriority } from "../contribute/priority.js";
 import type { PlaceCard, RouteCard } from "./cards.js";
-import { CARD_TOOLS, runTool, toolDefinitions } from "./registry.js";
-import { placeAccessibility, type ToolContext } from "./tools.js";
+import { AGENT_TOOLS, CARD_TOOLS, runTool, toolDefinitions, type RegisteredTool } from "./registry.js";
+import type { ToolContext } from "./tools.js";
 
 /** Putaran alat paling banyak; langkah setelahnya meminta model menjawab tanpa alat. */
 export const MAX_TOOL_ROUNDS = 3;
@@ -31,14 +31,45 @@ export type Source =
 export type Card = PlaceCard | RouteCard | ({ type: "prioritas" } & KecamatanPriority);
 export type AskResult = { answer: string; sources: Source[]; model: string | null; cards: Card[] };
 
-type Deps = { model: AgentModel; ctx: ToolContext; deadlineMs?: number };
+/** Apa yang sudah dibaca dari hasil alat selama satu pertanyaan, untuk pemeriksaan jawaban. */
+export type Seen = {
+  /** Ada lokasi yang jawaban fasilitasnya sudah diperiksa tim dan statusnya bukan belum_diketahui. */
+  checkedPlace: boolean;
+};
+
+/**
+ * Satu jenis agen: daftar alat, instruksi sistem, dan pemeriksaan jawaban. Agen kontributor (ADR-0043) dan asisten rute
+ * publik (ADR-0050) memakai putaran alat yang sama dengan profil berbeda.
+ */
+export type AgentProfile = {
+  tools: readonly RegisteredTool[];
+  /** `ctx` hanya untuk membaca apakah titik awal ada; nilai posisinya tidak boleh masuk instruksi. */
+  system: (place?: ChosenPlace, ctx?: ToolContext) => string;
+  guard: (text: string, seen: Seen) => string;
+};
+
+export const CONTRIBUTOR_PROFILE: AgentProfile = { tools: AGENT_TOOLS, system: systemPrompt, guard: guardRouteClaims };
+
+type Checked = { checkedByTeam?: unknown; status?: unknown };
+const isChecked = (p: Checked) => p.checkedByTeam === true && p.status !== "belum_diketahui";
+/** Hasil alat yang memuat lokasi terperiksa tim: satu lokasi (place_accessibility) atau daftar (find_place, nearby_places). */
+function hasCheckedPlace(result: unknown) {
+  const value = (result ?? {}) as Checked & { places?: unknown };
+  return isChecked(value) || (Array.isArray(value.places) && (value.places as Checked[]).some(isChecked));
+}
+
+type Deps = { model: AgentModel; ctx: ToolContext; deadlineMs?: number; profile?: AgentProfile };
 
 /**
  * Jawaban agen untuk satu pertanyaan. `placeId` diisi bila pengguna bertanya dari halaman sebuah tempat; melempar 404
  * bila tempatnya tidak ada.
  */
-export async function askAgent({ model, ctx, deadlineMs = QUESTION_DEADLINE_MS }: Deps, input: { placeId?: string; question: string; history?: Turn[] }): Promise<AskResult> {
-  const place = input.placeId ? await placeAccessibility(ctx, { placeId: input.placeId }) : undefined;
+export async function askAgent(
+  { model, ctx, deadlineMs = QUESTION_DEADLINE_MS, profile = CONTRIBUTOR_PROFILE }: Deps,
+  input: { placeId?: string; question: string; history?: Turn[] },
+): Promise<AskResult> {
+  const place = input.placeId ? ((await runTool(ctx, "place_accessibility", { placeId: input.placeId }, profile.tools)) as ChosenPlace) : undefined;
+  const seen: Seen = { checkedPlace: place ? hasCheckedPlace(place) : false };
   const sources = new Map<string, Source>();
   const addPlace = (p: { id: string; name: string; lastVerifiedAt: string }) =>
     sources.set(`lokasi:${p.id}`, { type: "lokasi", placeId: p.id, name: p.name, lastVerifiedAt: p.lastVerifiedAt });
@@ -58,7 +89,8 @@ export async function askAgent({ model, ctx, deadlineMs = QUESTION_DEADLINE_MS }
    */
   const run = async (call: ToolCall): Promise<{ content: string; isError?: true }> => {
     try {
-      const result = await runTool(ctx, call.name, call.input);
+      const result = await runTool(ctx, call.name, call.input, profile.tools);
+      if (hasCheckedPlace(result)) seen.checkedPlace = true;
       if (call.name === "place_accessibility") addPlace(result as { id: string; name: string; lastVerifiedAt: string });
       if (call.name === "search_knowledge") addPassages((result as { passages: KnowledgeHit[] }).passages);
       if (call.name === "kecamatan_priority") {
@@ -85,8 +117,8 @@ export async function askAgent({ model, ctx, deadlineMs = QUESTION_DEADLINE_MS }
     }
   };
 
-  const system = systemPrompt(place);
-  const tools = toolDefinitions();
+  const system = profile.system(place, ctx);
+  const tools = toolDefinitions(profile.tools);
   const messages: AgentMessage[] = [...(input.history ?? []), { role: "user", content: input.question }];
   const signal = AbortSignal.timeout(deadlineMs);
   let answeredBy: string | null = null;
@@ -106,12 +138,12 @@ export async function askAgent({ model, ctx, deadlineMs = QUESTION_DEADLINE_MS }
       messages.push({ role: "assistant", content: "", toolCalls: [call] }, { role: "tool", toolCallId: call.id, name: call.name, ...(await run(call)) });
       continue;
     }
-    if (turn.kind === "answer") return { answer: guardRouteClaims(turn.text), sources: [...sources.values()], model: answeredBy, cards };
+    if (turn.kind === "answer") return { answer: profile.guard(turn.text, seen), sources: [...sources.values()], model: answeredBy, cards };
     if (last) break;
     if (turn.text && turn.calls.every((call) => CARD_TOOLS.has(call.name))) {
       // Model sudah menulis jawabannya dan hanya meminta kartu: kartu ditampilkan tanpa langkah model tambahan.
       for (const call of turn.calls.slice(0, MAX_CALLS_PER_ROUND)) await run(call);
-      return { answer: guardRouteClaims(turn.text), sources: [...sources.values()], model: answeredBy, cards };
+      return { answer: profile.guard(turn.text, seen), sources: [...sources.values()], model: answeredBy, cards };
     }
     messages.push({ role: "assistant", content: turn.text ?? "", toolCalls: turn.calls, raw: turn.raw });
     for (const [index, call] of turn.calls.entries()) {
