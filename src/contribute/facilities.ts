@@ -1,7 +1,8 @@
 // Tempat umum dari OpenStreetMap dalam empat kategori MVP (ADR-0004) sebagai calon tujuan kontributor (ADR-0043):
-// kueri Overpass, pengubah hasilnya, penyimpanan, dan pencarian tempat yang belum punya data AksesBogor.
+// kueri Overpass, pengubah hasilnya, penyimpanan, pencarian tempat yang belum punya data AksesBogor, dan kandidat
+// lapisan "Belum ada data" di Peta (ADR-0049).
 // Data © kontributor OpenStreetMap, berlisensi ODbL.
-import { sql } from "drizzle-orm";
+import { sql, type SQL } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import type { placeCategory } from "../db/schema.js";
 import { KOTA_BOGOR_RELATION, OSM_ATTRIBUTION, OSM_LICENSE, type OverpassElement } from "../knowledge/osm.js";
@@ -87,7 +88,7 @@ export type ContributionPlace = { osm: OsmTarget; name: string | null; category:
 type CandidateRow = { osm_type: string; osm_id: number | string; name: string | null; category: PlaceCategory; slug: string; district: string };
 
 /** Syarat SQL: tidak ada lokasi AksesBogor berkategori sama dalam `SAME_PLACE_METERS` dari tempat OSM `o`. */
-// Lokasi yang diturunkan admin tidak dihitung, jadi kandidat OSM di dekatnya tampil lagi (ADR-0050).
+// Lokasi yang diturunkan admin tidak dihitung, jadi kandidat OSM di dekatnya tampil lagi (ADR-0051).
 export const withoutAksesBogorData = sql`NOT EXISTS (SELECT 1 FROM places p WHERE p.unpublished_at IS NULL AND p.category = o.category AND ST_DWithin(p.location::geography, o.location::geography, ${SAME_PLACE_METERS}))`;
 
 /**
@@ -140,3 +141,61 @@ export async function districtsByMissingData(db: Db): Promise<{ slug: string; co
   );
 }
 
+
+/** Batas kandidat dalam satu jawaban. Kota Bogor punya sekitar 650 tempat OSM empat kategori. */
+export const CANDIDATE_LIMIT = 3000;
+const OSM_COPYRIGHT = "https://www.openstreetmap.org/copyright";
+
+export type CandidateFilters = { q?: string; category?: PlaceCategory[]; district?: string[] };
+export type Candidate = {
+  osm: OsmTarget;
+  name: string | null;
+  category: PlaceCategory;
+  district: { slug: string; name: string };
+  location: { lat: number; lng: number };
+  /** Nilai mentah tag `wheelchair` OSM, belum diperiksa tim; null bila tidak ada. */
+  wheelchair: string | null;
+};
+
+const escapeLike = (value: string) => value.replace(/[\\%_]/g, (c) => `\\${c}`);
+const anyOf = (column: SQL, values?: readonly string[]) => (values?.length ? sql`AND ${column} IN (${sql.join(values.map((v) => sql`${v}`), sql`, `)})` : sql``);
+
+/**
+ * Kandidat lapisan "Belum ada data" di Peta (ADR-0049): tempat OSM tanpa lokasi AksesBogor berkategori sama dalam
+ * `SAME_PLACE_METERS`, dengan titiknya. Kandidat tidak punya status dan tidak pernah dihitung sebagai lokasi terbit.
+ * Sumbernya ikut, supaya atribusi ODbL selalu bersama datanya.
+ */
+export async function listCandidates(db: Db, filters: CandidateFilters) {
+  const rows = rowsOf<CandidateRow & { lat: number; lng: number; wheelchair: string | null }>(
+    await db.execute(sql`
+      SELECT o.osm_type, o.osm_id, o.name, o.category, d.slug, d.name AS district, ST_Y(o.location) AS lat, ST_X(o.location) AS lng, o.tags->>'wheelchair' AS wheelchair
+      FROM osm_places o JOIN districts d ON d.slug = o.district_slug
+      WHERE ${withoutAksesBogorData}
+        ${filters.q ? sql`AND o.name ILIKE ${`%${escapeLike(filters.q)}%`}` : sql``}
+        ${anyOf(sql`o.category::text`, filters.category)}
+        ${anyOf(sql`o.district_slug`, filters.district)}
+      ORDER BY o.osm_type, o.osm_id
+      LIMIT ${CANDIDATE_LIMIT}`),
+  );
+  const [source] = rowsOf<{ title: string; retrieved_at: Date | string }>(
+    await db.execute(sql`SELECT title, retrieved_at FROM knowledge_sources WHERE id = ${FACILITIES_SOURCE_ID}`),
+  );
+  const candidates: Candidate[] = rows.map((r) => ({
+    osm: { osmType: r.osm_type, osmId: Number(r.osm_id) },
+    name: r.name,
+    category: r.category,
+    district: { slug: r.slug, name: r.district },
+    location: { lat: Number(r.lat), lng: Number(r.lng) },
+    wheelchair: r.wheelchair,
+  }));
+  return {
+    candidates,
+    source: {
+      title: source?.title ?? "Kampus, masjid, halte, dan rumah sakit di Kota Bogor (OpenStreetMap)",
+      license: OSM_LICENSE,
+      attribution: "© kontributor OpenStreetMap",
+      url: OSM_COPYRIGHT,
+      retrievedAt: source ? new Date(source.retrieved_at).toISOString() : null,
+    },
+  };
+}

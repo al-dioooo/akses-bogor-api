@@ -1,4 +1,4 @@
--- Tempat yang dibuat, diubah, atau diterbitkan langsung oleh admin, dan tempat yang diturunkan dengan alasannya (ADR-0050).
+-- Tempat yang dibuat, diubah, atau diterbitkan langsung oleh admin, dan tempat yang diturunkan dengan alasannya (ADR-0051).
 -- Semua kolom boleh kosong, jadi baris lama tetap sah: lewat verifikasi dan tayang.
 ALTER TABLE "places" ADD COLUMN "admin_published_at" timestamp with time zone;--> statement-breakpoint
 ALTER TABLE "places" ADD COLUMN "admin_published_by" uuid;--> statement-breakpoint

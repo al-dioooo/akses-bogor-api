@@ -79,7 +79,7 @@ async function checkLimits(db: Db, reporterId: string, now: Date) {
 export async function submitReport(db: Db, reporterId: string, body: ReportBody, now: Date, opts: { skipLimits?: boolean } = {}) {
   const repeat = await existing(db, reporterId, body.submissionKey);
   if (repeat) return { report: repeat, created: false };
-  // Batas per akun tidak berlaku untuk admin yang menerbitkan langsung (ADR-0050).
+  // Batas per akun tidak berlaku untuk admin yang menerbitkan langsung (ADR-0051).
   if (!opts.skipLimits) await checkLimits(db, reporterId, now);
 
   let place: { name: string; category: NonNullable<ReportBody["category"]>; location: { lat: number; lng: number }; landmark: string | null } | null = null;

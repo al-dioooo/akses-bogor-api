@@ -28,10 +28,10 @@ describe("systemPrompt", () => {
   });
 
   it("asks for plain text, since the web shows the answer as it is", () => {
-    expect(systemPrompt({ id: "x", name: "Tempat", lastVerifiedAt: "2026-10-18T03:00:00.000Z" })).toContain("tanpa Markdown");
+    expect(systemPrompt({ id: "x", name: "Tempat", lastVerifiedAt: "2026-10-18T03:00:00.000Z", verifiedBy: "tim" })).toContain("tanpa Markdown");
   });
 
   it("writes the verification date as a WIB calendar date", () => {
-    expect(systemPrompt({ id: "x", name: "Tempat", lastVerifiedAt: "2026-10-17T18:00:00.000Z" })).toContain('"lastVerifiedAt":"2026-10-18"');
+    expect(systemPrompt({ id: "x", name: "Tempat", lastVerifiedAt: "2026-10-17T18:00:00.000Z", verifiedBy: "tim" })).toContain('"lastVerifiedAt":"2026-10-18"');
   });
 });
