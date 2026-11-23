@@ -68,6 +68,11 @@ const schema = z
      */
     DISABILITY_DATA_ENABLED: z.stringbool().default(false),
     /**
+     * Asisten rute publik `/route-assistant/*` untuk siapa pun, juga tanpa akun (ADR-0050), dan rute jalan kaki ke lokasi
+     * AksesBogor tanpa akun. Mati sampai Kebijakan Privasi yang menyebut asisten ini dirilis.
+     */
+    ROUTE_ASSISTANT_ENABLED: z.stringbool().default(false),
+    /**
      * Penyedia model agen (ADR-0047): `anthropic` untuk Claude API, atau `openrouter`. Tidak ada cadangan otomatis ke
      * penyedia lain; pertanyaan hanya dikirim ke penyedia yang dipilih di sini.
      */

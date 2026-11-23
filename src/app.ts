@@ -96,10 +96,11 @@ export async function buildApp(env: Env, deps: { db?: Db; now?: () => Date; fetc
     origin: (origin, callback) => callback(null, originAllowed(origin)),
     methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
   });
+  const visitorKey = createRateLimitKey(env.WEB_SERVER_SECRET);
   await app.register(rateLimit, {
     max: 120,
     timeWindow: "1 minute",
-    keyGenerator: createRateLimitKey(env.WEB_SERVER_SECRET),
+    keyGenerator: visitorKey,
     allowList: (request) => request.url === "/healthz",
   });
 
@@ -175,6 +176,8 @@ export async function buildApp(env: Env, deps: { db?: Db; now?: () => Date; fetc
     disabilityData: env.DISABILITY_DATA_ENABLED,
     walking: secretToken ? mapboxWalking({ token: secretToken, now, fetch: deps.fetch }) : undefined,
     model: agentModel(env, { fetch: deps.fetch, budget: agentBudget, log: app.log }),
+    assistantEnabled: env.ROUTE_ASSISTANT_ENABLED,
+    visitorKey,
     now,
   });
   if (env.NODE_ENV !== "test") {
