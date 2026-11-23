@@ -17,6 +17,19 @@ export type ProviderResult = MapboxHint | GoogleHint | { provider: "mapbox" | "g
 
 export type HintProvider = { name: "mapbox" | "google"; lookup: (target: HintTarget) => Promise<ProviderResult> };
 
+/** Galat penyedia dengan status HTTP-nya (null bila tidak terhubung). Pesannya tidak pernah memuat URL, kunci, atau body. */
+export class ProviderError extends Error {
+  constructor(
+    message: string,
+    readonly status: number | null,
+  ) {
+    super(message);
+  }
+}
+
+/** Pencatat galat penyedia; hanya nama penyedia dan status yang dicatat. */
+export type HintLog = { warn: (fields: { provider: string; status: number | null }, message: string) => void };
+
 /** Tanggal di WIB (UTC+7), supaya batas harian dihitung ulang tengah malam WIB. */
 export const wibDate = (date: Date) => new Date(date.getTime() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
@@ -33,8 +46,18 @@ export function dailyBudget(perDay: number, now: () => Date) {
   };
 }
 
-/** Petunjuk dari semua penyedia yang menyala, bersamaan. Penyedia yang gagal tidak menggagalkan yang lain. */
-export async function lookupHints(target: HintTarget, providers: readonly HintProvider[]): Promise<ProviderResult[]> {
+/**
+ * Petunjuk dari semua penyedia yang menyala, bersamaan. Penyedia yang gagal tidak menggagalkan yang lain, dan galatnya
+ * dicatat dengan nama penyedia dan status saja.
+ */
+export async function lookupHints(target: HintTarget, providers: readonly HintProvider[], log?: HintLog): Promise<ProviderResult[]> {
   if (!target.name) return providers.map((p) => ({ provider: p.name, result: "none" as const }));
-  return Promise.all(providers.map((p) => p.lookup(target).catch(() => ({ provider: p.name, result: "unavailable" as const }))));
+  return Promise.all(
+    providers.map((p) =>
+      p.lookup(target).catch((error: unknown) => {
+        log?.warn({ provider: p.name, status: error instanceof ProviderError ? error.status : null }, "Petunjuk penyedia gagal dimuat");
+        return { provider: p.name, result: "unavailable" as const };
+      }),
+    ),
+  );
 }

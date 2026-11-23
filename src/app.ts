@@ -139,8 +139,8 @@ export async function buildApp(env: Env, deps: { db?: Db; now?: () => Date; fetc
   // Petunjuk aksesibilitas langsung dari penyedia (ADR-0052): mati bawaan, Google hanya dengan kuncinya sendiri.
   const hintProviders = env.PROVIDER_HINTS_ENABLED
     ? [
-        ...(secretToken ? [mapboxHints({ token: secretToken, now, fetch: deps.fetch })] : []),
-        ...(env.GOOGLE_MAPS_API_KEY ? [googleHints({ apiKey: env.GOOGLE_MAPS_API_KEY, now, fetch: deps.fetch })] : []),
+        ...(secretToken ? [mapboxHints({ token: secretToken, now, fetch: deps.fetch, perDay: env.PROVIDER_HINTS_MAPBOX_PER_DAY })] : []),
+        ...(env.GOOGLE_MAPS_API_KEY ? [googleHints({ apiKey: env.GOOGLE_MAPS_API_KEY, now, fetch: deps.fetch, perDay: env.PROVIDER_HINTS_GOOGLE_PER_DAY })] : []),
       ]
     : [];
   await app.register(hintRoutes, { providers: hintProviders, stored: env.PROVIDER_HINTS_ENABLED, now });
