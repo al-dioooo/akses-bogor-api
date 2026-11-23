@@ -68,8 +68,7 @@ export const photoInput = z.object({
 /** Isian yang wajib ada untuk laporan baru dan perubahan; laporan kekurangan memakai data lokasi saat ini. */
 const PLACE_FIELDS = ["name", "category", "location"] as const;
 
-export const reportBody = z
-  .object({
+const reportFields = z.object({
     submissionKey: z.uuid().describe("Kunci acak dari draf; kirim ulang dengan kunci sama mengembalikan laporan yang sudah ada (ADR-0033)"),
     kind: z.enum(reportKind.enumValues).describe("baru, perubahan (Edit lokasi), atau kekurangan (Laporkan kekurangan)"),
     placeId: z.uuid().optional().describe("Wajib untuk perubahan dan kekurangan; tidak boleh ada untuk laporan baru"),
@@ -89,26 +88,51 @@ export const reportBody = z
       .default([])
       .refine((items) => new Set(items.map((p) => p.id)).size === items.length, "Foto tidak boleh dobel")
       .describe("0 sampai 10 foto yang sudah diunggah akun ini (FR-25)"),
-  })
-  .superRefine((body, ctx) => {
-    if (body.kind === "baru" && body.placeId) ctx.addIssue({ code: "custom", message: "Laporan baru tidak punya lokasi terkait", path: ["placeId"] });
-    if (body.kind !== "baru" && !body.placeId) ctx.addIssue({ code: "custom", message: "Lokasi terkait wajib diisi", path: ["placeId"] });
-    if (body.kind !== "kekurangan") {
-      for (const field of PLACE_FIELDS) if (body[field] === undefined) ctx.addIssue({ code: "custom", message: "Wajib diisi", path: [field] });
-    }
-  });
+});
+
+function reportRules(body: z.infer<typeof reportFields>, ctx: z.RefinementCtx) {
+  if (body.kind === "baru" && body.placeId) ctx.addIssue({ code: "custom", message: "Laporan baru tidak punya lokasi terkait", path: ["placeId"] });
+  if (body.kind !== "baru" && !body.placeId) ctx.addIssue({ code: "custom", message: "Lokasi terkait wajib diisi", path: ["placeId"] });
+  if (body.kind !== "kekurangan") {
+    for (const field of PLACE_FIELDS) if (body[field] === undefined) ctx.addIssue({ code: "custom", message: "Wajib diisi", path: [field] });
+  }
+}
+
+export const reportBody = reportFields.superRefine(reportRules);
 
 export type ReportBody = z.infer<typeof reportBody>;
+
+/** Badan `POST /reports`: laporan, ditambah terbit langsung khusus admin (ADR-0051). */
+export const reportSubmission = reportFields
+  .extend({
+    publishDirectly: z.boolean().optional().describe("Khusus admin: terbitkan langsung tanpa pemeriksaan orang kedua; akun lain 403 `bukan_admin` (ADR-0051)"),
+    publishReason: z
+      .string()
+      .trim()
+      .min(5)
+      .max(500)
+      .regex(/^(?:[^\p{C}]|[\n\r\t])+$/u)
+      .optional()
+      .describe("Wajib bila `publishDirectly`: alasan admin, masuk log audit"),
+  })
+  .superRefine((body, ctx) => {
+    reportRules(body, ctx);
+    if (body.publishDirectly && !body.publishReason) ctx.addIssue({ code: "custom", message: "Alasan wajib untuk terbit langsung", path: ["publishReason"] });
+  });
 
 export const submittedReport = z
   .object({
     id: z.uuid(),
     kind: z.enum(reportKind.enumValues),
-    status: z.enum(reportStatus.enumValues).describe("Selalu menunggu untuk laporan baru masuk"),
+    status: z.enum(reportStatus.enumValues).describe("Menunggu untuk laporan yang masuk antrean; diterbitkan untuk terbit langsung oleh admin"),
     placeId: z.uuid().nullable(),
     name: z.string().describe("Nama tempat yang dilaporkan"),
     district,
     photos: z.number().int().describe("Jumlah foto yang terpasang"),
     submittedAt: z.iso.datetime(),
+    downgraded: z
+      .array(z.enum(facilityKind.enumValues))
+      .optional()
+      .describe("Hanya untuk terbit langsung: fasilitas Tersedia atau Tidak perlu tanpa foto bertag fasilitas itu, jadi disimpan sebagai Belum tahu"),
   })
   .describe("Laporan masuk antrean verifikasi");

@@ -51,7 +51,7 @@ export type AdminPlaceBody = {
 };
 
 /** Diperiksa sebelum laporan dibuat, supaya isian yang pasti ditolak tidak meninggalkan laporan di antrean. */
-function precheck(body: AdminPlaceBody, store: PhotoStore | undefined) {
+function precheck(body: Pick<AdminPlaceBody, "facilities" | "photos">, store: PhotoStore | undefined) {
   if (body.facilities.some((f) => f.answer === "tidak_tersedia" && !f.reason)) {
     throw new HttpError(400, "alasan_wajib", "Setiap jawaban Tidak tersedia butuh alasan sebelum diterbitkan.");
   }
@@ -79,7 +79,9 @@ const reportOf = (body: AdminPlaceBody, kind: "baru" | "perubahan", placeId?: st
   photos: body.photos,
 });
 
-async function publishDirect(db: Db, store: PhotoStore | undefined, adminId: string, reportId: string, body: AdminPlaceBody, tags: PhotoTag[], now: Date, log: Log | undefined, extra: { version?: string; removePhotoIds?: string[] }) {
+type DirectInput = Pick<AdminPlaceBody, "facilities" | "reason" | "osm"> & Partial<Pick<AdminPlaceBody, "name" | "category" | "location" | "landmark" | "description">>;
+
+async function publishDirect(db: Db, store: PhotoStore | undefined, adminId: string, reportId: string, body: DirectInput, tags: PhotoTag[], now: Date, log: Log | undefined, extra: { version?: string; removePhotoIds?: string[] }) {
   const { final, downgraded } = directAnswers(body.facilities, tags);
   try {
     const published = await publishReport(
@@ -154,4 +156,23 @@ export async function restorePlace(db: Db, adminId: string, placeId: string, rea
       at: now,
     });
   });
+}
+
+const shownTags = async (db: Db, placeId: string) =>
+  (await db.select({ tag: photos.tag }).from(photos).where(and(eq(photos.placeId, placeId), eq(photos.moderation, "tayang")))).map((p) => p.tag);
+
+/**
+ * Laporan Laporkan milik admin yang diterbitkan langsung (`publishDirectly`, ADR-0051). Untuk Edit lokasi dan Laporkan
+ * kekurangan, foto tayang tempat itu ikut menjadi bukti. Kirim ulang dengan kunci draf yang sama mengembalikan laporan
+ * yang sudah ada.
+ */
+export async function publishSubmission(db: Db, store: PhotoStore | undefined, adminId: string, body: ReportBody, reason: string, now: Date, log?: Log) {
+  precheck(body, store);
+  const existing = body.placeId ? await shownTags(db, body.placeId) : [];
+  const { report, created } = await submitReport(db, adminId, body, now, { skipLimits: true });
+  if (!created) return { report, downgraded: [] };
+  const [place] = body.placeId ? await db.select({ updatedAt: places.updatedAt }).from(places).where(eq(places.id, body.placeId)) : [];
+  const input = { name: body.name, category: body.category, location: body.location, landmark: body.landmark, description: body.description, facilities: body.facilities, reason };
+  const published = await publishDirect(db, store, adminId, report.id, input, [...existing, ...body.photos.map((p) => p.tag)], now, log, { version: place?.updatedAt.toISOString() });
+  return { report: { ...report, status: "diterbitkan" as const, placeId: published.placeId }, downgraded: published.downgraded };
 }
