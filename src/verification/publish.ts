@@ -31,7 +31,7 @@ export type PublishInput = {
 type Log = { warn: (obj: object, msg: string) => void };
 
 /**
- * Terbit langsung oleh admin (ADR-0050): laporan milik admin itu sendiri boleh diterbitkan, tempat diberi label admin,
+ * Terbit langsung oleh admin (ADR-0051): laporan milik admin itu sendiri boleh diterbitkan, tempat diberi label admin,
  * alasan masuk log audit, dan tidak ada email status. Jawaban sudah diberi bukti oleh pemanggil (`directAnswers`).
  */
 export type DirectPublish = {
@@ -76,7 +76,7 @@ export async function publishReport(db: Db, store: PhotoStore | undefined, viewe
   const copied: string[] = [];
   try {
     const result = await db.transaction(async (tx) => {
-      // FR-37 berlaku untuk verifikator; admin yang menerbitkan langsung menerbitkan laporannya sendiri (ADR-0050).
+      // FR-37 berlaku untuk verifikator; admin yang menerbitkan langsung menerbitkan laporannya sendiri (ADR-0051).
       const report = await lockReport(tx, id, direct ? null : viewerId);
       const facilities = finalAnswers(input.facilities);
 
@@ -139,9 +139,15 @@ export async function publishReport(db: Db, store: PhotoStore | undefined, viewe
         facilitiesRelevant: status.relevant,
         facilitiesUnknown: status.unknown,
         lastVerifiedAt: now,
+<<<<<<< HEAD
         // Diterbitkan verifikator: label "langsung oleh admin" tidak berlaku lagi; terbit langsung memasangnya (ADR-0050).
         adminPublishedAt: direct ? now : null,
         adminPublishedBy: direct ? viewerId : null,
+=======
+        // Diterbitkan verifikator: label "langsung oleh admin" tidak berlaku lagi (ADR-0051).
+        adminPublishedAt: null,
+        adminPublishedBy: null,
+>>>>>>> feature/kelola-tempat-baca
         updatedAt: now,
       };
       let before: Snapshot | null = null;

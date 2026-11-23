@@ -125,10 +125,19 @@ const routeCardTool = {
 };
 
 export const AGENT_TOOLS = [findPlaceTool, placeAccessibilityTool, knowledgeTool, contributeTool, priorityTool, placeCardTool, routeCardTool] as const;
-/** Alat yang hanya menampilkan kartu di web; model menerima `pesan`-nya saja. */
-export const CARD_TOOLS: ReadonlySet<string> = new Set([placeCardTool.name, routeCardTool.name]);
+/** Alat yang hanya menampilkan kartu di web; model menerima `pesan`-nya saja. `show_route` milik asisten rute publik. */
+export const CARD_TOOLS: ReadonlySet<string> = new Set([placeCardTool.name, routeCardTool.name, "show_route"]);
 export type AgentTool = (typeof AGENT_TOOLS)[number];
 export type ToolName = AgentTool["name"];
+
+/** Satu alat di sebuah daftar alat: agen kontributor (`AGENT_TOOLS`) atau asisten rute publik (ADR-0050). */
+export type RegisteredTool = {
+  name: string;
+  description: string;
+  input: z.ZodType;
+  output: z.ZodType;
+  run: (ctx: ToolContext, input: never) => Promise<unknown>;
+};
 
 /** Satu alat dalam larik `tools` format OpenAI chat completions, yang juga dipakai OpenRouter. */
 export type ToolDefinition = {
@@ -137,8 +146,8 @@ export type ToolDefinition = {
 };
 
 /** Larik `tools` untuk penyedia model yang mendukung tool calling: nama, deskripsi, dan JSON Schema parameter. */
-export function toolDefinitions(): ToolDefinition[] {
-  return AGENT_TOOLS.map((tool) => {
+export function toolDefinitions(tools: readonly RegisteredTool[] = AGENT_TOOLS): ToolDefinition[] {
+  return tools.map((tool) => {
     // `$schema` dibuang: penyedia model hanya meminta objek skemanya.
     const parameters = z.toJSONSchema(tool.input, { io: "input" }) as Record<string, unknown>;
     delete parameters.$schema;
@@ -150,8 +159,8 @@ export function toolDefinitions(): ToolDefinition[] {
  * Menjalankan satu alat dari nama dan input mentah, mis. dari panggilan alat sebuah model. Input diperiksa dengan skema
  * yang sama dengan route API; galat dikembalikan sebagai HttpError dengan kode dan pesan yang bisa diteruskan ke model.
  */
-export async function runTool(ctx: ToolContext, name: string, input: unknown): Promise<unknown> {
-  const tool = AGENT_TOOLS.find((t) => t.name === name);
+export async function runTool(ctx: ToolContext, name: string, input: unknown, tools: readonly RegisteredTool[] = AGENT_TOOLS): Promise<unknown> {
+  const tool = tools.find((t) => t.name === name);
   if (!tool) throw new HttpError(404, "alat_tidak_dikenal", `Alat ${name} tidak dikenal.`);
   const parsed = tool.input.safeParse(input);
   if (!parsed.success) throw new HttpError(400, "input_tidak_valid", `Input ${name} tidak sesuai skema.`);

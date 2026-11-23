@@ -4,7 +4,7 @@ import { directAnswers } from "../src/admin/edit.js";
 import { auditLog, photoDeletions, photos, placeFacilities, places, reportEmails, reports } from "../src/db/schema.js";
 import { facilities, verificationRig, type Rig } from "./helpers/verification.js";
 
-// Tambah, ubah, turunkan, dan tayangkan lagi tempat oleh admin (ADR-0050).
+// Tambah, ubah, turunkan, dan tayangkan lagi tempat oleh admin (ADR-0051).
 let rig: Rig;
 let admin: { token: string; user: { id: string } };
 let verifier: { token: string };

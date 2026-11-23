@@ -26,7 +26,7 @@ export type AdminPlaceRouteOptions = { auth?: Auth; photoBaseUrl?: string; store
 const TAG = "Admin";
 
 /**
- * Kelola tempat oleh admin (ADR-0050). Setiap route memeriksa sesi dan peran admin di sini, bukan di web; verifikator dan
+ * Kelola tempat oleh admin (ADR-0051). Setiap route memeriksa sesi dan peran admin di sini, bukan di web; verifikator dan
  * pengguna mendapat 403.
  */
 export const adminPlaceRoutes: FastifyPluginAsyncZod<AdminPlaceRouteOptions> = async (app, opts) => {
@@ -116,7 +116,7 @@ export const adminPlaceRoutes: FastifyPluginAsyncZod<AdminPlaceRouteOptions> = a
       schema: {
         tags: [TAG],
         summary: "Tambah tempat",
-        description: `Tempat baru langsung tayang dengan label "Diterbitkan langsung oleh admin" (ADR-0050). Disimpan sebagai laporan milik admin yang langsung diterbitkan lewat validasi yang sama dengan verifikasi; titik di luar Kota Bogor 422. ${evidence} Foto harus diunggah akun ini lewat \`POST /reports/photos\`. Alasan masuk log audit.`,
+        description: `Tempat baru langsung tayang dengan label "Diterbitkan langsung oleh admin" (ADR-0051). Disimpan sebagai laporan milik admin yang langsung diterbitkan lewat validasi yang sama dengan verifikasi; titik di luar Kota Bogor 422. ${evidence} Foto harus diunggah akun ini lewat \`POST /reports/photos\`. Alasan masuk log audit.`,
         body: adminPlaceBody,
         response: { 201: saveResult, 400: errorSchema, 422: errorSchema, 502: errorSchema, ...guarded },
       },
@@ -153,7 +153,7 @@ export const adminPlaceRoutes: FastifyPluginAsyncZod<AdminPlaceRouteOptions> = a
       schema: {
         tags: [TAG],
         summary: "Turunkan tempat",
-        description: "Menurunkan tempat dari tayang dengan alasan wajib. Tidak ada yang dihapus: laporan yang merujuknya tetap utuh, dan admin bisa menayangkannya lagi (ADR-0050). Sudah diturunkan: 409 `sudah_diturunkan`.",
+        description: "Menurunkan tempat dari tayang dengan alasan wajib. Tidak ada yang dihapus: laporan yang merujuknya tetap utuh, dan admin bisa menayangkannya lagi (ADR-0051). Sudah diturunkan: 409 `sudah_diturunkan`.",
         params: placeIdParams,
         body: reasonBody,
         response: { 204: z.null(), 400: errorSchema, 404: errorSchema, 409: errorSchema, ...guarded },

@@ -1,4 +1,4 @@
-// Tambah, ubah, turunkan, dan tayangkan lagi tempat oleh admin (ADR-0050). Tambah dan ubah dibuat sebagai laporan milik
+// Tambah, ubah, turunkan, dan tayangkan lagi tempat oleh admin (ADR-0051). Tambah dan ubah dibuat sebagai laporan milik
 // admin yang langsung diterbitkan lewat `publishReport`, jadi foto, kecamatan, status, dan log audit memakai jalur yang
 // sama dengan verifikasi. Hanya dipanggil route `/admin/*` yang sudah memeriksa peran admin.
 import { randomUUID } from "node:crypto";
@@ -26,7 +26,7 @@ export type FacilityAnswer = { facility: Facility; answer: Answer; reason?: Reas
 
 /**
  * Jawaban akhir untuk terbit langsung: Tersedia dan Tidak perlu tanpa foto bertag fasilitas itu menjadi Tanpa bukti, jadi
- * disimpan sebagai Belum tahu seperti saat verifikasi (ADR-0036, ADR-0050). `downgraded` menyebut fasilitas yang berubah.
+ * disimpan sebagai Belum tahu seperti saat verifikasi (ADR-0036, ADR-0051). `downgraded` menyebut fasilitas yang berubah.
  */
 export function directAnswers(items: readonly FacilityAnswer[], tags: Iterable<PhotoTag>) {
   const shown = new Set(tags);
@@ -129,7 +129,7 @@ export async function updatePlace(db: Db, store: PhotoStore | undefined, adminId
   return publishDirect(db, store, adminId, report.id, body, [...kept, ...body.photos.map((p) => p.tag)], now, log, { version: body.version, removePhotoIds: body.removePhotos });
 }
 
-/** Menurunkan tempat dari tayang dengan alasan; tidak ada yang dihapus (ADR-0050). */
+/** Menurunkan tempat dari tayang dengan alasan; tidak ada yang dihapus (ADR-0051). */
 export async function unpublishPlace(db: Db, adminId: string, placeId: string, reason: string, now: Date) {
   await db.transaction(async (tx) => {
     const [place] = await tx.select({ unpublishedAt: places.unpublishedAt }).from(places).where(eq(places.id, placeId)).for("update");

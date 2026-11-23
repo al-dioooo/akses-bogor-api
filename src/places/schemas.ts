@@ -42,6 +42,35 @@ export const mapQuery = placeFilters.extend({
     .describe("Batas tampilan peta: barat,selatan,timur,utara (derajat)"),
 });
 
+/** Filter kandidat: kandidat tidak punya status dan fasilitas, jadi hanya nama, kategori, dan kecamatan. */
+export const candidateQuery = placeFilters.pick({ q: true, category: true, district: true });
+
+export const candidateMap = z.object({
+  type: z.literal("FeatureCollection"),
+  features: z.array(
+    z.object({
+      type: z.literal("Feature"),
+      id: z.string().describe("Tipe dan id OSM, mis. node/123"),
+      geometry: z.object({ type: z.literal("Point"), coordinates: z.tuple([z.number(), z.number()]).describe("[lng, lat]") }),
+      properties: z.object({
+        osmType: z.enum(["node", "way", "relation"]),
+        osmId: z.number().int(),
+        name: z.string().nullable().describe("Nama di OSM; banyak halte tidak bernama"),
+        category,
+        district: z.object({ slug: z.string(), name: z.string() }),
+        wheelchair: z.string().nullable().describe("Nilai mentah tag wheelchair OSM (mis. yes, limited, no), belum diperiksa tim AksesBogor"),
+      }),
+    }),
+  ),
+  source: z.object({
+    title: z.string(),
+    license: z.string(),
+    attribution: z.string().describe("Wajib tampil bersama data (ODbL)"),
+    url: z.url().describe("Halaman hak cipta dan lisensi OpenStreetMap"),
+    retrievedAt: z.iso.datetime().nullable().describe("Waktu unduh dari Overpass; null bila data belum dimuat"),
+  }),
+});
+
 export const placeIdParams = z.object({ id: z.uuid() });
 
 const district = z.object({ slug: z.string(), name: z.string() });
@@ -72,7 +101,7 @@ export const placeSummary = z.object({
   lastVerifiedAt: z.iso.datetime().describe("Waktu verifikasi terakhir, atau waktu admin menerbitkan bila `verifiedBy` bernilai `admin`"),
   verifiedBy: z
     .enum(["tim", "admin"])
-    .describe("`tim`: diterbitkan verifikator dari laporan. `admin`: dibuat, diubah, atau diterbitkan langsung oleh admin tanpa pemeriksaan orang kedua; web menulis \"Diterbitkan langsung oleh admin\", bukan \"Diverifikasi\" (ADR-0050)"),
+    .describe("`tim`: diterbitkan verifikator dari laporan. `admin`: dibuat, diubah, atau diterbitkan langsung oleh admin tanpa pemeriksaan orang kedua; web menulis \"Diterbitkan langsung oleh admin\", bukan \"Diverifikasi\" (ADR-0051)"),
   coverPhoto: photo.nullable().describe("Foto tayang pertama, mendahulukan tag pintu_masuk"),
 });
 

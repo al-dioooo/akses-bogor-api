@@ -4,7 +4,7 @@
 const wibDate = (iso: string) => new Date(new Date(iso).getTime() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
 /** Data tempat yang sedang dilihat pengguna, dari place_accessibility, tanpa koordinat. */
-export type ChosenPlace = { id: string; name: string; lastVerifiedAt: string; [key: string]: unknown };
+export type ChosenPlace = { id: string; name: string; lastVerifiedAt: string; verifiedBy: "tim" | "admin"; [key: string]: unknown };
 
 /**
  * Instruksi sistem untuk kontributor (ADR-0043): orang yang membantu memetakan aksesibilitas tempat umum, bukan

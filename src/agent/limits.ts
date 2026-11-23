@@ -1,4 +1,4 @@
-// Batas harian agen rute (ADR-0043, ADR-0047). Hitungannya di memori proses, seperti batas Mapbox Directions, jadi
+// Batas harian agen rute (ADR-0043, ADR-0047) dan asisten rute publik (ADR-0050). Hitungannya di memori proses, seperti batas Mapbox Directions, jadi
 // kembali ke nol saat hari berganti atau API di-restart. Batas dan saldo akun di penyedia model tetap menjadi pengaman
 // terakhir.
 
@@ -9,6 +9,10 @@
 export const DEFAULT_REQUESTS_PER_DAY = 45;
 /** Pertanyaan per akun per hari WIB. */
 export const QUESTIONS_PER_ACCOUNT_PER_DAY = 5;
+/** Pertanyaan asisten rute publik per IP per hari WIB, untuk penanya tanpa akun yang lengkap (ADR-0050). */
+export const QUESTIONS_PER_VISITOR_PER_DAY = 5;
+/** Bawaan `ROUTE_ASSISTANT_QUESTIONS_PER_DAY`: pertanyaan asisten rute publik untuk semua penanya per hari WIB. */
+export const DEFAULT_ASSISTANT_QUESTIONS_PER_DAY = 300;
 
 export type DailyLimit = {
   /** Memakai satu jatah untuk `key`; `false` bila jatah hari ini sudah habis. */

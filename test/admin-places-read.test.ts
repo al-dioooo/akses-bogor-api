@@ -5,7 +5,7 @@ import { places } from "../src/db/schema.js";
 import type { OverpassElement } from "../src/knowledge/osm.js";
 import { facilities, verificationRig, type Rig } from "./helpers/verification.js";
 
-// Route baca Kelola tempat (ADR-0050): daftar, detail, riwayat, dan kandidat OSM, khusus admin.
+// Route baca Kelola tempat (ADR-0051): daftar, detail, riwayat, dan kandidat OSM, khusus admin.
 let rig: Rig;
 let admin: { token: string };
 let verifier: { token: string };

@@ -23,7 +23,7 @@ export const placeCardSchema = z.union([
     district,
     status: z.enum(placeStatus.enumValues),
     lastVerifiedAt: z.iso.datetime(),
-    verifiedBy: z.enum(["tim", "admin"]).describe("`admin`: diterbitkan langsung oleh admin, tanpa pemeriksaan orang kedua (ADR-0050)"),
+    verifiedBy: z.enum(["tim", "admin"]).describe("`admin`: diterbitkan langsung oleh admin, tanpa pemeriksaan orang kedua (ADR-0051)"),
   }),
   z.object({
     type: z.literal("tempat"),

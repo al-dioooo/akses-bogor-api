@@ -1,4 +1,4 @@
-// Bacaan untuk halaman Kelola tempat (ADR-0050). Berbeda dengan query publik, di sini tempat yang diturunkan ikut terbaca,
+// Bacaan untuk halaman Kelola tempat (ADR-0051). Berbeda dengan query publik, di sini tempat yang diturunkan ikut terbaca,
 // dengan alasannya. Hanya dipanggil route `/admin/*` yang sudah memeriksa peran admin.
 import { and, asc, count, desc, eq, ilike, isNotNull, isNull, sql, type SQL } from "drizzle-orm";
 import { withoutAksesBogorData } from "../contribute/facilities.js";
