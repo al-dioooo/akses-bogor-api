@@ -131,7 +131,7 @@ describe("POST /admin/places", () => {
       expect(res.statusCode).toBe(200);
       expect(res.json().downgraded).toEqual([]);
       expect(await answersOf(placeId)).toMatchObject({ ramp: "tersedia", lift: "tidak_perlu" });
-      expect((await lastAudit(placeId)).action).toBe("diubah_admin");
+      expect(await lastAudit(placeId)).toMatchObject({ action: "diubah_admin", changes: { photos: { ditambah: 1, dihapus: 0 } } });
 
       const removal = await send("PATCH", `/admin/places/${placeId}`, {
         ...newPlace({ name: "Masjid Raya Bogor contoh", reason: "Foto pintu masuk memperlihatkan wajah" }),
@@ -142,6 +142,8 @@ describe("POST /admin/places", () => {
       expect(removal.statusCode).toBe(200);
       // Tanpa foto pintu masuk, ramp tidak lagi punya bukti.
       expect(removal.json().downgraded).toEqual(["ramp"]);
+      // Riwayat tempat menyebut foto yang dihapus, dengan alasan admin.
+      expect(await lastAudit(placeId)).toMatchObject({ action: "diubah_admin", changes: { photos: { ditambah: 0, dihapus: 1 }, alasan: "Foto pintu masuk memperlihatkan wajah" } });
       expect(await rig.db.select().from(photos).where(eq(photos.id, shown!.id))).toEqual([]);
       expect(rig.memory.files.has(shown!.key)).toBe(false);
       expect(await rig.db.select().from(photoDeletions).where(eq(photoDeletions.storageKey, shown!.key))).toEqual([]);
