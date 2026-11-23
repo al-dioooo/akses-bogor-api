@@ -173,21 +173,14 @@ Contoh lengkap ada di [.env.example](.env.example). Jangan commit `.env`.
 | `GET /admin/team` | Tim verifikasi (verifikator dan admin) dengan email; khusus admin | FR-36 |
 | `POST /admin/team` | Jadikan verifikator akun yang sudah dilengkapi, dengan email yang tepat; khusus admin | FR-36 |
 | `DELETE /admin/team/{userId}` | Cabut peran verifikator; peran admin hanya lewat `pnpm peran` | FR-36 |
-<<<<<<< HEAD
 | `GET /admin/places` | Semua tempat termasuk yang diturunkan, berhalaman; saring `q`, `category`, `district`, `status`, `origin` (`tim`, `admin`), `published` (`ya`, `tidak`); khusus admin | ADR-0051 |
 | `GET /admin/places/{id}` | Satu tempat untuk formulir ubah: jawaban, foto tayang, dan `version`; khusus admin | ADR-0051 |
 | `GET /admin/places/{id}/history` | Riwayat tempat dari log audit dengan nama tampilan anggota tim; khusus admin | ADR-0038, ADR-0051 |
 | `GET /admin/candidates` | Kandidat OpenStreetMap tanpa lokasi AksesBogor dalam 50 m, berhalaman, untuk dibuat menjadi tempat; khusus admin | ADR-0049, ADR-0051 |
-| `POST /admin/places` | Tambah tempat yang langsung tayang dengan label admin; Tersedia dan Tidak perlu tanpa foto bertag fasilitas itu menjadi Belum tahu; alasan wajib; khusus admin | ADR-0050 |
-| `PATCH /admin/places/{id}` | Ubah data, jawaban, dan foto (tambah dan hapus) dengan `version`; tempat menjadi berlabel admin; khusus admin | ADR-0050 |
-| `DELETE /admin/places/{id}` | Turunkan tempat dari tayang dengan alasan; tidak ada yang dihapus permanen; khusus admin | ADR-0050 |
-| `POST /admin/places/{id}/restore` | Tayangkan lagi tempat yang diturunkan, dengan alasan; khusus admin | ADR-0050 |
-=======
-| `GET /admin/places` | Semua tempat termasuk yang diturunkan, berhalaman; saring `q`, `category`, `district`, `status`, `origin` (`tim`, `admin`), `published` (`ya`, `tidak`); khusus admin | ADR-0051 |
-| `GET /admin/places/{id}` | Satu tempat untuk formulir ubah: jawaban, foto tayang, dan `version`; khusus admin | ADR-0051 |
-| `GET /admin/places/{id}/history` | Riwayat tempat dari log audit dengan nama tampilan anggota tim; khusus admin | ADR-0038, ADR-0051 |
-| `GET /admin/candidates` | Kandidat OpenStreetMap tanpa lokasi AksesBogor dalam 50 m, berhalaman, untuk dibuat menjadi tempat; khusus admin | ADR-0049, ADR-0051 |
->>>>>>> feature/kelola-tempat-baca
+| `POST /admin/places` | Tambah tempat yang langsung tayang dengan label admin; Tersedia dan Tidak perlu tanpa foto bertag fasilitas itu menjadi Belum tahu; alasan wajib; khusus admin | ADR-0051 |
+| `PATCH /admin/places/{id}` | Ubah data, jawaban, dan foto (tambah dan hapus) dengan `version`; tempat menjadi berlabel admin; khusus admin | ADR-0051 |
+| `DELETE /admin/places/{id}` | Turunkan tempat dari tayang dengan alasan; tidak ada yang dihapus permanen; khusus admin | ADR-0051 |
+| `POST /admin/places/{id}/restore` | Tayangkan lagi tempat yang diturunkan, dengan alasan; khusus admin | ADR-0051 |
 | `GET /verifier/reports` | Antrean verifikasi terlama dulu, atau `status=klarifikasi` untuk yang menunggu jawaban pelapor; tanpa laporan sendiri; khusus verifikator dan admin | FR-30, FR-37 |
 | `GET /verifier/reports/{id}` | Isian, foto, titik, klarifikasi, data lokasi saat ini, dan lokasi mirip untuk dibandingkan; laporan sendiri 403 | FR-31, FR-37 |
 | `GET /verifier/photos/{id}` | Foto laporan yang belum terbit dari bucket privat, `?versi=kabur` untuk pratinjau area kabur; `Cache-Control: private, no-store` | FR-34, ADR-0031, ADR-0037 |
