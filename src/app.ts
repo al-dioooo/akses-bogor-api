@@ -20,6 +20,8 @@ import { QUESTIONS_PER_ACCOUNT_PER_DAY, dailyLimit } from "./agent/limits.js";
 import { agentModel } from "./agent/provider.js";
 import { mapboxWalking } from "./map/directions.js";
 import { mapboxSearch } from "./map/search.js";
+import { googleHints } from "./hints/google.js";
+import { mapboxHints } from "./hints/mapbox.js";
 import { mapTokenSource } from "./map/token.js";
 import { schedulePhotoCleanup } from "./photos/cleanup.js";
 import { scheduleVerificationJobs } from "./verification/jobs.js";
@@ -33,6 +35,7 @@ import { healthRoutes } from "./routes/health.js";
 import { mapRoutes } from "./routes/map.js";
 import { meRoutes } from "./routes/me.js";
 import { placeRoutes } from "./routes/places.js";
+import { hintRoutes } from "./routes/hints.js";
 import { reportRoutes } from "./routes/reports.js";
 import { verifierRoutes } from "./routes/verifier.js";
 
@@ -133,6 +136,14 @@ export async function buildApp(env: Env, deps: { db?: Db; now?: () => Date; fetc
     mapToken: secretToken && username ? mapTokenSource({ secretToken, username, now, fetch: deps.fetch }) : undefined,
     search: secretToken ? mapboxSearch({ token: secretToken, now, fetch: deps.fetch }) : undefined,
   });
+  // Petunjuk aksesibilitas langsung dari penyedia (ADR-0052): mati bawaan, Google hanya dengan kuncinya sendiri.
+  const hintProviders = env.PROVIDER_HINTS_ENABLED
+    ? [
+        ...(secretToken ? [mapboxHints({ token: secretToken, now, fetch: deps.fetch })] : []),
+        ...(env.GOOGLE_MAPS_API_KEY ? [googleHints({ apiKey: env.GOOGLE_MAPS_API_KEY, now, fetch: deps.fetch })] : []),
+      ]
+    : [];
+  await app.register(hintRoutes, { providers: hintProviders, now });
 
   // Akun (ADR-0029) dan email (ADR-0030).
   const development = env.NODE_ENV === "development";
