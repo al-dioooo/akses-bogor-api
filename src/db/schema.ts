@@ -71,16 +71,16 @@ export const places = pgTable(
     facilitiesAvailable: smallint("facilities_available").notNull(),
     facilitiesRelevant: smallint("facilities_relevant").notNull(),
     facilitiesUnknown: smallint("facilities_unknown").notNull(),
-    /** Waktu verifikasi terakhir, atau waktu admin menerbitkan bila `adminPublishedAt` terisi (ADR-0050). */
+    /** Waktu verifikasi terakhir, atau waktu admin menerbitkan bila `adminPublishedAt` terisi (ADR-0051). */
     lastVerifiedAt: timestamp("last_verified_at", { withTimezone: true }).notNull(),
     /**
      * Terisi bila data terakhir dibuat, diubah, atau diterbitkan langsung oleh admin tanpa pemeriksaan orang kedua
-     * (ADR-0050). Publik melihat "Diterbitkan langsung oleh admin", tidak pernah "Diverifikasi". Kosong lagi setelah
+     * (ADR-0051). Publik melihat "Diterbitkan langsung oleh admin", tidak pernah "Diverifikasi". Kosong lagi setelah
      * laporan tentang tempat ini diterbitkan verifikator.
      */
     adminPublishedAt: timestamp("admin_published_at", { withTimezone: true }),
     adminPublishedBy: uuid("admin_published_by").references(() => users.id, { onDelete: "set null" }),
-    /** Tempat yang diturunkan admin, dengan alasannya, tidak tampil di route publik mana pun (ADR-0050). */
+    /** Tempat yang diturunkan admin, dengan alasannya, tidak tampil di route publik mana pun (ADR-0051). */
     unpublishedAt: timestamp("unpublished_at", { withTimezone: true }),
     unpublishedReason: varchar("unpublished_reason", { length: 500 }),
     ...timestamps,

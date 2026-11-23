@@ -593,7 +593,7 @@
                               "tim",
                               "admin"
                             ],
-                            "description": "`tim`: diterbitkan verifikator dari laporan. `admin`: dibuat, diubah, atau diterbitkan langsung oleh admin tanpa pemeriksaan orang kedua; web menulis \"Diterbitkan langsung oleh admin\", bukan \"Diverifikasi\" (ADR-0050)"
+                            "description": "`tim`: diterbitkan verifikator dari laporan. `admin`: dibuat, diubah, atau diterbitkan langsung oleh admin tanpa pemeriksaan orang kedua; web menulis \"Diterbitkan langsung oleh admin\", bukan \"Diverifikasi\" (ADR-0051)"
                           },
                           "coverPhoto": {
                             "nullable": true,
@@ -1356,7 +1356,7 @@
                         "tim",
                         "admin"
                       ],
-                      "description": "`tim`: diterbitkan verifikator dari laporan. `admin`: dibuat, diubah, atau diterbitkan langsung oleh admin tanpa pemeriksaan orang kedua; web menulis \"Diterbitkan langsung oleh admin\", bukan \"Diverifikasi\" (ADR-0050)"
+                      "description": "`tim`: diterbitkan verifikator dari laporan. `admin`: dibuat, diubah, atau diterbitkan langsung oleh admin tanpa pemeriksaan orang kedua; web menulis \"Diterbitkan langsung oleh admin\", bukan \"Diverifikasi\" (ADR-0051)"
                     },
                     "landmark": {
                       "nullable": true,
@@ -8679,7 +8679,7 @@
                         "tim",
                         "admin"
                       ],
-                      "description": "`tim`: diterbitkan verifikator dari laporan. `admin`: dibuat, diubah, atau diterbitkan langsung oleh admin tanpa pemeriksaan orang kedua; web menulis \"Diterbitkan langsung oleh admin\", bukan \"Diverifikasi\" (ADR-0050)"
+                      "description": "`tim`: diterbitkan verifikator dari laporan. `admin`: dibuat, diubah, atau diterbitkan langsung oleh admin tanpa pemeriksaan orang kedua; web menulis \"Diterbitkan langsung oleh admin\", bukan \"Diverifikasi\" (ADR-0051)"
                     },
                     "landmark": {
                       "nullable": true,
@@ -10261,7 +10261,7 @@
                                 "tim",
                                 "admin"
                               ],
-                              "description": "`admin`: diterbitkan langsung oleh admin, tanpa pemeriksaan orang kedua (ADR-0050)"
+                              "description": "`admin`: diterbitkan langsung oleh admin, tanpa pemeriksaan orang kedua (ADR-0051)"
                             }
                           },
                           "required": [
@@ -11888,7 +11888,7 @@
                                   "tim",
                                   "admin"
                                 ],
-                                "description": "`admin`: diterbitkan langsung oleh admin, web tidak menyebutnya terverifikasi (ADR-0050)"
+                                "description": "`admin`: diterbitkan langsung oleh admin, web tidak menyebutnya terverifikasi (ADR-0051)"
                               }
                             },
                             "required": [
@@ -12030,7 +12030,7 @@
                                       "tim",
                                       "admin"
                                     ],
-                                    "description": "`admin`: diterbitkan langsung oleh admin, tanpa pemeriksaan orang kedua (ADR-0050)"
+                                    "description": "`admin`: diterbitkan langsung oleh admin, tanpa pemeriksaan orang kedua (ADR-0051)"
                                   }
                                 },
                                 "required": [
