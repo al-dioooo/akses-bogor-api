@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { DEFAULT_REQUESTS_PER_DAY } from "../agent/limits.js";
+import { DEFAULT_ASSISTANT_QUESTIONS_PER_DAY, DEFAULT_REQUESTS_PER_DAY } from "../agent/limits.js";
 
 const csv = (fallback = "") =>
   z
@@ -72,6 +72,8 @@ const schema = z
      * AksesBogor tanpa akun. Mati sampai Kebijakan Privasi yang menyebut asisten ini dirilis.
      */
     ROUTE_ASSISTANT_ENABLED: z.stringbool().default(false),
+    /** Pertanyaan asisten rute publik per hari WIB untuk semua penanya. Bawaan 300; satu pertanyaan paling banyak 4 permintaan ke model. */
+    ROUTE_ASSISTANT_QUESTIONS_PER_DAY: orDefault(z.coerce.number().int().min(1).default(DEFAULT_ASSISTANT_QUESTIONS_PER_DAY)),
     /**
      * Penyedia model agen (ADR-0047): `anthropic` untuk Claude API, atau `openrouter`. Tidak ada cadangan otomatis ke
      * penyedia lain; pertanyaan hanya dikirim ke penyedia yang dipilih di sini.
