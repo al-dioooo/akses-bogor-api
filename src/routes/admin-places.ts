@@ -12,7 +12,7 @@ export type AdminPlaceRouteOptions = { auth?: Auth; photoBaseUrl?: string; now: 
 const TAG = "Admin";
 
 /**
- * Kelola tempat oleh admin (ADR-0050). Setiap route memeriksa sesi dan peran admin di sini, bukan di web; verifikator dan
+ * Kelola tempat oleh admin (ADR-0051). Setiap route memeriksa sesi dan peran admin di sini, bukan di web; verifikator dan
  * pengguna mendapat 403.
  */
 export const adminPlaceRoutes: FastifyPluginAsyncZod<AdminPlaceRouteOptions> = async (app, opts) => {

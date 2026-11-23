@@ -1,4 +1,4 @@
-// Skema Zod untuk route kelola tempat oleh admin (ADR-0050). Skema ini juga menjadi API spec (docs/openapi.json).
+// Skema Zod untuk route kelola tempat oleh admin (ADR-0051). Skema ini juga menjadi API spec (docs/openapi.json).
 import { z } from "zod";
 import { facilityAnswer, facilityKind, placeCategory, placeStatus, unavailableReason } from "../db/schema.js";
 import { photo } from "../places/schemas.js";
