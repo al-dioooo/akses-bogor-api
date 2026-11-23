@@ -102,10 +102,10 @@ export const reportBody = reportFields.superRefine(reportRules);
 
 export type ReportBody = z.infer<typeof reportBody>;
 
-/** Badan `POST /reports`: laporan, ditambah terbit langsung khusus admin (ADR-0050). */
+/** Badan `POST /reports`: laporan, ditambah terbit langsung khusus admin (ADR-0051). */
 export const reportSubmission = reportFields
   .extend({
-    publishDirectly: z.boolean().optional().describe("Khusus admin: terbitkan langsung tanpa pemeriksaan orang kedua; akun lain 403 `bukan_admin` (ADR-0050)"),
+    publishDirectly: z.boolean().optional().describe("Khusus admin: terbitkan langsung tanpa pemeriksaan orang kedua; akun lain 403 `bukan_admin` (ADR-0051)"),
     publishReason: z
       .string()
       .trim()

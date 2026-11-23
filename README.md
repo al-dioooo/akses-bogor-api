@@ -196,7 +196,7 @@ Contoh lengkap ada di [.env.example](.env.example). Jangan commit `.env`.
 | `POST /verifier/reports/{id}/clarify` | Minta klarifikasi dengan tenggat 7 × 24 jam; email ke pelapor | FR-32, FR-41 |
 | `POST /verifier/reports/{id}/reject` | Tolak dengan alasan R1–R5; foto laporan dihapus; email ke pelapor | FR-32, FR-40 |
 | `GET /verifier/places/recheck` | Lokasi yang terakhir diverifikasi lebih dari 12 bulan lalu, terlama dulu | FR-38 |
-| `POST /reports` | Kirim laporan baru, perubahan, atau kekurangan ke antrean verifikasi dengan foto yang sudah diunggah; kecamatan dihitung ulang; kunci draf mencegah laporan ganda; 20 laporan per 24 jam dan 30 laporan menunggu per akun; admin bisa menerbitkan langsung dengan `publishDirectly` dan `publishReason` (ADR-0050) | FR-20 sampai FR-27 |
+| `POST /reports` | Kirim laporan baru, perubahan, atau kekurangan ke antrean verifikasi dengan foto yang sudah diunggah; kecamatan dihitung ulang; kunci draf mencegah laporan ganda; 20 laporan per 24 jam dan 30 laporan menunggu per akun; admin bisa menerbitkan langsung dengan `publishDirectly` dan `publishReason` (ADR-0051) | FR-20 sampai FR-27 |
 | `GET /agent/tools` | Larik `tools` format OpenAI untuk ketiga alat yang boleh dipanggil model | FR-60, ADR-0042 |
 | `POST /agent/tools/find_place` | Lokasi AksesBogor bernama mirip, paling banyak 5 | FR-60 |
 | `POST /agent/tools/place_accessibility` | Status, jawaban fasilitas terverifikasi, dan tanggal verifikasi terakhir sebuah lokasi, tanpa koordinat | FR-60 |

@@ -162,7 +162,7 @@ const shownTags = async (db: Db, placeId: string) =>
   (await db.select({ tag: photos.tag }).from(photos).where(and(eq(photos.placeId, placeId), eq(photos.moderation, "tayang")))).map((p) => p.tag);
 
 /**
- * Laporan Laporkan milik admin yang diterbitkan langsung (`publishDirectly`, ADR-0050). Untuk Edit lokasi dan Laporkan
+ * Laporan Laporkan milik admin yang diterbitkan langsung (`publishDirectly`, ADR-0051). Untuk Edit lokasi dan Laporkan
  * kekurangan, foto tayang tempat itu ikut menjadi bukti. Kirim ulang dengan kunci draf yang sama mengembalikan laporan
  * yang sudah ada.
  */

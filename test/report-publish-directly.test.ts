@@ -3,7 +3,7 @@ import { and, count, desc, eq } from "drizzle-orm";
 import { auditLog, places, reports } from "../src/db/schema.js";
 import { facilities, verificationRig, type Rig } from "./helpers/verification.js";
 
-// Terbit langsung dari Laporkan, khusus admin (ADR-0050).
+// Terbit langsung dari Laporkan, khusus admin (ADR-0051).
 let rig: Rig;
 let admin: { token: string; user: { id: string } };
 let verifier: { token: string };
