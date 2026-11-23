@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { buildApp } from "../src/app.js";
 import { loadEnv } from "../src/config/env.js";
 import { loadFacilities, parseFacilities } from "../src/contribute/facilities.js";
@@ -57,6 +57,11 @@ beforeAll(async () => {
     ],
   });
   await loadFacilities(db, rows, { url: "https://overpass-api.de/api/interpreter", retrievedAt: new Date("2026-11-22T10:00:00.000Z"), sha256: "e".repeat(64) });
+  // Salinan tersimpan, seperti 38 baris kandidat di produksi.
+  const google = { sumber: "Google Maps", nama: "Masjid Al-Ikhlas", url: "https://maps.google.com/?cid=9", place_id: "ChIJikhlas", aksesibilitas: ["wheelchairAccessibleEntrance"], diambil: "2026-11-23", metode: "places-api", jarak_titik_m: 9 };
+  await db.execute(sql`
+    UPDATE osm_places SET tags = tags || jsonb_build_object('aksesbogor:google_maps', ${JSON.stringify(google)}::jsonb, 'aksesbogor:osm_aksesibilitas', '{"wheelchair":"limited","arti":"sebagian"}'::jsonb)
+    WHERE osm_type = 'way' AND osm_id = 2`);
 }, 60_000);
 
 afterAll(async () => {
@@ -115,7 +120,7 @@ describe("GET /places/candidates/:osmType/:osmId/hints", () => {
       // The fake Mapbox POI is a hospital, so the masjid has no match.
       const named = await app.inject({ method: "GET", url: "/places/candidates/way/2/hints" });
       expect(named.statusCode).toBe(200);
-      expect(named.json()).toEqual({ hints: [{ provider: "mapbox", result: "none" }] });
+      expect(named.json().hints[0]).toEqual({ provider: "mapbox", result: "none" });
       calls.length = 0;
       expect((await app.inject({ method: "GET", url: "/places/candidates/node/7/hints" })).json()).toEqual({ hints: [{ provider: "mapbox", result: "none" }] });
       expect(calls).toEqual([]);
@@ -123,6 +128,37 @@ describe("GET /places/candidates/:osmType/:osmId/hints", () => {
       expect((await app.inject({ method: "GET", url: "/places/candidates/area/2/hints" })).statusCode).toBe(400);
     } finally {
       await app.close();
+    }
+  });
+
+  it("adds the stored Google Maps copy and OSM note, but not while the switch is off", async () => {
+    const app = await appWith({ PROVIDER_HINTS_ENABLED: "true" });
+    try {
+      const res = await app.inject({ method: "GET", url: "/places/candidates/way/2/hints" });
+      expect(res.headers["cache-control"]).toBe("private, no-store");
+      expect(res.json()).toEqual({
+        hints: [
+          { provider: "mapbox", result: "none" },
+          {
+            provider: "google",
+            result: "stored",
+            placeName: "Masjid Al-Ikhlas",
+            distanceMeters: 9,
+            url: "https://maps.google.com/?cid=9",
+            retrievedAt: "2026-11-23",
+            accessibility: { entrance: true, restroom: null, parking: null, seating: null },
+          },
+          { provider: "openstreetmap", result: "stored", wheelchair: "limited" },
+        ],
+      });
+    } finally {
+      await app.close();
+    }
+    const off = await appWith({});
+    try {
+      expect((await off.inject({ method: "GET", url: "/places/candidates/way/2/hints" })).json()).toEqual({ hints: [] });
+    } finally {
+      await off.close();
     }
   });
 });

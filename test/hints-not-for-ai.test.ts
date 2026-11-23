@@ -19,4 +19,12 @@ describe("provider hints stay away from the AI", () => {
       expect(source, file).not.toMatch(/routes\/hints/);
     }
   });
+
+  it("no agent module or OSM query the assistant uses reads the stored Google Maps or OSM copies", async () => {
+    const agentFiles = (await readdir(new URL("../src/agent/", import.meta.url))).map((file) => `src/agent/${file}`);
+    for (const file of [...agentFiles, "src/contribute/facilities.ts", "src/knowledge/search.ts"]) {
+      const source = await readFile(new URL(`../${file}`, import.meta.url), "utf8");
+      expect(source, file).not.toMatch(/aksesbogor:(google_maps|osm_aksesibilitas)/);
+    }
+  });
 });
