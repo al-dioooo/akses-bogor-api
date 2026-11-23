@@ -16,7 +16,7 @@ import { createDb, type Db } from "./db/client.js";
 import { logMailer, resendMailer, type Mailer } from "./email/mailer.js";
 import { HttpError } from "./http/errors.js";
 import { createRateLimitKey, WEB_SERVER_SECRET_HEADER } from "./http/rate-limit.js";
-import { dailyLimit } from "./agent/limits.js";
+import { QUESTIONS_PER_ACCOUNT_PER_DAY, dailyLimit } from "./agent/limits.js";
 import { agentModel } from "./agent/provider.js";
 import { mapboxWalking } from "./map/directions.js";
 import { mapboxSearch } from "./map/search.js";
@@ -26,6 +26,7 @@ import { scheduleVerificationJobs } from "./verification/jobs.js";
 import { localStore, r2Store, type PhotoStore } from "./photos/storage.js";
 import { adminRoutes } from "./routes/admin.js";
 import { agentRoutes } from "./routes/agent.js";
+import { assistantRoutes } from "./routes/assistant.js";
 import { authRoutes } from "./routes/auth.js";
 import { districtRoutes } from "./routes/districts.js";
 import { healthRoutes } from "./routes/health.js";
@@ -96,10 +97,11 @@ export async function buildApp(env: Env, deps: { db?: Db; now?: () => Date; fetc
     origin: (origin, callback) => callback(null, originAllowed(origin)),
     methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
   });
+  const visitorKey = createRateLimitKey(env.WEB_SERVER_SECRET);
   await app.register(rateLimit, {
     max: 120,
     timeWindow: "1 minute",
-    keyGenerator: createRateLimitKey(env.WEB_SERVER_SECRET),
+    keyGenerator: visitorKey,
     allowList: (request) => request.url === "/healthz",
   });
 
@@ -169,12 +171,27 @@ export async function buildApp(env: Env, deps: { db?: Db; now?: () => Date; fetc
   // Agen rute (ADR-0042, ADR-0043, ADR-0047): rute jalan kaki memakai token Mapbox yang sama dengan pencarian tempat,
   // dan model dari Claude API (bawaan) atau OpenRouter dengan batas harian untuk semua pengguna.
   const agentBudget = dailyLimit(env.AGENT_REQUESTS_PER_DAY, now, 0);
+  const accountQuestions = dailyLimit(QUESTIONS_PER_ACCOUNT_PER_DAY, now, 7);
   await app.register(agentRoutes, {
     auth,
     enabled: env.ROUTE_AGENT_ENABLED,
     disabilityData: env.DISABILITY_DATA_ENABLED,
     walking: secretToken ? mapboxWalking({ token: secretToken, now, fetch: deps.fetch }) : undefined,
     model: agentModel(env, { fetch: deps.fetch, budget: agentBudget, log: app.log }),
+    assistantEnabled: env.ROUTE_ASSISTANT_ENABLED,
+    visitorKey,
+    accountQuestions,
+    now,
+  });
+  // Asisten rute publik (ADR-0050): model dengan hitungan sendiri, jadi tidak memakai `AGENT_REQUESTS_PER_DAY`; biayanya
+  // dibatasi `ROUTE_ASSISTANT_QUESTIONS_PER_DAY`.
+  await app.register(assistantRoutes, {
+    auth,
+    enabled: env.ROUTE_ASSISTANT_ENABLED,
+    model: agentModel(env, { fetch: deps.fetch, log: app.log }),
+    questionsPerDay: env.ROUTE_ASSISTANT_QUESTIONS_PER_DAY,
+    accountQuestions,
+    visitorKey,
     now,
   });
   if (env.NODE_ENV !== "test") {

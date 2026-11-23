@@ -3,12 +3,12 @@ import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { askAgent } from "../agent/ask.js";
 import { placeCardSchema, routeCardSchema } from "../agent/cards.js";
-import { QUESTIONS_PER_ACCOUNT_PER_DAY, dailyLimit } from "../agent/limits.js";
+import { QUESTIONS_PER_ACCOUNT_PER_DAY, dailyLimit, type DailyLimit } from "../agent/limits.js";
 import { AgentBusyError, type AgentModel } from "../agent/model.js";
 import { AGENT_TOOLS, toolDefinitions } from "../agent/registry.js";
 import type { ToolContext } from "../agent/tools.js";
 import type { Auth } from "../auth/auth.js";
-import { needsCompletion, requireSession } from "../auth/session.js";
+import { currentSession, needsCompletion, requireSession } from "../auth/session.js";
 import { osmFeatureKind } from "../db/schema.js";
 import { prioritySchema } from "./districts.js";
 import { HttpError, errorSchema } from "../http/errors.js";
@@ -34,6 +34,14 @@ export type AgentRouteOptions = {
   disabilityData?: boolean;
   /** Model agen (`provider.ts`); kosong bila OpenRouter dipilih tanpa API key, dan `POST /agent/ask` menjawab sibuk. */
   model?: AgentModel;
+  /**
+   * `ROUTE_ASSISTANT_ENABLED` (ADR-0050): rute jalan kaki ke lokasi AksesBogor dan hambatannya boleh dipakai tanpa akun,
+   * dengan batas per IP dari `visitorKey`.
+   */
+  assistantEnabled?: boolean;
+  visitorKey?: (request: FastifyRequest) => string;
+  /** Jatah pertanyaan per akun per hari, satu hitungan dengan asisten rute publik. */
+  accountQuestions?: DailyLimit;
   now: () => Date;
 };
 
@@ -132,6 +140,8 @@ const askResponse = z.object({
 const errors = { 400: errorSchema, 401: errorSchema, 403: errorSchema, 404: errorSchema, 422: errorSchema, 429: errorSchema, 502: errorSchema, 503: errorSchema };
 const COMMON =
   "Hanya untuk akun yang sudah masuk dan melengkapi akun (ADR-0042). Menjawab 503 `agen_rute_belum_aktif` selama `ROUTE_AGENT_ENABLED` mati. Semua route agen dan rute berbagi batas 120 permintaan per akun per jam. Data dikirim di badan permintaan supaya tidak tercatat di log.";
+const VISITORS =
+  "Selama `ROUTE_ASSISTANT_ENABLED` menyala, route ini juga untuk pengunjung tanpa akun asisten rute publik, hanya untuk lokasi AksesBogor, dengan batas per IP (ADR-0050).";
 const APP_ONLY = "Dipanggil browser pengguna sendiri dan hasilnya hanya ditampilkan kepadanya; tidak pernah dikirim ke model (Product Terms Mapbox §1.5).";
 
 /**
@@ -144,17 +154,12 @@ export const agentRoutes: FastifyPluginAsyncZod<AgentRouteOptions> = async (app,
   const accountOf = new WeakMap<FastifyRequest, string>();
   const limit = (name: string, max: number) => app.createRateLimit({ max, timeWindow: HOUR_MS, keyGenerator: (request) => `${name}:${accountOf.get(request)}` });
   const agentLimit = limit("agen", AGENT_CALLS_PER_HOUR);
-  const questionLimit = dailyLimit(QUESTIONS_PER_ACCOUNT_PER_DAY, opts.now, 7);
+  const questionLimit = opts.accountQuestions ?? dailyLimit(QUESTIONS_PER_ACCOUNT_PER_DAY, opts.now, 7);
   const busy = () => new HttpError(503, "agen_sibuk", "Agen sedang sibuk, coba lagi nanti.");
   const walkingLimit = limit("agen-rute", WALKING_ROUTES_PER_HOUR);
 
-  /** Akun yang boleh memakai agen rute, lalu batas per akun. */
-  const member = async (request: FastifyRequest, reply: FastifyReply, limits: ReturnType<typeof limit>[]) => {
-    if (!opts.enabled) throw new HttpError(503, "agen_rute_belum_aktif", "Agen rute belum dibuka.");
-    if (!opts.auth) throw new HttpError(503, "akun_belum_diatur", "Fitur akun belum diatur di server.");
-    const { user } = await requireSession(opts.auth, app.db, request, opts.now);
-    if (needsCompletion(user)) throw new HttpError(403, "akun_belum_lengkap", "Lengkapi akun dulu sebelum memakai agen rute.");
-    accountOf.set(request, user.id);
+  /** Batas per akun, atau per IP untuk pengunjung asisten rute publik. */
+  const checkLimits = async (request: FastifyRequest, reply: FastifyReply, limits: ReturnType<typeof limit>[]) => {
     for (const check of limits) {
       const result = await check(request);
       if (!result.isAllowed && result.isExceeded) {
@@ -163,6 +168,28 @@ export const agentRoutes: FastifyPluginAsyncZod<AgentRouteOptions> = async (app,
       }
     }
     reply.header("cache-control", "no-store");
+  };
+
+  /** Akun yang boleh memakai agen rute, lalu batas per akun. */
+  const member = async (request: FastifyRequest, reply: FastifyReply, limits: ReturnType<typeof limit>[]) => {
+    if (!opts.enabled) throw new HttpError(503, "agen_rute_belum_aktif", "Agen rute belum dibuka.");
+    if (!opts.auth) throw new HttpError(503, "akun_belum_diatur", "Fitur akun belum diatur di server.");
+    const { user } = await requireSession(opts.auth, app.db, request, opts.now);
+    if (needsCompletion(user)) throw new HttpError(403, "akun_belum_lengkap", "Lengkapi akun dulu sebelum memakai agen rute.");
+    accountOf.set(request, user.id);
+    await checkLimits(request, reply, limits);
+  };
+
+  /**
+   * Pemanggil rute jalan kaki dan hambatan. Selama asisten rute publik dibuka (ADR-0050), siapa pun boleh meminta rute
+   * ke lokasi AksesBogor: akun yang lengkap dihitung per akun, yang lain per IP. Tujuan OpenStreetMap tetap hanya untuk
+   * akun Bantu memetakan.
+   */
+  const routeCaller = async (request: FastifyRequest, reply: FastifyReply, limits: ReturnType<typeof limit>[], osm: boolean) => {
+    if (!opts.assistantEnabled || osm || !opts.visitorKey) return member(request, reply, limits);
+    const session = opts.auth && request.headers.authorization ? await currentSession(opts.auth, app.db, request, opts.now) : null;
+    accountOf.set(request, session && !needsCompletion(session.user) ? session.user.id : `ip:${opts.visitorKey(request)}`);
+    await checkLimits(request, reply, limits);
   };
 
   app.get(
@@ -202,13 +229,13 @@ export const agentRoutes: FastifyPluginAsyncZod<AgentRouteOptions> = async (app,
       schema: {
         tags: [TAG_ROUTE],
         summary: "Rute jalan kaki ke pin lokasi",
-        description: `Rute jalan kaki Mapbox dari posisi pengguna ke pin lokasi (biasanya pintu masuk utama): jarak, waktu, langkah, garis rute, kalimat peringatan tetap, dan atribusi. Profil jalan kaki tidak memperhitungkan tangga, kerb, atau kemiringan, jadi antarmuka selalu menampilkan \`warning\`. Posisi dibulatkan ke 4 desimal sebelum dikirim ke Mapbox Directions, harus di dalam Kota Bogor dan paling jauh 10 km dari tujuan, dan jawaban Mapbox tidak disimpan. ${APP_ONLY}\n\n${COMMON} Batas tambahan 30 rute per akun per jam dan 1.000 rute per hari untuk semua pengguna.`,
+        description: `Rute jalan kaki Mapbox dari posisi pengguna ke pin lokasi (biasanya pintu masuk utama): jarak, waktu, langkah, garis rute, kalimat peringatan tetap, dan atribusi. Profil jalan kaki tidak memperhitungkan tangga, kerb, atau kemiringan, jadi antarmuka selalu menampilkan \`warning\`. Posisi dibulatkan ke 4 desimal sebelum dikirim ke Mapbox Directions, harus di dalam Kota Bogor dan paling jauh 10 km dari tujuan, dan jawaban Mapbox tidak disimpan. ${APP_ONLY}\n\n${COMMON} ${VISITORS} Batas tambahan 30 rute per akun atau per IP per jam dan 1.000 rute per hari untuk semua pengguna.`,
         body: walkingBody,
         response: { 200: walkingResponse, ...errors },
       },
     },
     async (request, reply) => {
-      await member(request, reply, [agentLimit, walkingLimit]);
+      await routeCaller(request, reply, [agentLimit, walkingLimit], Boolean(request.body.osm));
       return walkingRoute(routeCtx, request.body);
     },
   );
@@ -219,13 +246,13 @@ export const agentRoutes: FastifyPluginAsyncZod<AgentRouteOptions> = async (app,
       schema: {
         tags: [TAG_ROUTE],
         summary: "Hambatan OpenStreetMap di dekat rute",
-        description: `Tangga, kerb, ramp, lift, pintu masuk, dan guiding block yang tercatat di OpenStreetMap dalam 20 m (paling jauh 50 m) dari garis rute, urut dari awal rute, dengan tautan ke OSM. Data OSM bisa tidak lengkap; daftar kosong bukan berarti jalannya bebas hambatan. ${APP_ONLY}\n\n${COMMON}`,
+        description: `Tangga, kerb, ramp, lift, pintu masuk, dan guiding block yang tercatat di OpenStreetMap dalam 20 m (paling jauh 50 m) dari garis rute, urut dari awal rute, dengan tautan ke OSM. Data OSM bisa tidak lengkap; daftar kosong bukan berarti jalannya bebas hambatan. ${APP_ONLY}\n\n${COMMON} ${VISITORS}`,
         body: obstaclesBody,
         response: { 200: obstaclesResponse, ...errors },
       },
     },
     async (request, reply) => {
-      await member(request, reply, [agentLimit]);
+      await routeCaller(request, reply, [agentLimit], false);
       return routeObstacles(routeCtx, request.body);
     },
   );
