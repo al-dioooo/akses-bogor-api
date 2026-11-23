@@ -7,6 +7,7 @@ import { kecamatanPriority } from "../contribute/priority.js";
 import type { Db } from "../db/client.js";
 import { HttpError } from "../http/errors.js";
 import { searchKnowledge, type KnowledgeHit, type KnowledgeKind } from "../knowledge/search.js";
+import type { LatLng } from "../map/directions.js";
 import { getPlace, placesNamed } from "../places/queries.js";
 
 export type ToolContext = {
@@ -14,6 +15,11 @@ export type ToolContext = {
   now: () => Date;
   /** `DISABILITY_DATA_ENABLED`: data disabilitas Open Data Kota Bogor boleh dipakai untuk prioritas kecamatan. */
   disabilityData?: boolean;
+  /**
+   * Titik awal pengunjung asisten rute publik (ADR-0050), dari browser atau titik yang dipilih di peta. Hanya dipakai
+   * server, mis. untuk nearby_places; tidak pernah dikirim ke model.
+   */
+  position?: LatLng;
 };
 
 /** find_place: lokasi AksesBogor yang sudah terbit dengan nama mirip, paling banyak 5, tanpa koordinat. */

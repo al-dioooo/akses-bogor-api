@@ -1,5 +1,5 @@
 // Query baca lokasi. Semua hanya membaca lokasi yang sudah terbit dan masih tayang (tabel `places`, tanpa yang diturunkan
-// admin, ADR-0050) dan foto yang lolos moderasi.
+// admin, ADR-0051) dan foto yang lolos moderasi.
 import { and, asc, count, countDistinct, eq, exists, ilike, inArray, isNotNull, isNull, or, sql, type SQL } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import { districts, photos, placeFacilities, places, reports } from "../db/schema.js";
@@ -20,7 +20,7 @@ const escapeLike = (value: string) => value.replace(/[\\%_]/g, (c) => `\\${c}`);
 /** Lokasi yang masih tayang. Dipakai setiap query publik; lokasi yang diturunkan admin hanya terlihat di route admin. */
 export const published = isNull(places.unpublishedAt);
 
-/** Siapa yang terakhir menerbitkan data lokasi: verifikator lewat laporan, atau admin langsung (ADR-0050). */
+/** Siapa yang terakhir menerbitkan data lokasi: verifikator lewat laporan, atau admin langsung (ADR-0051). */
 export const verifiedBy = (adminPublishedAt: Date | null) => (adminPublishedAt ? ("admin" as const) : ("tim" as const));
 
 function filterConditions(f: PlaceFilters, bbox?: [number, number, number, number]): SQL | undefined {
@@ -191,7 +191,7 @@ export async function placesNamed(db: Db, query: string, limit = 3) {
   const words = q.split(/\s+/).filter(Boolean);
   const allWords = and(...words.map((word) => sql`strpos(lower(${places.name}), ${word}) > 0`));
   const rows = await db
-    .select({ id: places.id, name: places.name, category: places.category, status: places.status, districtSlug: places.districtSlug, districtName: districts.name, location: places.location })
+    .select({ id: places.id, name: places.name, category: places.category, status: places.status, districtSlug: places.districtSlug, districtName: districts.name, location: places.location, adminPublishedAt: places.adminPublishedAt })
     .from(places)
     .innerJoin(districts, eq(districts.slug, places.districtSlug))
     .where(and(published, or(allWords, sql`${score} >= 0.5`)))
@@ -204,5 +204,6 @@ export async function placesNamed(db: Db, query: string, limit = 3) {
     status: r.status,
     district: { slug: r.districtSlug, name: r.districtName },
     location: { lat: r.location.y, lng: r.location.x },
+    verifiedBy: verifiedBy(r.adminPublishedAt),
   }));
 }

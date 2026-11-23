@@ -4,7 +4,7 @@ import { places } from "../src/db/schema.js";
 import { placesNamed } from "../src/places/queries.js";
 import { facilities, verificationRig, type Rig } from "./helpers/verification.js";
 
-// Lokasi yang diturunkan admin dan lokasi yang diterbitkan langsung oleh admin (ADR-0050), dilihat dari route publik.
+// Lokasi yang diturunkan admin dan lokasi yang diterbitkan langsung oleh admin (ADR-0051), dilihat dari route publik.
 let rig: Rig;
 let halteId: string;
 let kampusId: string;

@@ -593,7 +593,7 @@
                               "tim",
                               "admin"
                             ],
-                            "description": "`tim`: diterbitkan verifikator dari laporan. `admin`: dibuat, diubah, atau diterbitkan langsung oleh admin tanpa pemeriksaan orang kedua; web menulis \"Diterbitkan langsung oleh admin\", bukan \"Diverifikasi\" (ADR-0050)"
+                            "description": "`tim`: diterbitkan verifikator dari laporan. `admin`: dibuat, diubah, atau diterbitkan langsung oleh admin tanpa pemeriksaan orang kedua; web menulis \"Diterbitkan langsung oleh admin\", bukan \"Diverifikasi\" (ADR-0051)"
                           },
                           "coverPhoto": {
                             "nullable": true,
@@ -903,6 +903,252 @@
         }
       }
     },
+    "/places/candidates": {
+      "get": {
+        "summary": "Kandidat Belum ada data dari OpenStreetMap",
+        "tags": [
+          "Lokasi"
+        ],
+        "description": "Kampus, masjid, halte, dan rumah sakit di OpenStreetMap tanpa lokasi AksesBogor berkategori sama dalam 50 m, untuk lapisan \"Belum ada data\" di Peta (ADR-0049). Kandidat belum diperiksa tim: tanpa status, tidak terhitung sebagai lokasi terbit, dan `wheelchair` adalah nilai mentah tag OSM. Data © kontributor OpenStreetMap (ODbL); atribusi di `source` wajib tampil bersama datanya.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "description": "Cari nama tempat, cocok sebagian kata dan tanpa membedakan huruf besar"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "category",
+            "required": false,
+            "description": "Kategori, dipisah koma"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "district",
+            "required": false,
+            "description": "Slug kecamatan, dipisah koma, mis. bogor-tengah"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "FeatureCollection"
+                      ]
+                    },
+                    "features": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "Feature"
+                            ]
+                          },
+                          "id": {
+                            "type": "string",
+                            "description": "Tipe dan id OSM, mis. node/123"
+                          },
+                          "geometry": {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "Point"
+                                ]
+                              },
+                              "coordinates": {
+                                "type": "array",
+                                "items": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "number"
+                                    }
+                                  ]
+                                },
+                                "minItems": 2,
+                                "maxItems": 2,
+                                "description": "[lng, lat]"
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "coordinates"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "properties": {
+                            "type": "object",
+                            "properties": {
+                              "osmType": {
+                                "type": "string",
+                                "enum": [
+                                  "node",
+                                  "way",
+                                  "relation"
+                                ]
+                              },
+                              "osmId": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              "name": {
+                                "nullable": true,
+                                "description": "Nama di OSM; banyak halte tidak bernama",
+                                "type": "string"
+                              },
+                              "category": {
+                                "type": "string",
+                                "enum": [
+                                  "kampus",
+                                  "masjid",
+                                  "halte",
+                                  "rumah_sakit"
+                                ]
+                              },
+                              "district": {
+                                "type": "object",
+                                "properties": {
+                                  "slug": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "slug",
+                                  "name"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "wheelchair": {
+                                "nullable": true,
+                                "description": "Nilai mentah tag wheelchair OSM (mis. yes, limited, no), belum diperiksa tim AksesBogor",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "osmType",
+                              "osmId",
+                              "name",
+                              "category",
+                              "district",
+                              "wheelchair"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "id",
+                          "geometry",
+                          "properties"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "source": {
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string"
+                        },
+                        "license": {
+                          "type": "string"
+                        },
+                        "attribution": {
+                          "type": "string",
+                          "description": "Wajib tampil bersama data (ODbL)"
+                        },
+                        "url": {
+                          "type": "string",
+                          "format": "uri",
+                          "description": "Halaman hak cipta dan lisensi OpenStreetMap"
+                        },
+                        "retrievedAt": {
+                          "nullable": true,
+                          "description": "Waktu unduh dari Overpass; null bila data belum dimuat",
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                        }
+                      },
+                      "required": [
+                        "title",
+                        "license",
+                        "attribution",
+                        "url",
+                        "retrievedAt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "features",
+                    "source"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/places/stats": {
       "get": {
         "summary": "Angka untuk Beranda",
@@ -1110,7 +1356,7 @@
                         "tim",
                         "admin"
                       ],
-                      "description": "`tim`: diterbitkan verifikator dari laporan. `admin`: dibuat, diubah, atau diterbitkan langsung oleh admin tanpa pemeriksaan orang kedua; web menulis \"Diterbitkan langsung oleh admin\", bukan \"Diverifikasi\" (ADR-0050)"
+                      "description": "`tim`: diterbitkan verifikator dari laporan. `admin`: dibuat, diubah, atau diterbitkan langsung oleh admin tanpa pemeriksaan orang kedua; web menulis \"Diterbitkan langsung oleh admin\", bukan \"Diverifikasi\" (ADR-0051)"
                     },
                     "landmark": {
                       "nullable": true,
@@ -9729,7 +9975,7 @@
                         "tim",
                         "admin"
                       ],
-                      "description": "`tim`: diterbitkan verifikator dari laporan. `admin`: dibuat, diubah, atau diterbitkan langsung oleh admin tanpa pemeriksaan orang kedua; web menulis \"Diterbitkan langsung oleh admin\", bukan \"Diverifikasi\" (ADR-0050)"
+                      "description": "`tim`: diterbitkan verifikator dari laporan. `admin`: dibuat, diubah, atau diterbitkan langsung oleh admin tanpa pemeriksaan orang kedua; web menulis \"Diterbitkan langsung oleh admin\", bukan \"Diverifikasi\" (ADR-0051)"
                     },
                     "landmark": {
                       "nullable": true,
@@ -11311,7 +11557,7 @@
                                 "tim",
                                 "admin"
                               ],
-                              "description": "`admin`: diterbitkan langsung oleh admin, tanpa pemeriksaan orang kedua (ADR-0050)"
+                              "description": "`admin`: diterbitkan langsung oleh admin, tanpa pemeriksaan orang kedua (ADR-0051)"
                             }
                           },
                           "required": [
@@ -12007,7 +12253,7 @@
         "tags": [
           "Rute jalan kaki"
         ],
-        "description": "Rute jalan kaki Mapbox dari posisi pengguna ke pin lokasi (biasanya pintu masuk utama): jarak, waktu, langkah, garis rute, kalimat peringatan tetap, dan atribusi. Profil jalan kaki tidak memperhitungkan tangga, kerb, atau kemiringan, jadi antarmuka selalu menampilkan `warning`. Posisi dibulatkan ke 4 desimal sebelum dikirim ke Mapbox Directions, harus di dalam Kota Bogor dan paling jauh 10 km dari tujuan, dan jawaban Mapbox tidak disimpan. Dipanggil browser pengguna sendiri dan hasilnya hanya ditampilkan kepadanya; tidak pernah dikirim ke model (Product Terms Mapbox §1.5).\n\nHanya untuk akun yang sudah masuk dan melengkapi akun (ADR-0042). Menjawab 503 `agen_rute_belum_aktif` selama `ROUTE_AGENT_ENABLED` mati. Semua route agen dan rute berbagi batas 120 permintaan per akun per jam. Data dikirim di badan permintaan supaya tidak tercatat di log. Batas tambahan 30 rute per akun per jam dan 1.000 rute per hari untuk semua pengguna.",
+        "description": "Rute jalan kaki Mapbox dari posisi pengguna ke pin lokasi (biasanya pintu masuk utama): jarak, waktu, langkah, garis rute, kalimat peringatan tetap, dan atribusi. Profil jalan kaki tidak memperhitungkan tangga, kerb, atau kemiringan, jadi antarmuka selalu menampilkan `warning`. Posisi dibulatkan ke 4 desimal sebelum dikirim ke Mapbox Directions, harus di dalam Kota Bogor dan paling jauh 10 km dari tujuan, dan jawaban Mapbox tidak disimpan. Dipanggil browser pengguna sendiri dan hasilnya hanya ditampilkan kepadanya; tidak pernah dikirim ke model (Product Terms Mapbox §1.5).\n\nHanya untuk akun yang sudah masuk dan melengkapi akun (ADR-0042). Menjawab 503 `agen_rute_belum_aktif` selama `ROUTE_AGENT_ENABLED` mati. Semua route agen dan rute berbagi batas 120 permintaan per akun per jam. Data dikirim di badan permintaan supaya tidak tercatat di log. Selama `ROUTE_ASSISTANT_ENABLED` menyala, route ini juga untuk pengunjung tanpa akun asisten rute publik, hanya untuk lokasi AksesBogor, dengan batas per IP (ADR-0050). Batas tambahan 30 rute per akun atau per IP per jam dan 1.000 rute per hari untuk semua pengguna.",
         "requestBody": {
           "required": true,
           "content": {
@@ -12481,7 +12727,7 @@
         "tags": [
           "Rute jalan kaki"
         ],
-        "description": "Tangga, kerb, ramp, lift, pintu masuk, dan guiding block yang tercatat di OpenStreetMap dalam 20 m (paling jauh 50 m) dari garis rute, urut dari awal rute, dengan tautan ke OSM. Data OSM bisa tidak lengkap; daftar kosong bukan berarti jalannya bebas hambatan. Dipanggil browser pengguna sendiri dan hasilnya hanya ditampilkan kepadanya; tidak pernah dikirim ke model (Product Terms Mapbox §1.5).\n\nHanya untuk akun yang sudah masuk dan melengkapi akun (ADR-0042). Menjawab 503 `agen_rute_belum_aktif` selama `ROUTE_AGENT_ENABLED` mati. Semua route agen dan rute berbagi batas 120 permintaan per akun per jam. Data dikirim di badan permintaan supaya tidak tercatat di log.",
+        "description": "Tangga, kerb, ramp, lift, pintu masuk, dan guiding block yang tercatat di OpenStreetMap dalam 20 m (paling jauh 50 m) dari garis rute, urut dari awal rute, dengan tautan ke OSM. Data OSM bisa tidak lengkap; daftar kosong bukan berarti jalannya bebas hambatan. Dipanggil browser pengguna sendiri dan hasilnya hanya ditampilkan kepadanya; tidak pernah dikirim ke model (Product Terms Mapbox §1.5).\n\nHanya untuk akun yang sudah masuk dan melengkapi akun (ADR-0042). Menjawab 503 `agen_rute_belum_aktif` selama `ROUTE_AGENT_ENABLED` mati. Semua route agen dan rute berbagi batas 120 permintaan per akun per jam. Data dikirim di badan permintaan supaya tidak tercatat di log. Selama `ROUTE_ASSISTANT_ENABLED` menyala, route ini juga untuk pengunjung tanpa akun asisten rute publik, hanya untuk lokasi AksesBogor, dengan batas per IP (ADR-0050).",
         "requestBody": {
           "required": true,
           "content": {
@@ -12938,7 +13184,7 @@
                                   "tim",
                                   "admin"
                                 ],
-                                "description": "`admin`: diterbitkan langsung oleh admin, web tidak menyebutnya terverifikasi (ADR-0050)"
+                                "description": "`admin`: diterbitkan langsung oleh admin, web tidak menyebutnya terverifikasi (ADR-0051)"
                               }
                             },
                             "required": [
@@ -13080,7 +13326,7 @@
                                       "tim",
                                       "admin"
                                     ],
-                                    "description": "`admin`: diterbitkan langsung oleh admin, tanpa pemeriksaan orang kedua (ADR-0050)"
+                                    "description": "`admin`: diterbitkan langsung oleh admin, tanpa pemeriksaan orang kedua (ADR-0051)"
                                   }
                                 },
                                 "required": [
@@ -13621,6 +13867,418 @@
             }
           },
           "502": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/route-assistant/status": {
+      "get": {
+        "summary": "Apakah asisten rute publik dibuka",
+        "tags": [
+          "Asisten rute publik"
+        ],
+        "description": "Dipakai web untuk menampilkan halaman Tanya rute atau pesan belum dibuka. Tanpa sesi.",
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean",
+                      "description": "Asisten dibuka (`ROUTE_ASSISTANT_ENABLED`)"
+                    },
+                    "questionsPerDay": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Jatah pertanyaan per pengunjung atau per akun per hari WIB"
+                    }
+                  },
+                  "required": [
+                    "enabled",
+                    "questionsPerDay"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/route-assistant/ask": {
+      "post": {
+        "summary": "Bertanya rute kepada asisten AksesBogor",
+        "tags": [
+          "Asisten rute publik"
+        ],
+        "description": "Pertanyaan siapa pun tentang cara ke lokasi AksesBogor, lokasi terdekat, dan data aksesibilitasnya (ADR-0050). Model hanya menerima pertanyaan, giliran sebelumnya, data lokasi, hasil alat, dan apakah titik awal ada; tidak pernah titik awal itu sendiri, koordinat, atau rute. Titik awal dibulatkan ke 4 desimal untuk jarak garis lurus ke lokasi terdekat, tidak disimpan, dan tidak dicatat. Tidak ada percakapan yang disimpan.\n\nAkun yang sudah masuk dan lengkap memakai jatah 5 pertanyaan per akun per hari WIB, satu hitungan dengan `POST /agent/ask`; penanya lain 5 pertanyaan per IP per hari WIB. Jatah habis dijawab 429 `kuota_habis`. Menjawab 503 `agen_sibuk` bila batas harian semua penanya (`ROUTE_ASSISTANT_QUESTIONS_PER_DAY`) habis, API key belum diatur, atau model gagal, dan 503 `asisten_rute_belum_aktif` selama `ROUTE_ASSISTANT_ENABLED` mati. Batas tambahan 120 permintaan per akun atau per IP per jam.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "placeId": {
+                    "description": "Id lokasi AksesBogor bila pengunjung datang dari \"Tanya rute ke sini\"",
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "question": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 500,
+                    "description": "Pertanyaan pengunjung"
+                  },
+                  "history": {
+                    "description": "Giliran sebelumnya yang disimpan browser selama halaman terbuka; server tidak menyimpannya",
+                    "maxItems": 6,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "role": {
+                          "type": "string",
+                          "enum": [
+                            "user",
+                            "assistant"
+                          ]
+                        },
+                        "content": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 1000
+                        }
+                      },
+                      "required": [
+                        "role",
+                        "content"
+                      ]
+                    }
+                  },
+                  "from": {
+                    "type": "object",
+                    "properties": {
+                      "lat": {
+                        "type": "number",
+                        "minimum": -90,
+                        "maximum": 90,
+                        "description": "Lintang (derajat, WGS 84)"
+                      },
+                      "lng": {
+                        "type": "number",
+                        "minimum": -180,
+                        "maximum": 180,
+                        "description": "Bujur (derajat, WGS 84)"
+                      }
+                    },
+                    "required": [
+                      "lat",
+                      "lng"
+                    ],
+                    "description": "Titik awal pengunjung dari browser atau titik yang dipilih di peta. Hanya dipakai server untuk tempat terdekat; tidak pernah dikirim ke model"
+                  }
+                },
+                "required": [
+                  "question"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "answer": {
+                      "type": "string",
+                      "description": "Jawaban asisten dalam bahasa Indonesia"
+                    },
+                    "sources": {
+                      "type": "array",
+                      "items": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "lokasi"
+                                ]
+                              },
+                              "placeId": {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "lastVerifiedAt": {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "placeId",
+                              "name",
+                              "lastVerifiedAt"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "pengetahuan"
+                                ]
+                              },
+                              "citation": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "url": {
+                                "type": "string",
+                                "format": "uri"
+                              },
+                              "license": {
+                                "type": "string"
+                              },
+                              "attribution": {
+                                "nullable": true,
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "citation",
+                              "title",
+                              "url",
+                              "license",
+                              "attribution"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      },
+                      "description": "Data AksesBogor dan potongan basis pengetahuan yang dibaca asisten untuk jawaban ini"
+                    },
+                    "model": {
+                      "nullable": true,
+                      "description": "Model yang menjawab, mis. claude-haiku-5-5",
+                      "type": "string"
+                    },
+                    "cards": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "rute"
+                            ]
+                          },
+                          "target": {
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                      "aksesbogor"
+                                    ]
+                                  },
+                                  "placeId": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "placeId"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                      "osm"
+                                    ]
+                                  },
+                                  "osmType": {
+                                    "type": "string",
+                                    "enum": [
+                                      "node",
+                                      "way",
+                                      "relation"
+                                    ]
+                                  },
+                                  "osmId": {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "osmType",
+                                  "osmId"
+                                ],
+                                "additionalProperties": false
+                              }
+                            ]
+                          },
+                          "name": {
+                            "nullable": true,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "target",
+                          "name"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Kartu rute jalan kaki untuk ditampilkan web; web menghitung rutenya dari titik awal pengunjung"
+                    }
+                  },
+                  "required": [
+                    "answer",
+                    "sources",
+                    "model",
+                    "cards"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          },
+          "429": {
             "description": "Galat",
             "content": {
               "application/json": {

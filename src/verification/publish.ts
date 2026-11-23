@@ -126,7 +126,7 @@ export async function publishReport(db: Db, store: PhotoStore | undefined, viewe
         facilitiesRelevant: status.relevant,
         facilitiesUnknown: status.unknown,
         lastVerifiedAt: now,
-        // Diterbitkan verifikator: label "langsung oleh admin" tidak berlaku lagi (ADR-0050).
+        // Diterbitkan verifikator: label "langsung oleh admin" tidak berlaku lagi (ADR-0051).
         adminPublishedAt: null,
         adminPublishedBy: null,
         updatedAt: now,
