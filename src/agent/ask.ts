@@ -58,6 +58,21 @@ function hasCheckedPlace(result: unknown) {
   return isChecked(value) || (Array.isArray(value.places) && (value.places as Checked[]).some(isChecked));
 }
 
+/** Sumber yang ditampilkan bila jawaban memakai kandidat OpenStreetMap (ADR-0049), untuk atribusi ODbL. */
+const OSM_CANDIDATE_SOURCE: Source = {
+  type: "pengetahuan",
+  citation: "© kontributor OpenStreetMap",
+  title: "Kampus, masjid, halte, dan rumah sakit di Kota Bogor (OpenStreetMap)",
+  url: "https://www.openstreetmap.org/copyright",
+  license: "Open Database License (ODbL) 1.0",
+  attribution: "© kontributor OpenStreetMap",
+};
+const isCandidate = (p: unknown) => (p as { kind?: unknown } | null)?.kind === "kandidat";
+function hasCandidate(result: unknown) {
+  const places = (result as { places?: unknown } | null)?.places;
+  return isCandidate(result) || (Array.isArray(places) && places.some(isCandidate));
+}
+
 type Deps = { model: AgentModel; ctx: ToolContext; deadlineMs?: number; profile?: AgentProfile };
 
 /**
@@ -91,7 +106,9 @@ export async function askAgent(
     try {
       const result = await runTool(ctx, call.name, call.input, profile.tools);
       if (hasCheckedPlace(result)) seen.checkedPlace = true;
-      if (call.name === "place_accessibility") addPlace(result as { id: string; name: string; lastVerifiedAt: string });
+      // Kandidat OpenStreetMap (asisten rute publik) tidak punya tanggal verifikasi, jadi tidak menjadi sumber "lokasi".
+      if (call.name === "place_accessibility" && (result as { lastVerifiedAt?: unknown }).lastVerifiedAt) addPlace(result as { id: string; name: string; lastVerifiedAt: string });
+      if (hasCandidate(result)) sources.set("osm-kandidat", OSM_CANDIDATE_SOURCE);
       if (call.name === "search_knowledge") addPassages((result as { passages: KnowledgeHit[] }).passages);
       if (call.name === "kecamatan_priority") {
         const priority = result as KecamatanPriority;
