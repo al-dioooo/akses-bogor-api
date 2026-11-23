@@ -135,7 +135,7 @@ const errors = { 400: errorSchema, 401: errorSchema, 403: errorSchema, 404: erro
 const COMMON =
   "Hanya untuk akun yang sudah masuk dan melengkapi akun (ADR-0042). Menjawab 503 `agen_rute_belum_aktif` selama `ROUTE_AGENT_ENABLED` mati. Semua route agen dan rute berbagi batas 120 permintaan per akun per jam. Data dikirim di badan permintaan supaya tidak tercatat di log.";
 const VISITORS =
-  "Selama `ROUTE_ASSISTANT_ENABLED` menyala, route ini juga untuk pengunjung tanpa akun asisten rute publik, hanya untuk lokasi AksesBogor, dengan batas per IP (ADR-0050).";
+  "Selama `ROUTE_ASSISTANT_ENABLED` menyala, route ini juga untuk pengunjung tanpa akun asisten rute publik, untuk lokasi AksesBogor dan kandidat OpenStreetMap, dengan batas per IP (ADR-0050).";
 const APP_ONLY = "Dipanggil browser pengguna sendiri dan hasilnya hanya ditampilkan kepadanya; tidak pernah dikirim ke model (Product Terms Mapbox §1.5).";
 
 /**
@@ -176,11 +176,10 @@ export const agentRoutes: FastifyPluginAsyncZod<AgentRouteOptions> = async (app,
 
   /**
    * Pemanggil rute jalan kaki dan hambatan. Selama asisten rute publik dibuka (ADR-0050), siapa pun boleh meminta rute
-   * ke lokasi AksesBogor: akun yang lengkap dihitung per akun, yang lain per IP. Tujuan OpenStreetMap tetap hanya untuk
-   * akun Bantu memetakan.
+   * ke lokasi AksesBogor atau kandidat OpenStreetMap (ADR-0049): akun yang lengkap dihitung per akun, yang lain per IP.
    */
-  const routeCaller = async (request: FastifyRequest, reply: FastifyReply, limits: ReturnType<typeof limit>[], osm: boolean) => {
-    if (!opts.assistantEnabled || osm || !opts.visitorKey) return member(request, reply, limits);
+  const routeCaller = async (request: FastifyRequest, reply: FastifyReply, limits: ReturnType<typeof limit>[]) => {
+    if (!opts.assistantEnabled || !opts.visitorKey) return member(request, reply, limits);
     const session = opts.auth && request.headers.authorization ? await currentSession(opts.auth, app.db, request, opts.now) : null;
     accountOf.set(request, session && !needsCompletion(session.user) ? session.user.id : `ip:${opts.visitorKey(request)}`);
     await checkLimits(request, reply, limits);
@@ -229,7 +228,7 @@ export const agentRoutes: FastifyPluginAsyncZod<AgentRouteOptions> = async (app,
       },
     },
     async (request, reply) => {
-      await routeCaller(request, reply, [agentLimit, walkingLimit], Boolean(request.body.osm));
+      await routeCaller(request, reply, [agentLimit, walkingLimit]);
       return walkingRoute(routeCtx, request.body);
     },
   );
@@ -246,7 +245,7 @@ export const agentRoutes: FastifyPluginAsyncZod<AgentRouteOptions> = async (app,
       },
     },
     async (request, reply) => {
-      await routeCaller(request, reply, [agentLimit], false);
+      await routeCaller(request, reply, [agentLimit]);
       return routeObstacles(routeCtx, request.body);
     },
   );
