@@ -139,15 +139,9 @@ export async function publishReport(db: Db, store: PhotoStore | undefined, viewe
         facilitiesRelevant: status.relevant,
         facilitiesUnknown: status.unknown,
         lastVerifiedAt: now,
-<<<<<<< HEAD
-        // Diterbitkan verifikator: label "langsung oleh admin" tidak berlaku lagi; terbit langsung memasangnya (ADR-0050).
+        // Diterbitkan verifikator: label "langsung oleh admin" tidak berlaku lagi; terbit langsung memasangnya (ADR-0051).
         adminPublishedAt: direct ? now : null,
         adminPublishedBy: direct ? viewerId : null,
-=======
-        // Diterbitkan verifikator: label "langsung oleh admin" tidak berlaku lagi (ADR-0051).
-        adminPublishedAt: null,
-        adminPublishedBy: null,
->>>>>>> feature/kelola-tempat-baca
         updatedAt: now,
       };
       let before: Snapshot | null = null;

@@ -5772,7 +5772,7 @@
         "tags": [
           "Admin"
         ],
-        "description": "Tempat baru langsung tayang dengan label \"Diterbitkan langsung oleh admin\" (ADR-0050). Disimpan sebagai laporan milik admin yang langsung diterbitkan lewat validasi yang sama dengan verifikasi; titik di luar Kota Bogor 422. Tersedia dan Tidak perlu tanpa foto bertag fasilitas itu (pintu masuk untuk ramp) disimpan sebagai Belum tahu dan disebut di `downgraded`; setiap Tidak tersedia butuh alasan (400 `alasan_wajib`). Foto harus diunggah akun ini lewat `POST /reports/photos`. Alasan masuk log audit.",
+        "description": "Tempat baru langsung tayang dengan label \"Diterbitkan langsung oleh admin\" (ADR-0051). Disimpan sebagai laporan milik admin yang langsung diterbitkan lewat validasi yang sama dengan verifikasi; titik di luar Kota Bogor 422. Tersedia dan Tidak perlu tanpa foto bertag fasilitas itu (pintu masuk untuk ramp) disimpan sebagai Belum tahu dan disebut di `downgraded`; setiap Tidak tersedia butuh alasan (400 `alasan_wajib`). Foto harus diunggah akun ini lewat `POST /reports/photos`. Alasan masuk log audit.",
         "requestBody": {
           "required": true,
           "content": {
@@ -7047,7 +7047,7 @@
         "tags": [
           "Admin"
         ],
-        "description": "Menurunkan tempat dari tayang dengan alasan wajib. Tidak ada yang dihapus: laporan yang merujuknya tetap utuh, dan admin bisa menayangkannya lagi (ADR-0050). Sudah diturunkan: 409 `sudah_diturunkan`.",
+        "description": "Menurunkan tempat dari tayang dengan alasan wajib. Tidak ada yang dihapus: laporan yang merujuknya tetap utuh, dan admin bisa menayangkannya lagi (ADR-0051). Sudah diturunkan: 409 `sudah_diturunkan`.",
         "requestBody": {
           "required": true,
           "content": {
