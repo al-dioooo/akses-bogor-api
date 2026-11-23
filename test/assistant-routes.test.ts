@@ -1,8 +1,10 @@
+import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { QUESTIONS_PER_VISITOR_PER_DAY } from "../src/agent/limits.js";
 import { buildApp } from "../src/app.js";
 import { loadEnv } from "../src/config/env.js";
 import type { Db } from "../src/db/client.js";
+import { places } from "../src/db/schema.js";
 import { seedSampleData } from "../src/db/seed.js";
 import type { Email, Mailer } from "../src/email/mailer.js";
 import { placesNamed } from "../src/places/queries.js";
@@ -105,6 +107,24 @@ describe("POST /route-assistant/ask", () => {
     for (const body of bodies) expect(body).not.toMatch(COORDINATE);
     expect(bodies[1]).toContain('\\"distanceMeters\\":100');
     expect(bodies[0]).toContain("Titik awal pengunjung: sudah dipilih");
+  });
+
+  it("tells the web which places an admin published directly, so Tanya rute does not call them verified", async () => {
+    const kampus = (await placesNamed(db, "Kampus contoh A", 5)).find((p) => p.name === "Kampus contoh A")!.id;
+    await db.update(places).set({ adminPublishedAt: NOW }).where(eq(places.id, kampus));
+    try {
+      replies = [tool("place_accessibility", { placeId: kampus }), tool("place_accessibility", { placeId: halteId }, "t2"), text("Ini data Kampus contoh A dan Halte contoh.")];
+      const res = await ask({ question: "Bagaimana aksesibilitas Kampus contoh A dan Halte contoh?" });
+      expect(res.statusCode).toBe(200);
+      expect(res.json().sources).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ type: "lokasi", placeId: kampus, verifiedBy: "admin" }),
+          expect.objectContaining({ type: "lokasi", placeId: halteId, verifiedBy: "tim" }),
+        ]),
+      );
+    } finally {
+      await db.update(places).set({ adminPublishedAt: null }).where(eq(places.id, kampus));
+    }
   });
 
   it("gives each IP five questions a day, and a failed question does not count", async () => {
