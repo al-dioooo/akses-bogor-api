@@ -131,6 +131,10 @@ Contoh lengkap ada di [.env.example](.env.example). Jangan commit `.env`.
 | `PHOTO_STORAGE_DIR` | Tidak | Folder foto di development tanpa R2, bawaan `.data/foto`. Di production tanpa R2, unggah foto menjawab 503 |
 | `WEB_SERVER_SECRET` | Di production | Rahasia bersama dengan server Next.js, minimal 32 karakter. Bila cocok, rate limit dihitung per IP pengunjung yang dikirim web, bukan per IP server web |
 | `ROUTE_AGENT_ENABLED` | Tidak | `true` membuka route agen rute `/agent/*` dan rute jalan kaki `/route/*` (ADR-0042). Bawaan `false`: route menjawab 503. Biarkan mati di production sampai syarat peluncuran di ADR-0042 terpenuhi |
+| `PROVIDER_HINTS_ENABLED` | Tidak | `true` menyalakan petunjuk aksesibilitas langsung dari Mapbox (dengan `MAPBOX_SECRET_TOKEN`) dan Google (dengan `GOOGLE_MAPS_API_KEY`) di `GET /places/{id}/hints` dan `GET /places/candidates/{osmType}/{osmId}/hints` (ADR-0052). Bawaan `false`: setiap petunjuk berarti panggilan berbayar ke penyedia |
+| `GOOGLE_MAPS_API_KEY` | Tidak | API key Google Maps Platform untuk Places API (New), hanya untuk petunjuk aksesibilitas. Kosong berarti Google mati |
+| `PROVIDER_HINTS_MAPBOX_PER_DAY` | Tidak | Batas pencarian petunjuk Mapbox per hari WIB, di memori proses. Setelah habis, Mapbox dilaporkan `unavailable` sampai tengah malam WIB. Bawaan 1000 |
+| `PROVIDER_HINTS_GOOGLE_PER_DAY` | Tidak | Sama untuk Google. Bawaan 1000 |
 | `DISABILITY_DATA_ENABLED` | Tidak | `true` membuka `GET /districts/priority` dan memakai data disabilitas Open Data Kota Bogor untuk prioritas kecamatan (ADR-0043). Bawaan `false`; biarkan mati sampai Diskominfo Kota Bogor mengizinkan pemakaiannya |
 | `AGENT_PROVIDER` | Tidak | Penyedia model agen: `anthropic` (Claude API, bawaan) atau `openrouter` (ADR-0047). Tidak ada cadangan otomatis ke penyedia lain |
 | `AGENT_REQUESTS_PER_DAY` | Tidak | Permintaan ke model yang berhasil per hari UTC untuk semua pengguna Bantu memetakan. Bawaan 45 |
@@ -153,6 +157,8 @@ Contoh lengkap ada di [.env.example](.env.example). Jangan commit `.env`.
 | `GET /places` | Daftar lokasi: pencarian `q`, filter `category`, `district`, `facility`, `status` (dipisah koma), `limit`, `offset` | FR-02 sampai FR-04 |
 | `GET /places/map` | GeoJSON untuk Mapbox dengan filter yang sama dan `bbox` | FR-05 |
 | `GET /places/candidates` | Kandidat "Belum ada data" untuk Peta: tempat OSM empat kategori tanpa lokasi AksesBogor berkategori sama dalam 50 m, dengan kecamatan, tag `wheelchair` mentah, dan `source` (lisensi dan atribusi ODbL); filter `q`, `category`, `district`; tanpa status; cache 5 menit | ADR-0049 |
+| `GET /places/{id}/hints` | Petunjuk aksesibilitas langsung dari Mapbox dan Google untuk lokasi AksesBogor: tempat penyedia dalam 75 m dengan nama mirip (terhadap kedua nama), angka dan huruf tunggal yang sama, kata jenis tempat yang sesuai, dan kategori penyedia yang sesuai; tanda aksesibilitas, nama di penyedia, dan tautan Google Maps; belum diperiksa tim dan tidak mengubah status; tidak disimpan (`private, no-store`); 30 per menit per klien; `hints: []` tanpa memeriksa tempatnya selama `PROVIDER_HINTS_ENABLED` mati atau tidak ada penyedia yang menyala; galat penyedia dicatat dengan nama penyedia dan status saja | ADR-0052 |
+| `GET /places/candidates/{osmType}/{osmId}/hints` | Sama untuk kandidat OSM; kandidat tanpa nama tidak dicocokkan. Juga salinan tersimpan (`result: "stored"`) dari tag `aksesbogor:google_maps` (Google Maps, dengan tanggal pengambilan) dan `aksesbogor:osm_aksesibilitas` (wheelchair OSM), selama `PROVIDER_HINTS_ENABLED` menyala | ADR-0052 |
 | `GET /places/stats` | Jumlah per kategori, pintu masuk tanpa tangga, dan kontributor | FR-01 |
 | `GET /places/{id}` | Detail: jawaban, alasan, catatan, ringkasan X dari Y, fasilitas penentu status, foto, `needsRecheck` | FR-06, FR-07, FR-38 |
 | `GET /map/token` | Token Mapbox sementara untuk peta di browser; 503 bila `MAPBOX_SECRET_TOKEN` belum diatur | FR-05 |

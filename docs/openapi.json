@@ -1972,6 +1972,662 @@
         }
       }
     },
+    "/places/{id}/hints": {
+      "get": {
+        "summary": "Petunjuk aksesibilitas dari Mapbox dan Google untuk lokasi AksesBogor",
+        "tags": [
+          "Lokasi"
+        ],
+        "description": "Petunjuk dari penyedia peta, bukan data AksesBogor: belum diperiksa tim dan tidak mengubah status atau jawaban fasilitas (ADR-0052). Tempat penyedia diterima hanya bila paling jauh 75 m, namanya mirip terhadap kedua nama, angka dan huruf tunggalnya sama, kata jenis tempatnya sesuai, dan kategori penyedianya sesuai. Hasil penyedia tidak disimpan: Mapbox di-cache di memori 10 menit, dan dari Google hanya place_id. Jawaban `hints: []` berarti petunjuk dimatikan atau tidak ada penyedia yang menyala; saat itu tempatnya tidak diperiksa. 30 permintaan per menit per klien.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "hints": {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "provider": {
+                                "type": "string",
+                                "enum": [
+                                  "mapbox"
+                                ]
+                              },
+                              "result": {
+                                "type": "string",
+                                "enum": [
+                                  "found"
+                                ]
+                              },
+                              "placeName": {
+                                "type": "string",
+                                "description": "Nama tempat di penyedia"
+                              },
+                              "distanceMeters": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Jarak dari titik tempat ini"
+                              },
+                              "wheelchairAccessible": {
+                                "type": "boolean",
+                                "description": "metadata.wheelchair_accessible dari Mapbox Search Box"
+                              }
+                            },
+                            "required": [
+                              "provider",
+                              "result",
+                              "placeName",
+                              "distanceMeters",
+                              "wheelchairAccessible"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "provider": {
+                                "type": "string",
+                                "enum": [
+                                  "google"
+                                ]
+                              },
+                              "result": {
+                                "type": "string",
+                                "enum": [
+                                  "found"
+                                ]
+                              },
+                              "placeName": {
+                                "type": "string",
+                                "description": "Nama tempat di penyedia"
+                              },
+                              "distanceMeters": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Jarak dari titik tempat ini"
+                              },
+                              "url": {
+                                "nullable": true,
+                                "description": "Halaman tempat di Google Maps; wajib ditautkan bersama atribusi Google Maps",
+                                "type": "string"
+                              },
+                              "accessibility": {
+                                "type": "object",
+                                "properties": {
+                                  "entrance": {
+                                    "nullable": true,
+                                    "description": "null: penyedia tidak tahu",
+                                    "type": "boolean"
+                                  },
+                                  "restroom": {
+                                    "nullable": true,
+                                    "description": "null: penyedia tidak tahu",
+                                    "type": "boolean"
+                                  },
+                                  "parking": {
+                                    "nullable": true,
+                                    "description": "null: penyedia tidak tahu",
+                                    "type": "boolean"
+                                  },
+                                  "seating": {
+                                    "nullable": true,
+                                    "description": "null: penyedia tidak tahu",
+                                    "type": "boolean"
+                                  }
+                                },
+                                "required": [
+                                  "entrance",
+                                  "restroom",
+                                  "parking",
+                                  "seating"
+                                ],
+                                "additionalProperties": false,
+                                "description": "accessibilityOptions Google Places API (New)"
+                              }
+                            },
+                            "required": [
+                              "provider",
+                              "result",
+                              "placeName",
+                              "distanceMeters",
+                              "url",
+                              "accessibility"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "provider": {
+                                "type": "string",
+                                "enum": [
+                                  "mapbox",
+                                  "google"
+                                ]
+                              },
+                              "result": {
+                                "type": "string",
+                                "enum": [
+                                  "none",
+                                  "unavailable"
+                                ],
+                                "description": "none: tidak ada tempat yang cocok atau tanpa tanda; unavailable: penyedia gagal atau batas harian habis"
+                              }
+                            },
+                            "required": [
+                              "provider",
+                              "result"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      },
+                      "description": "Satu baris per penyedia yang menyala; kosong bila petunjuk dimatikan"
+                    }
+                  },
+                  "required": [
+                    "hints"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/places/candidates/{osmType}/{osmId}/hints": {
+      "get": {
+        "summary": "Petunjuk aksesibilitas dari Mapbox dan Google untuk kandidat OpenStreetMap",
+        "tags": [
+          "Lokasi"
+        ],
+        "description": "Petunjuk dari penyedia peta, bukan data AksesBogor: belum diperiksa tim dan tidak mengubah status atau jawaban fasilitas (ADR-0052). Tempat penyedia diterima hanya bila paling jauh 75 m, namanya mirip terhadap kedua nama, angka dan huruf tunggalnya sama, kata jenis tempatnya sesuai, dan kategori penyedianya sesuai. Hasil penyedia tidak disimpan: Mapbox di-cache di memori 10 menit, dan dari Google hanya place_id. Jawaban `hints: []` berarti petunjuk dimatikan atau tidak ada penyedia yang menyala; saat itu tempatnya tidak diperiksa. 30 permintaan per menit per klien. Kandidat tanpa nama tidak dicocokkan. Untuk sebagian kandidat, jawaban juga membawa salinan tersimpan (result `stored`): Google Maps dengan tanggal pengambilannya, dan keterangan wheelchair OSM.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "node",
+                "way",
+                "relation"
+              ]
+            },
+            "in": "path",
+            "name": "osmType",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "exclusiveMinimum": true,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "osmId",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "hints": {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "provider": {
+                                "type": "string",
+                                "enum": [
+                                  "mapbox"
+                                ]
+                              },
+                              "result": {
+                                "type": "string",
+                                "enum": [
+                                  "found"
+                                ]
+                              },
+                              "placeName": {
+                                "type": "string",
+                                "description": "Nama tempat di penyedia"
+                              },
+                              "distanceMeters": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Jarak dari titik tempat ini"
+                              },
+                              "wheelchairAccessible": {
+                                "type": "boolean",
+                                "description": "metadata.wheelchair_accessible dari Mapbox Search Box"
+                              }
+                            },
+                            "required": [
+                              "provider",
+                              "result",
+                              "placeName",
+                              "distanceMeters",
+                              "wheelchairAccessible"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "provider": {
+                                "type": "string",
+                                "enum": [
+                                  "google"
+                                ]
+                              },
+                              "result": {
+                                "type": "string",
+                                "enum": [
+                                  "found"
+                                ]
+                              },
+                              "placeName": {
+                                "type": "string",
+                                "description": "Nama tempat di penyedia"
+                              },
+                              "distanceMeters": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Jarak dari titik tempat ini"
+                              },
+                              "url": {
+                                "nullable": true,
+                                "description": "Halaman tempat di Google Maps; wajib ditautkan bersama atribusi Google Maps",
+                                "type": "string"
+                              },
+                              "accessibility": {
+                                "type": "object",
+                                "properties": {
+                                  "entrance": {
+                                    "nullable": true,
+                                    "description": "null: penyedia tidak tahu",
+                                    "type": "boolean"
+                                  },
+                                  "restroom": {
+                                    "nullable": true,
+                                    "description": "null: penyedia tidak tahu",
+                                    "type": "boolean"
+                                  },
+                                  "parking": {
+                                    "nullable": true,
+                                    "description": "null: penyedia tidak tahu",
+                                    "type": "boolean"
+                                  },
+                                  "seating": {
+                                    "nullable": true,
+                                    "description": "null: penyedia tidak tahu",
+                                    "type": "boolean"
+                                  }
+                                },
+                                "required": [
+                                  "entrance",
+                                  "restroom",
+                                  "parking",
+                                  "seating"
+                                ],
+                                "additionalProperties": false,
+                                "description": "accessibilityOptions Google Places API (New)"
+                              }
+                            },
+                            "required": [
+                              "provider",
+                              "result",
+                              "placeName",
+                              "distanceMeters",
+                              "url",
+                              "accessibility"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "provider": {
+                                "type": "string",
+                                "enum": [
+                                  "mapbox",
+                                  "google"
+                                ]
+                              },
+                              "result": {
+                                "type": "string",
+                                "enum": [
+                                  "none",
+                                  "unavailable"
+                                ],
+                                "description": "none: tidak ada tempat yang cocok atau tanpa tanda; unavailable: penyedia gagal atau batas harian habis"
+                              }
+                            },
+                            "required": [
+                              "provider",
+                              "result"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "provider": {
+                                "type": "string",
+                                "enum": [
+                                  "google"
+                                ]
+                              },
+                              "result": {
+                                "type": "string",
+                                "enum": [
+                                  "stored"
+                                ]
+                              },
+                              "placeName": {
+                                "nullable": true,
+                                "description": "Nama tempat di Google Maps saat diambil",
+                                "type": "string"
+                              },
+                              "distanceMeters": {
+                                "nullable": true,
+                                "description": "Jarak tempat Google Maps dari titik OSM saat diambil",
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              "url": {
+                                "nullable": true,
+                                "description": "Halaman tempat di Google Maps; wajib ditautkan bersama atribusi Google Maps",
+                                "type": "string"
+                              },
+                              "retrievedAt": {
+                                "type": "string",
+                                "format": "date",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                                "description": "Tanggal salinan diambil (WIB)"
+                              },
+                              "accessibility": {
+                                "type": "object",
+                                "properties": {
+                                  "entrance": {
+                                    "nullable": true,
+                                    "description": "null: penyedia tidak tahu",
+                                    "type": "boolean"
+                                  },
+                                  "restroom": {
+                                    "nullable": true,
+                                    "description": "null: penyedia tidak tahu",
+                                    "type": "boolean"
+                                  },
+                                  "parking": {
+                                    "nullable": true,
+                                    "description": "null: penyedia tidak tahu",
+                                    "type": "boolean"
+                                  },
+                                  "seating": {
+                                    "nullable": true,
+                                    "description": "null: penyedia tidak tahu",
+                                    "type": "boolean"
+                                  }
+                                },
+                                "required": [
+                                  "entrance",
+                                  "restroom",
+                                  "parking",
+                                  "seating"
+                                ],
+                                "additionalProperties": false,
+                                "description": "Opsi aksesibilitas Google Maps saat diambil"
+                              }
+                            },
+                            "required": [
+                              "provider",
+                              "result",
+                              "placeName",
+                              "distanceMeters",
+                              "url",
+                              "retrievedAt",
+                              "accessibility"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "provider": {
+                                "type": "string",
+                                "enum": [
+                                  "openstreetmap"
+                                ]
+                              },
+                              "result": {
+                                "type": "string",
+                                "enum": [
+                                  "stored"
+                                ]
+                              },
+                              "wheelchair": {
+                                "type": "string",
+                                "enum": [
+                                  "yes",
+                                  "limited",
+                                  "no",
+                                  "designated"
+                                ],
+                                "description": "Nilai wheelchair OSM yang tersimpan, bila berbeda dari tag tempat itu sendiri"
+                              }
+                            },
+                            "required": [
+                              "provider",
+                              "result",
+                              "wheelchair"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      },
+                      "description": "Satu baris per penyedia yang menyala, lalu salinan tersimpan (result `stored`) bila ada; kosong bila petunjuk dimatikan"
+                    }
+                  },
+                  "required": [
+                    "hints"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/auth/code": {
       "post": {
         "summary": "Kirim kode masuk",
