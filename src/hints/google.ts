@@ -6,27 +6,28 @@
 // lewat Place Details setiap kali diminta, tidak di-cache, tidak disimpan di database, dan tidak menjadi masukan AI.
 // Web wajib menampilkan atribusi Google Maps di dekat isinya.
 import { pickMatch, type HintTarget, type Point } from "./match.js";
-import { dailyBudget, type GoogleHint, type HintProvider, type ProviderResult } from "./provider.js";
+import { DEFAULT_HINTS_PER_DAY } from "../config/env.js";
+import { dailyBudget, ProviderError, type GoogleHint, type HintProvider, type ProviderResult } from "./provider.js";
 
 const BASE = "https://places.googleapis.com/v1";
-const PLACE_FIELDS = ["id", "displayName", "location", "googleMapsUri", "accessibilityOptions"];
-/** Pencarian petunjuk per hari WIB; setiap pencarian satu panggilan Text Search atau Place Details. */
-export const GOOGLE_HINTS_PER_DAY = 1000;
+const PLACE_FIELDS = ["id", "displayName", "location", "types", "googleMapsUri", "accessibilityOptions"];
 /** Bias lokasi Text Search, sedikit lebih luas dari jarak cocok supaya tempat yang sama pasti ikut. */
 const BIAS_METERS = 200;
 
+/** `perDay`: pencarian per hari WIB (`PROVIDER_HINTS_GOOGLE_PER_DAY`); setiap pencarian satu panggilan Text Search atau Place Details. */
 type Options = { apiKey: string; now: () => Date; fetch?: typeof fetch; perDay?: number; idTtlMs?: number };
 type Place = {
   id?: string;
   displayName?: { text?: string };
   location?: { latitude?: number; longitude?: number };
+  types?: unknown;
   googleMapsUri?: string;
   accessibilityOptions?: { wheelchairAccessibleEntrance?: boolean; wheelchairAccessibleRestroom?: boolean; wheelchairAccessibleParking?: boolean; wheelchairAccessibleSeating?: boolean };
 };
 
 const flag = (value: unknown) => (typeof value === "boolean" ? value : null);
 
-export function googleHints({ apiKey, now, fetch = globalThis.fetch, perDay = GOOGLE_HINTS_PER_DAY, idTtlMs = 24 * 60 * 60_000 }: Options): HintProvider {
+export function googleHints({ apiKey, now, fetch = globalThis.fetch, perDay = DEFAULT_HINTS_PER_DAY, idTtlMs = 24 * 60 * 60_000 }: Options): HintProvider {
   // Hanya `place_id` (atau "tidak ada yang cocok"), tidak pernah isi tempat.
   const ids = new Map<string, { at: number; placeId: string | null }>();
   const spend = dailyBudget(perDay, now);
@@ -36,10 +37,10 @@ export function googleHints({ apiKey, now, fetch = globalThis.fetch, perDay = GO
     try {
       response = await fetch(url, { ...init, signal: AbortSignal.timeout(5000) });
     } catch {
-      throw new Error("Google Places API tidak bisa dihubungi");
+      throw new ProviderError("Google Places API tidak bisa dihubungi", null);
     }
     const body = await response.json().catch(() => null);
-    if (!response.ok) throw new Error(`Google Places API menjawab ${response.status}`);
+    if (!response.ok) throw new ProviderError(`Google Places API menjawab ${response.status}`, response.status);
     return body;
   }
 
@@ -47,7 +48,8 @@ export function googleHints({ apiKey, now, fetch = globalThis.fetch, perDay = GO
   const placeOf = (place: Place) => {
     const { latitude: lat, longitude: lng } = place.location ?? {};
     const name = place.displayName?.text;
-    return place.id && name && typeof lat === "number" && typeof lng === "number" ? { ...place, id: place.id, name, location: { lat, lng } satisfies Point } : null;
+    const categories = Array.isArray(place.types) ? place.types.filter((c): c is string => typeof c === "string") : [];
+    return place.id && name && typeof lat === "number" && typeof lng === "number" ? { ...place, id: place.id, name, location: { lat, lng } satisfies Point, categories } : null;
   };
 
   function hint(place: NonNullable<ReturnType<typeof placeOf>>, distanceMeters: number): ProviderResult {

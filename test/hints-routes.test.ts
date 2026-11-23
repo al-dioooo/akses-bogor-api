@@ -21,7 +21,7 @@ const fetch = (async (input: string | URL) => {
   const url = new URL(String(input));
   calls.push(url);
   if (url.pathname.endsWith("/forward")) {
-    return json({ features: [{ geometry: { coordinates: [106.7641, -6.5701] }, properties: { name: "RS Contoh Bogor", mapbox_id: "rs-contoh" } }] });
+    return json({ features: [{ geometry: { coordinates: [106.7641, -6.5701] }, properties: { name: "RS Contoh Bogor", mapbox_id: "rs-contoh", poi_category_ids: ["hospital"] } }] });
   }
   if (url.pathname.includes("/retrieve/")) return json({ features: [{ properties: { metadata: { wheelchair_accessible: false } } }] });
   if (url.pathname.endsWith(":searchText")) {
@@ -31,6 +31,7 @@ const fetch = (async (input: string | URL) => {
           id: "ChIJcontoh",
           displayName: { text: "Rumah Sakit Contoh" },
           location: { latitude: -6.5702, longitude: 106.764 },
+          types: ["hospital", "point_of_interest"],
           googleMapsUri: "https://maps.google.com/?cid=2",
           accessibilityOptions: { wheelchairAccessibleEntrance: true, wheelchairAccessibleRestroom: true },
         },
@@ -99,6 +100,8 @@ describe("GET /places/:id/hints", () => {
     const off = await appWith({ GOOGLE_MAPS_API_KEY: "kunci-google" });
     try {
       expect((await off.inject({ method: "GET", url: `/places/${hospitalId}/hints` })).json()).toEqual({ hints: [] });
+      // Returns early without looking the place up.
+      expect((await off.inject({ method: "GET", url: "/places/00000000-0000-4000-8000-000000000000/hints" })).json()).toEqual({ hints: [] });
       expect(calls).toEqual([]);
     } finally {
       await off.close();

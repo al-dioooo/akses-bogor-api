@@ -16,7 +16,7 @@ export type HintRouteOptions = {
 };
 
 const DESCRIPTION =
-  "Petunjuk dari penyedia peta, bukan data AksesBogor: belum diperiksa tim dan tidak mengubah status atau jawaban fasilitas (ADR-0052). Tempat penyedia diterima hanya bila paling jauh 75 m dan namanya mirip. Hasil penyedia tidak disimpan: Mapbox di-cache di memori 10 menit, dan dari Google hanya place_id. Jawaban `hints: []` berarti petunjuk dimatikan. 30 permintaan per menit per klien.";
+  "Petunjuk dari penyedia peta, bukan data AksesBogor: belum diperiksa tim dan tidak mengubah status atau jawaban fasilitas (ADR-0052). Tempat penyedia diterima hanya bila paling jauh 75 m, namanya mirip terhadap kedua nama, angka dan huruf tunggalnya sama, kata jenis tempatnya sesuai, dan kategori penyedianya sesuai. Hasil penyedia tidak disimpan: Mapbox di-cache di memori 10 menit, dan dari Google hanya place_id. Jawaban `hints: []` berarti petunjuk dimatikan atau tidak ada penyedia yang menyala; saat itu tempatnya tidak diperiksa. 30 permintaan per menit per klien.";
 
 /** Tidak disimpan browser atau Cloudflare, dan dibatasi karena setiap petunjuk berarti panggilan berbayar ke penyedia. */
 const routeConfig = {
@@ -41,10 +41,11 @@ export const hintRoutes: FastifyPluginAsyncZod<HintRouteOptions> = async (app, o
       config: routeConfig,
     },
     async (request, reply) => {
+      reply.header("cache-control", "private, no-store");
+      if (opts.providers.length === 0) return { hints: [] };
       const place = await getPlace(app.db, request.params.id, opts.now());
       if (!place) throw new HttpError(404, "lokasi_tidak_ditemukan", "Lokasi tidak ditemukan.");
-      reply.header("cache-control", "private, no-store");
-      return { hints: await lookupHints({ name: place.name, location: place.location }, opts.providers) };
+      return { hints: await lookupHints({ name: place.name, location: place.location, category: place.category }, opts.providers, request.log) };
     },
   );
 
@@ -61,10 +62,11 @@ export const hintRoutes: FastifyPluginAsyncZod<HintRouteOptions> = async (app, o
       config: routeConfig,
     },
     async (request, reply) => {
+      reply.header("cache-control", "private, no-store");
+      if (opts.providers.length === 0 && !opts.stored) return { hints: [] };
       const place = await getOsmPlace(app.db, request.params);
       if (!place) throw new HttpError(404, "kandidat_tidak_ditemukan", "Tempat tidak ditemukan.");
-      reply.header("cache-control", "private, no-store");
-      const live = await lookupHints({ name: place.name, location: place.location }, opts.providers);
+      const live = await lookupHints({ name: place.name, location: place.location, category: place.category }, opts.providers, request.log);
       return { hints: opts.stored ? withStored(live, await storedHints(app.db, request.params)) : live };
     },
   );

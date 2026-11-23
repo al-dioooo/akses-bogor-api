@@ -7,17 +7,20 @@
 import { randomUUID } from "node:crypto";
 import { KOTA_BOGOR_BBOX } from "../map/search.js";
 import { pickMatch, type HintTarget, type Point } from "./match.js";
-import { dailyBudget, type HintProvider, type ProviderResult } from "./provider.js";
+import { DEFAULT_HINTS_PER_DAY } from "../config/env.js";
+import { dailyBudget, ProviderError, type HintProvider, type ProviderResult } from "./provider.js";
 
 const BASE = "https://api.mapbox.com/search/searchbox/v1";
 const CACHE_LIMIT = 500;
-/** Pencarian petunjuk per hari WIB; satu pencarian berarti `forward` dan, bila ada yang cocok, `retrieve`. */
-export const MAPBOX_HINTS_PER_DAY = 1000;
 
+/** `perDay`: pencarian per hari WIB (`PROVIDER_HINTS_MAPBOX_PER_DAY`); satu pencarian berarti `forward` dan, bila ada yang cocok, `retrieve`. */
 type Options = { token: string; now: () => Date; fetch?: typeof fetch; perDay?: number; ttlMs?: number };
-type Feature = { geometry?: { coordinates?: [number, number] }; properties?: { name?: string; mapbox_id?: string; metadata?: { wheelchair_accessible?: unknown } } };
+type Feature = {
+  geometry?: { coordinates?: [number, number] };
+  properties?: { name?: string; mapbox_id?: string; poi_category_ids?: unknown; metadata?: { wheelchair_accessible?: unknown } };
+};
 
-export function mapboxHints({ token, now, fetch = globalThis.fetch, perDay = MAPBOX_HINTS_PER_DAY, ttlMs = 10 * 60_000 }: Options): HintProvider {
+export function mapboxHints({ token, now, fetch = globalThis.fetch, perDay = DEFAULT_HINTS_PER_DAY, ttlMs = 10 * 60_000 }: Options): HintProvider {
   const cache = new Map<string, { at: number; result: ProviderResult }>();
   const spend = dailyBudget(perDay, now);
 
@@ -27,10 +30,10 @@ export function mapboxHints({ token, now, fetch = globalThis.fetch, perDay = MAP
       response = await fetch(url, { signal: AbortSignal.timeout(5000) });
     } catch {
       // Dibuat ulang tanpa URL, karena URL-nya memuat token rahasia.
-      throw new Error("Mapbox Search Box tidak bisa dihubungi");
+      throw new ProviderError("Mapbox Search Box tidak bisa dihubungi", null);
     }
     const body = (await response.json().catch(() => null)) as { features?: Feature[] } | null;
-    if (!response.ok || !Array.isArray(body?.features)) throw new Error(`Mapbox Search Box menjawab ${response.status}`);
+    if (!response.ok || !Array.isArray(body?.features)) throw new ProviderError(`Mapbox Search Box menjawab ${response.status}`, response.status);
     return body.features;
   }
 
@@ -48,8 +51,9 @@ export function mapboxHints({ token, now, fetch = globalThis.fetch, perDay = MAP
     }).toString();
     const places = (await features(forward)).flatMap((feature) => {
       const [lng, lat] = feature.geometry?.coordinates ?? [];
-      const { name, mapbox_id: id } = feature.properties ?? {};
-      return typeof lng === "number" && typeof lat === "number" && name && id ? [{ id, name, location: { lat, lng } satisfies Point }] : [];
+      const { name, mapbox_id: id, poi_category_ids: ids } = feature.properties ?? {};
+      const categories = Array.isArray(ids) ? ids.filter((c): c is string => typeof c === "string") : [];
+      return typeof lng === "number" && typeof lat === "number" && name && id ? [{ id, name, location: { lat, lng } satisfies Point, categories }] : [];
     });
     const match = pickMatch(target, places);
     if (!match) return { provider: "mapbox", result: "none" };

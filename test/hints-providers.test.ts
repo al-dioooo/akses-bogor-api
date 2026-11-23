@@ -4,7 +4,7 @@ import { mapboxHints } from "../src/hints/mapbox.js";
 import { lookupHints } from "../src/hints/provider.js";
 
 const SILOAM = { lat: -6.59567, lng: 106.80465 };
-const target = { name: "RS Siloam Bogor", location: SILOAM };
+const target = { name: "RS Siloam Bogor", location: SILOAM, category: "rumah_sakit" as const };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 
 /** Fetch palsu yang mencatat setiap panggilan dan menjawab menurut path. */
@@ -23,8 +23,8 @@ describe("Mapbox hints", () => {
     url.pathname.endsWith("/forward")
       ? json({
           features: [
-            { geometry: { coordinates: [106.80481, -6.59218] }, properties: { name: "Pool Taxol Siloam", mapbox_id: "taksi" } },
-            { geometry: { coordinates: [106.80464507, -6.59567111] }, properties: { name: "Siloam Hospitals Bogor", mapbox_id: "siloam" } },
+            { geometry: { coordinates: [106.80481, -6.59218] }, properties: { name: "Pool Taxol Siloam", mapbox_id: "taksi", poi_category_ids: ["parking_lot", "transportation"] } },
+            { geometry: { coordinates: [106.80464507, -6.59567111] }, properties: { name: "Siloam Hospitals Bogor", mapbox_id: "siloam", poi_category_ids: ["health_services", "hospital"] } },
           ],
         })
       : json({ features: [{ properties: { name: "Siloam Hospitals Bogor", metadata: { wheelchair_accessible: true } } }] });
@@ -57,7 +57,10 @@ describe("Mapbox hints", () => {
   it("is unavailable after the daily budget and does not cache failures", async () => {
     const failing = fakeFetch(() => json({ message: "x" }, 500));
     const provider = mapboxHints({ token: "sk.x", now: () => new Date("2026-11-23T03:00:00Z"), fetch: failing.fetch, perDay: 2 });
-    expect(await lookupHints(target, [provider])).toEqual([{ provider: "mapbox", result: "unavailable" }]);
+    const logged: unknown[][] = [];
+    expect(await lookupHints(target, [provider], { warn: (...args) => logged.push(args) })).toEqual([{ provider: "mapbox", result: "unavailable" }]);
+    // Only the provider name and status are logged, never the body, URL, or token.
+    expect(logged).toEqual([[{ provider: "mapbox", status: 500 }, "Petunjuk penyedia gagal dimuat"]]);
     expect(await lookupHints(target, [provider])).toEqual([{ provider: "mapbox", result: "unavailable" }]);
     expect(failing.calls).toHaveLength(2);
     expect(await provider.lookup(target)).toEqual({ provider: "mapbox", result: "unavailable" });
@@ -70,6 +73,7 @@ describe("Google hints", () => {
     id: "ChIJsiloam",
     displayName: { text: "Siloam Hospitals Bogor" },
     location: { latitude: -6.5957, longitude: 106.8047 },
+    types: ["hospital", "health", "point_of_interest", "establishment"],
     googleMapsUri: "https://maps.google.com/?cid=1",
     accessibilityOptions: { wheelchairAccessibleEntrance: true, wheelchairAccessibleParking: false },
   };
@@ -91,13 +95,13 @@ describe("Google hints", () => {
     expect(search.url.pathname).toBe("/v1/places:searchText");
     const headers = search.init!.headers as Record<string, string>;
     expect(headers["x-goog-api-key"]).toBe("kunci-google");
-    expect(headers["x-goog-fieldmask"]).toBe("places.id,places.displayName,places.location,places.googleMapsUri,places.accessibilityOptions");
+    expect(headers["x-goog-fieldmask"]).toBe("places.id,places.displayName,places.location,places.types,places.googleMapsUri,places.accessibilityOptions");
     expect(JSON.parse(String(search.init!.body))).toMatchObject({ textQuery: "RS Siloam Bogor", locationBias: { circle: { radius: 200 } } });
 
     // The second lookup calls Place Details again: accessibility content is never served from a cache.
     expect(await provider.lookup(target)).toEqual(expected);
     expect(calls.map((c) => c.url.pathname)).toEqual(["/v1/places:searchText", "/v1/places/ChIJsiloam"]);
-    expect((calls[1]!.init!.headers as Record<string, string>)["x-goog-fieldmask"]).toBe("id,displayName,location,googleMapsUri,accessibilityOptions");
+    expect((calls[1]!.init!.headers as Record<string, string>)["x-goog-fieldmask"]).toBe("id,displayName,location,types,googleMapsUri,accessibilityOptions");
   });
 
   it("answers none for a place without accessibility options or without a match", async () => {
