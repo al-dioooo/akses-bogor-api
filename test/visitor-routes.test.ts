@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { buildApp } from "../src/app.js";
 import { loadEnv } from "../src/config/env.js";
 import type { Db } from "../src/db/client.js";
+import { loadFacilities, parseFacilities } from "../src/contribute/facilities.js";
 import { seedSampleData } from "../src/db/seed.js";
 import { placesNamed } from "../src/places/queries.js";
 import { WALKING_ROUTES_PER_HOUR } from "../src/routes/agent.js";
@@ -37,6 +38,11 @@ let halteId: string;
 beforeAll(async () => {
   ({ db, close } = await createTestDb());
   await seedSampleData(db);
+  await loadFacilities(db, parseFacilities({ elements: [{ type: "node", id: 41, lat: -6.58, lon: 106.8, tags: { amenity: "hospital", name: "RSUD Uji" } }] }), {
+    url: "https://overpass-api.de/api/interpreter",
+    retrievedAt: NOW,
+    sha256: "c".repeat(64),
+  });
   const deps = { db, fetch, now: () => NOW };
   open = await buildApp(loadEnv({ ...base, ROUTE_ASSISTANT_ENABLED: "true" }), deps);
   closed = await buildApp(loadEnv(base), deps);
@@ -72,10 +78,11 @@ describe("walking routes for visitors of the public route assistant", () => {
     expect((await walk({ from: nearHalte, placeId: halteId })).statusCode).toBe(200);
   });
 
-  it("keeps OpenStreetMap destinations for signed-in contributors", async () => {
-    const res = await walk({ from: nearHalte, osm: { type: "node", id: 1 } });
-    expect(res.statusCode).toBe(503);
-    expect(res.json().galat).toBe("agen_rute_belum_aktif");
+  it("lets a visitor route to an OpenStreetMap candidate, and answers 404 for an unknown one", async () => {
+    const res = await walk({ from: nearHalte, osm: { type: "node", id: 41 } });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().destination).toMatchObject({ placeId: null, osm: { type: "node", id: 41 }, name: "RSUD Uji" });
+    expect((await walk({ from: nearHalte, osm: { type: "node", id: 1 } })).statusCode).toBe(404);
   });
 
   it("stays closed to visitors while the assistant is off", async () => {
