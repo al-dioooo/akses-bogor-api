@@ -191,8 +191,10 @@ export async function publishReport(db: Db, store: PhotoStore | undefined, viewe
       const after = snapshot({ ...values, location }, facilities);
       const why = direct ? { alasan: direct.reason, ...(direct.osm ? { osm: direct.osm } : {}) } : {};
       const placeAction = direct ? (place ? "diubah_admin" : "dibuat_admin") : place ? "diubah" : "dibuat";
+      // Foto yang ditambah atau dihapus pada tempat yang sudah ada ikut tercatat di riwayat tempat; rinciannya di entri `foto`.
+      const photoChange = place && (published.length > 0 || removed.length > 0) ? { photos: { ditambah: published.length, dihapus: removed.length } } : {};
       const entries: AuditEntry[] = [
-        { entity: "lokasi", entityId: placeId, actor, action: placeAction, changes: { ...diff(before, after), laporan: id, ...why }, at: now },
+        { entity: "lokasi", entityId: placeId, actor, action: placeAction, changes: { ...diff(before, after), ...photoChange, laporan: id, ...why }, at: now },
         { entity: "laporan", entityId: id, actor, action: direct ? "terbit_langsung" : "diterbitkan", changes: { status: { sebelum: report.status, sesudah: "diterbitkan" }, lokasi: placeId, ...why }, at: now },
         ...removed.map((photo): AuditEntry => ({ entity: "foto", entityId: photo.id, actor, action: "dihapus", changes: { lokasi: placeId, tag: photo.tag, alasan: direct!.reason }, at: now })),
         ...published.map(({ photo }): AuditEntry => ({ entity: "foto", entityId: photo.id, actor, action: "diterbitkan", changes: { laporan: id, tag: photo.tag, areaKabur: photo.blurRegions?.length ?? 0 }, at: now })),
