@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Db } from "../src/db/client.js";
 import { knowledgePassages, knowledgeSources } from "../src/db/schema.js";
 import { queryConcepts, queryTerms, searchKnowledge } from "../src/knowledge/search.js";
-import { insertPassages, reindexStems, replaceSource } from "../src/knowledge/store.js";
+import { insertPassages, reindexStems, removeSources, replaceSource } from "../src/knowledge/store.js";
 import { createTestDb } from "./helpers/db.js";
 
 let db: Db;
@@ -214,5 +214,47 @@ describe("replaceSource", () => {
     ).rejects.toThrow("unduhan rusak");
     const rows = await db.select().from(knowledgePassages).where(sql`${knowledgePassages.sourceId} = ${uu.id}`);
     expect(rows).toHaveLength(2);
+  });
+});
+
+describe("removeSources", () => {
+  const page = (path: string) => ({ ...guide, id: `aksesbogor-halaman-${path}`, title: `Halaman ${path}`, url: `https://akses-bogor.aldio.dev/${path}` });
+  const passagesOf = async (id: string) => db.select().from(knowledgePassages).where(sql`${knowledgePassages.sourceId} = ${id}`);
+
+  it("removes dropped sources with their passages in the same transaction as the new data, and can run again", async () => {
+    for (const path of ["disabilitas", "tips"]) {
+      await replaceSource(db, page(path), (tx) => insertPassages(tx, page(path).id, [{ citation: `Halaman ${path}`, body: "Isi lama." }]));
+    }
+    const removed: number[] = [];
+    const load = () =>
+      replaceSource(db, page("aksesibilitas"), async (tx) => {
+        await insertPassages(tx, page("aksesibilitas").id, [{ citation: "Halaman aksesibilitas", body: "Isi baru." }]);
+        removed.push(await removeSources(tx, [page("disabilitas").id, page("tips").id]));
+      });
+
+    await load();
+    await load();
+
+    expect(removed).toEqual([2, 0]);
+    expect(await passagesOf(page("disabilitas").id)).toHaveLength(0);
+    expect(await passagesOf(page("tips").id)).toHaveLength(0);
+    expect(await passagesOf(page("aksesibilitas").id)).toHaveLength(1);
+    const left = await db.select({ url: knowledgeSources.url }).from(knowledgeSources);
+    expect(left.map((s) => s.url).filter((url) => /\/(disabilitas|tips)$/.test(url))).toEqual([]);
+  });
+
+  it("keeps the dropped sources when loading the new data fails", async () => {
+    await replaceSource(db, page("tips"), (tx) => insertPassages(tx, page("tips").id, [{ citation: "Halaman tips", body: "Isi lama." }]));
+    await expect(
+      replaceSource(db, page("aksesibilitas"), async (tx) => {
+        await removeSources(tx, [page("tips").id]);
+        throw new Error("unduhan rusak");
+      }),
+    ).rejects.toThrow("unduhan rusak");
+    expect(await passagesOf(page("tips").id)).toHaveLength(1);
+  });
+
+  it("does nothing for an empty list", async () => {
+    await db.transaction(async (tx) => expect(await removeSources(tx, [])).toBe(0));
   });
 });

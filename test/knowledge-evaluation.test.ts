@@ -54,4 +54,11 @@ describe("retrieval test sets", () => {
       }
     }
   });
+
+  it("do not expect citations from the Disabilitas and Tips pages, which were removed from the site", () => {
+    for (const file of ["uji-retrieval.json", "uji-retrieval-terpisah.json"]) {
+      const text = readFileSync(new URL(`../scripts/pengetahuan/${file}`, import.meta.url), "utf8");
+      expect(text).not.toMatch(/Mengenal disabilitas|Tips berkunjung dan melapor/);
+    }
+  });
 });
