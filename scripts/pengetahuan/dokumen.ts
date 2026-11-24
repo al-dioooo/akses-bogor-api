@@ -1,11 +1,12 @@
 // Dokumen AksesBogor untuk agen rute (ADR-0042), dibaca dari repo publik di GitHub cabang `main`:
-// - halaman edukasi Aksesibilitas, Disabilitas, dan Tips dari `messages/id.json` di akses-bogor-web (ADR-0041);
+// - halaman edukasi Aksesibilitas dari `messages/id.json` di akses-bogor-web (ADR-0041). Halaman Disabilitas dan Tips
+//   dihapus dari situs (dialihkan ke /aksesibilitas), jadi sumbernya ikut dihapus dari basis pengetahuan;
 // - Panduan Verifikasi, serta ADR-0017, ADR-0018, dan ADR-0022 dari akses-bogor-docs.
 //
 //   pnpm pengetahuan:dokumen             # unduh, simpan salinan mentah, lalu muat
 //   pnpm pengetahuan:dokumen --salinan   # muat dari salinan mentah terakhir tanpa mengunduh
 import { educationPassages, splitMarkdown } from "../../src/knowledge/documents.js";
-import { insertPassages, replaceSource, type Passage } from "../../src/knowledge/store.js";
+import { insertPassages, removeSources, replaceSource, type Passage } from "../../src/knowledge/store.js";
 import { obtain, withDb } from "./unduh.js";
 
 const RAW = "https://raw.githubusercontent.com/al-dioooo/";
@@ -21,25 +22,29 @@ const ADRS = [
   ["0022", "0022-tersedia-berarti-bisa-dipakai.md"],
 ] as const;
 
-type Doc = { id: string; title: string; url: string; retrievedAt: Date; sha256: string; passages: Passage[] };
+/**
+ * Sumber halaman edukasi yang sudah dihapus dari situs. Dihapus dalam transaksi yang sama dengan pemuatan halaman
+ * Aksesibilitas, supaya agen tidak lagi mengutip alamat yang hanya dialihkan.
+ */
+const REMOVED_SOURCES = ["aksesbogor-halaman-disabilitas", "aksesbogor-halaman-tips"] as const;
+
+type Doc = { id: string; title: string; url: string; retrievedAt: Date; sha256: string; passages: Passage[]; replaces?: readonly string[] };
 
 await withDb(async (db) => {
   const docs: Doc[] = [];
 
   const messages = await obtain("akses-bogor-web-messages-id.json", `${RAW}akses-bogor-web/main/messages/id.json`);
   const json = JSON.parse(messages.bytes.toString("utf8")) as Record<string, unknown>;
-  for (const [namespace, path] of [["Aksesibilitas", "aksesibilitas"], ["Disabilitas", "disabilitas"], ["Tips", "tips"]] as const) {
-    const passages = educationPassages(json, namespace);
-    const title = String((json[namespace] as { metaTitle?: string }).metaTitle ?? namespace);
-    docs.push({
-      id: `aksesbogor-halaman-${path}`,
-      title: `Halaman edukasi "${title}" (draf, menunggu tinjauan komunitas; ADR-0041)`,
-      retrievedAt: messages.retrievedAt,
-      sha256: messages.sha256,
-      url: `${WEB}${path}`,
-      passages,
-    });
-  }
+  const title = String((json.Aksesibilitas as { metaTitle?: string } | undefined)?.metaTitle ?? "Aksesibilitas");
+  docs.push({
+    id: "aksesbogor-halaman-aksesibilitas",
+    title: `Halaman edukasi "${title}" (draf, menunggu tinjauan komunitas; ADR-0041)`,
+    retrievedAt: messages.retrievedAt,
+    sha256: messages.sha256,
+    url: `${WEB}aksesibilitas`,
+    passages: educationPassages(json, "Aksesibilitas"),
+    replaces: REMOVED_SOURCES,
+  });
 
   const guide = await obtain("panduan-verifikasi.md", `${RAW}akses-bogor-docs/main/operations/panduan-verifikasi.md`);
   docs.push({
@@ -63,7 +68,11 @@ await withDb(async (db) => {
     await replaceSource(
       db,
       { id: doc.id, kind: "dokumen_aksesbogor", title: doc.title, url: doc.url, license: LICENSE, retrievedAt: doc.retrievedAt, sha256: doc.sha256 },
-      (tx) => insertPassages(tx, doc.id, doc.passages),
+      async (tx) => {
+        await insertPassages(tx, doc.id, doc.passages);
+        const removed = await removeSources(tx, doc.replaces ?? []);
+        if (removed > 0) console.log(`${removed} sumber halaman yang sudah dihapus dari situs ikut dihapus.`);
+      },
     );
     console.log(`${doc.title}: ${doc.passages.length} potongan.`);
   }
