@@ -1,5 +1,5 @@
 // Menulis basis pengetahuan agen rute (ADR-0042). Hanya dipakai skrip di `scripts/pengetahuan/`.
-import { eq, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import { knowledgePassages, knowledgeSources } from "../db/schema.js";
 import { stemText } from "./stemmer.js";
@@ -23,6 +23,16 @@ export async function replaceSource(db: Db, source: KnowledgeSource, fill: (tx: 
     await tx.insert(knowledgeSources).values(source);
     await fill(tx);
   });
+}
+
+/**
+ * Menghapus sumber yang tidak dimuat lagi beserta semua potongannya (lewat cascade). Aman dijalankan ulang: sumber yang
+ * sudah tidak ada dilewati. Mengembalikan jumlah sumber yang benar-benar terhapus.
+ */
+export async function removeSources(tx: Tx, ids: readonly string[]): Promise<number> {
+  if (ids.length === 0) return 0;
+  const removed = await tx.delete(knowledgeSources).where(inArray(knowledgeSources.id, [...ids])).returning({ id: knowledgeSources.id });
+  return removed.length;
 }
 
 /** Isi kolom `search_stem` (ADR-0044): bentuk dasar sitasi dan judul berbobot A, isi berbobot B, seperti kolom `search`. */
