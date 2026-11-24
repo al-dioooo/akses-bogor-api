@@ -10,5 +10,5 @@
   { "id": "T09", "jenis": "lift, jawaban", "pertanyaan": "Kapan lift dijawab tidak perlu?", "relevan": [["Panduan Verifikasi, 4. Daftar Periksa › 4.2 Fasilitas › Lift / Elevator", "ADR-0017, Keputusan", "Halaman \"Mengenal aksesibilitas\" (draf), Empat jawaban untuk setiap fasilitas"]] },
   { "id": "T10", "jenis": "toilet", "pertanyaan": "Tombol darurat di toilet disabilitas", "relevan": ["Permen PUPR No. 14/PRT/M/2017, Lampiran III, 5 Toilet (bagian 2 dari 5)"] },
   { "id": "T11", "jenis": "jawaban", "pertanyaan": "Apa alasan yang bisa dipilih untuk jawaban Tidak tersedia?", "relevan": ["ADR-0022, Keputusan › Alasan untuk \"Tidak tersedia\""] },
-  { "id": "T12", "jenis": "foto, guiding block", "pertanyaan": "Bagaimana memotret guiding block untuk laporan?", "relevan": [["Halaman \"Tips berkunjung dan melapor\" (draf), Foto yang membantu verifikasi", "Panduan Verifikasi, 5. Bukti Foto › 5.2 Foto yang Diterima dan yang Kurang"]] }
+  { "id": "T12", "jenis": "foto, guiding block", "pertanyaan": "Bagaimana memotret guiding block untuk laporan?", "relevan": [["Panduan Verifikasi, 5. Bukti Foto › 5.2 Foto yang Diterima dan yang Kurang"]] }
 ]
