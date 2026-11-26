@@ -27,7 +27,7 @@ import { mapboxHints } from "./hints/mapbox.js";
 import { mapTokenSource } from "./map/token.js";
 import { schedulePhotoCleanup } from "./photos/cleanup.js";
 import { scheduleVerificationJobs } from "./verification/jobs.js";
-import { localStore, r2Store, type PhotoStore } from "./photos/storage.js";
+import { photoStoreFromEnv, type PhotoStore } from "./photos/storage.js";
 import { adminRoutes } from "./routes/admin.js";
 import { adminPlaceRoutes } from "./routes/admin-places.js";
 import { agentRoutes } from "./routes/agent.js";
@@ -170,14 +170,7 @@ export async function buildApp(env: Env, deps: { db?: Db; now?: () => Date; fetc
   await app.register(meRoutes, { auth, mailer, now });
   await app.register(adminRoutes, { auth, now });
   // Foto laporan (ADR-0031): R2 bila diatur, folder lokal di development, dan tidak ada di production tanpa R2.
-  const { R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_LAPORAN, R2_BUCKET_PUBLIK } = env;
-  const photoStore =
-    deps.photoStore ??
-    (R2_ACCOUNT_ID && R2_ACCESS_KEY_ID && R2_SECRET_ACCESS_KEY && R2_BUCKET_LAPORAN && R2_BUCKET_PUBLIK
-      ? r2Store({ accountId: R2_ACCOUNT_ID, accessKeyId: R2_ACCESS_KEY_ID, secretAccessKey: R2_SECRET_ACCESS_KEY, privateBucket: R2_BUCKET_LAPORAN, publicBucket: R2_BUCKET_PUBLIK })
-      : development
-        ? localStore(env.PHOTO_STORAGE_DIR ?? ".data/foto")
-        : undefined);
+  const photoStore = deps.photoStore ?? photoStoreFromEnv(env);
   await app.register(reportRoutes, { auth, store: photoStore, now });
   await app.register(adminPlaceRoutes, { auth, photoBaseUrl: env.PHOTO_PUBLIC_URL, store: photoStore, now });
   // Tautan di email status laporan memakai origin web pertama (ADR-0039).
