@@ -68,11 +68,16 @@ export async function lastEntry(tx: Db, target: string, only?: { round: string; 
   return row ? { placeId: row.entity_id, action: row.action, changes: row.changes, at: new Date(row.created_at) } : null;
 }
 
-/** Tempat tayang berkategori sama dalam 50 m dari pintu masuk atau titik kandidat, terdekat dulu. */
+/**
+ * Tempat tayang dari laporan atau admin, berkategori sama, dalam 50 m dari pintu masuk atau titik kandidat, terdekat
+ * dulu. Tempat Street View tidak pernah dipakai ulang di sini: tempat milik sasaran ini sudah ditemukan lewat log audit
+ * (`lastEntry`), jadi tempat Street View di dekatnya selalu milik sasaran lain. Dua sasaran yang berdekatan, mis. dua
+ * gedung kampus atau halte di dua sisi jalan, tetap menjadi dua tempat.
+ */
 async function nearbyPlace(tx: Db, category: string, entrance: { lat: number; lng: number }, osm: OsmRow) {
   const at = (p: { lat: number; lng: number }) => sql`ST_SetSRID(ST_MakePoint(${p.lng}, ${p.lat}), 4326)::geography`;
   const result = await tx.execute(sql`
-    SELECT id FROM places WHERE category = ${category} AND unpublished_at IS NULL
+    SELECT id FROM places WHERE category = ${category} AND unpublished_at IS NULL AND verification_source <> 'street_view'
       AND (ST_DWithin(location::geography, ${at(entrance)}, ${SAME_PLACE_METERS}) OR ST_DWithin(location::geography, ${at({ lat: Number(osm.lat), lng: Number(osm.lng) })}, ${SAME_PLACE_METERS}))
     ORDER BY ST_Distance(location::geography, ${at(entrance)}) LIMIT 1`);
   const [row] = (result as unknown as { rows: { id: string }[] }).rows;
