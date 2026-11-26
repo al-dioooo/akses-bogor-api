@@ -35,7 +35,7 @@ const placeAccessibilityTool = {
   description:
     "Status aksesibilitas sebuah tempat dan jawaban keempat fasilitas (ramp, toilet difabel, guiding block, lift) yang sudah diverifikasi, dengan alasan, catatan, dan tanggal verifikasi terakhir. Sampaikan jawaban apa adanya: belum_tahu berarti belum diketahui, bukan tidak tersedia, dan jangan ditebak dari sumber lain.",
   input: z.object({ placeId }),
-  output: placeDetail.omit({ photos: true, location: true }),
+  output: placeDetail.omit({ photos: true, location: true, version: true }),
   run: placeAccessibility,
 };
 

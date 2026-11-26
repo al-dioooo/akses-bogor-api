@@ -24,6 +24,7 @@ const post = (token: string, payload: Record<string, unknown>) =>
   rig.app.inject({ method: "POST", url: "/reports", headers: rig.as(token), payload: { submissionKey: crypto.randomUUID(), facilities: facilities(), photos: [], ...payload } });
 const reportCount = async () => (await rig.db.select({ n: count() }).from(reports))[0]!.n;
 const direct = { publishDirectly: true, publishReason: "Saya cek sendiri di lokasi" };
+const versionOf = async (id: string) => (await rig.db.select({ v: places.updatedAt }).from(places).where(eq(places.id, id)))[0]!.v.toISOString();
 
 describe("POST /reports with publishDirectly", () => {
   let placeId: string;
@@ -68,11 +69,53 @@ describe("POST /reports with publishDirectly", () => {
   });
 
   it("counts the place's shown photos as evidence for a missing-facility report", async () => {
-    const res = await post(admin.token, { kind: "kekurangan", placeId, facilities: facilities({ ramp: { answer: "tersedia" }, lift: { answer: "tidak_perlu" } }), ...direct });
+    const res = await post(admin.token, { kind: "kekurangan", placeId, placeVersion: await versionOf(placeId), facilities: facilities({ ramp: { answer: "tersedia" }, lift: { answer: "tidak_perlu" } }), ...direct });
     expect(res.statusCode).toBe(201);
     expect(res.json().downgraded).toEqual(["lift"]);
     const [row] = await rig.db.select({ name: places.name }).from(places).where(eq(places.id, placeId));
     expect(row!.name).toBe("Masjid langsung contoh");
+  });
+
+  it("refuses a draft made from an older version of the place, without saving anything", async () => {
+    // Draf Edit lokasi dibuat dari versi ini, lalu verifikator menerbitkan laporan warga lebih dulu.
+    const draftVersion = await versionOf(placeId);
+    const detail = await rig.app.inject({ method: "GET", url: `/places/${placeId}` });
+    expect(detail.json().version).toBe(draftVersion);
+    const reportId = await rig.submit(reporter.token, { kind: "kekurangan", placeId, photos: [] });
+    rig.clock.now = new Date(rig.clock.now.getTime() + 60_000);
+    const published = await rig.app.inject({
+      method: "POST",
+      url: `/verifier/reports/${reportId}/publish`,
+      headers: rig.as(verifier.token),
+      payload: { placeVersion: draftVersion, description: null, facilities: facilities().map((f) => ({ reason: null, note: null, evidence: "terbukti", ...f })) },
+    });
+    expect(published.statusCode).toBe(200);
+    const newer = await versionOf(placeId);
+    expect(newer).not.toBe(draftVersion);
+
+    const before = await reportCount();
+    const audits = (await rig.db.select({ n: count() }).from(auditLog))[0]!.n;
+    const edit = { ...rig.newPlace({ name: "Masjid dari draf lama" }), kind: "perubahan", placeId, ...direct };
+    for (const placeVersion of [draftVersion, undefined]) {
+      const stale = await post(admin.token, { ...edit, placeVersion });
+      expect(stale.statusCode).toBe(409);
+      expect(stale.json()).toMatchObject({ galat: "draf_usang", pesan: expect.stringContaining("sudah berubah sejak draf dibuat") });
+    }
+    expect(await reportCount()).toBe(before);
+    expect((await rig.db.select({ n: count() }).from(auditLog))[0]!.n).toBe(audits);
+    expect(await versionOf(placeId)).toBe(newer);
+    expect((await rig.db.select({ name: places.name }).from(places).where(eq(places.id, placeId)))[0]!.name).toBe("Masjid langsung contoh");
+
+    // Setelah data terbaru dimuat ke draf, kiriman yang sama diterbitkan.
+    const fresh = await post(admin.token, { ...edit, placeVersion: newer });
+    expect(fresh.statusCode).toBe(201);
+    expect((await rig.db.select({ name: places.name }).from(places).where(eq(places.id, placeId)))[0]!.name).toBe("Masjid dari draf lama");
+  });
+
+  it("ignores placeVersion for a normal submission", async () => {
+    const res = await post(reporter.token, { kind: "kekurangan", placeId, placeVersion: "2020-01-01T00:00:00.000Z" });
+    expect(res.statusCode).toBe(201);
+    expect(res.json()).toMatchObject({ status: "menunggu", placeId });
   });
 
   it("leaves an admin report without the flag in the queue as usual", async () => {

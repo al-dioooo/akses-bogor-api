@@ -130,18 +130,18 @@ export const reportRoutes: FastifyPluginAsyncZod<ReportRouteOptions> = async (ap
       schema: {
         tags: [TAG],
         summary: "Kirim laporan",
-        description: `Laporan baru, perubahan (Edit lokasi), atau kekurangan (Laporkan kekurangan) masuk antrean verifikasi dengan status menunggu (FR-20 sampai FR-27). Data lokasi tidak berubah sampai laporan diterbitkan. Kecamatan dihitung ulang dari titik; titik di luar Kota Bogor menjawab 422. Laporan kekurangan memakai nama, kategori, titik, dan patokan lokasi saat ini. Foto harus diunggah akun ini lewat \`POST /reports/photos\` dan belum terpasang; bila tidak, 400 \`foto_tidak_ditemukan\`. Kirim ulang dengan kunci draf yang sama menjawab 201 dengan laporan yang sudah ada, tanpa membuat laporan kedua. Per akun ${REPORTS_PER_DAY} laporan per 24 jam dan ${WAITING_REPORTS} laporan menunggu. Admin boleh mengirim \`publishDirectly\` dengan \`publishReason\`: laporan langsung diterbitkan lewat validasi yang sama dengan verifikasi, tempatnya berlabel admin, Tersedia dan Tidak perlu tanpa foto bertag fasilitas itu disimpan sebagai Belum tahu (\`downgraded\`), dan batas per akun tidak berlaku; akun lain 403 \`bukan_admin\` (ADR-0051).`,
+        description: `Laporan baru, perubahan (Edit lokasi), atau kekurangan (Laporkan kekurangan) masuk antrean verifikasi dengan status menunggu (FR-20 sampai FR-27). Data lokasi tidak berubah sampai laporan diterbitkan. Kecamatan dihitung ulang dari titik; titik di luar Kota Bogor menjawab 422. Laporan kekurangan memakai nama, kategori, titik, dan patokan lokasi saat ini. Foto harus diunggah akun ini lewat \`POST /reports/photos\` dan belum terpasang; bila tidak, 400 \`foto_tidak_ditemukan\`. Kirim ulang dengan kunci draf yang sama menjawab 201 dengan laporan yang sudah ada, tanpa membuat laporan kedua. Per akun ${REPORTS_PER_DAY} laporan per 24 jam dan ${WAITING_REPORTS} laporan menunggu. Admin boleh mengirim \`publishDirectly\` dengan \`publishReason\`: laporan langsung diterbitkan lewat validasi yang sama dengan verifikasi, tempatnya berlabel admin, Tersedia dan Tidak perlu tanpa foto bertag fasilitas itu disimpan sebagai Belum tahu (\`downgraded\`), dan batas per akun tidak berlaku; akun lain 403 \`bukan_admin\` (ADR-0051). Untuk perubahan dan kekurangan, admin mengirim \`placeVersion\` dari draf; bila lokasi sudah berubah sejak draf dibuat, 409 \`draf_usang\` supaya draf lama tidak menimpa data yang lebih baru.`,
         body: reportSubmission,
         response: { 201: submittedReport, 400: errorSchema, 401: errorSchema, 403: errorSchema, 404: errorSchema, 409: errorSchema, 422: errorSchema, 429: errorSchema, 502: errorSchema, 503: errorSchema },
       },
     },
     async (request, reply) => {
       const user = await reporter(request);
-      const { publishDirectly, publishReason, ...body } = request.body;
+      const { publishDirectly, publishReason, placeVersion, ...body } = request.body;
       if (publishDirectly) {
         // Pengecualian FR-37 khusus admin (ADR-0051); verifikator dan pengguna tetap lewat antrean.
         if (user.role !== "admin") throw new HttpError(403, "bukan_admin", "Hanya admin AksesBogor yang bisa menerbitkan langsung.");
-        const { report, downgraded } = await publishSubmission(app.db, opts.store, user.id, body, publishReason!, opts.now(), request.log);
+        const { report, downgraded } = await publishSubmission(app.db, opts.store, user.id, body, { reason: publishReason!, placeVersion }, opts.now(), request.log);
         return reply.code(201).send({ ...report, downgraded });
       }
       const { report } = await submitReport(app.db, user.id, body, opts.now());

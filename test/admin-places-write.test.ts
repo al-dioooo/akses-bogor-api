@@ -137,6 +137,7 @@ describe("POST /admin/places", () => {
         submissionKey: crypto.randomUUID(),
         kind: "kekurangan",
         placeId: id,
+        placeVersion: await versionOf(id),
         facilities: facilities(),
         photos: [],
         publishDirectly: true,
