@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { and, count, desc, eq } from "drizzle-orm";
 import { directAnswers } from "../src/admin/edit.js";
 import { auditLog, photoDeletions, photos, placeFacilities, places, reportEmails, reports } from "../src/db/schema.js";
@@ -114,6 +114,58 @@ describe("POST /admin/places", () => {
     rig.memory.failing.put = false;
     expect(res.statusCode).toBe(502);
     expect(await reportCount()).toBe(before);
+    const [row] = await rig.db.select({ reportId: photos.reportId, uploaderId: photos.uploaderId }).from(photos).where(eq(photos.id, photo));
+    expect(row).toEqual({ reportId: null, uploaderId: admin.user.id });
+  });
+
+  it("saves and publishes in one transaction, so the admin report never waits in the verifier queue", async () => {
+    // Dua transaksi (simpan lalu terbitkan) membuat laporan sempat berstatus menunggu dan bisa diambil verifikator.
+    const transaction = vi.spyOn(rig.db, "transaction");
+    try {
+      const created = await send("POST", "/admin/places", newPlace({ name: "Masjid satu transaksi" }));
+      expect(created.statusCode).toBe(201);
+      expect(transaction).toHaveBeenCalledTimes(1);
+      const id = created.json().placeId as string;
+
+      transaction.mockClear();
+      const changed = await send("PATCH", `/admin/places/${id}`, { ...newPlace({ name: "Masjid satu transaksi" }), version: await versionOf(id), removePhotos: [] });
+      expect(changed.statusCode).toBe(200);
+      expect(transaction).toHaveBeenCalledTimes(1);
+
+      transaction.mockClear();
+      const fromLaporkan = await send("POST", "/reports", {
+        submissionKey: crypto.randomUUID(),
+        kind: "kekurangan",
+        placeId: id,
+        facilities: facilities(),
+        photos: [],
+        publishDirectly: true,
+        publishReason: "Saya cek sendiri di lokasi",
+      });
+      expect(fromLaporkan.statusCode).toBe(201);
+      expect(transaction).toHaveBeenCalledTimes(1);
+    } finally {
+      transaction.mockRestore();
+    }
+    const waiting = await rig.db.select({ n: count() }).from(reports).where(and(eq(reports.reporterId, admin.user.id), eq(reports.status, "menunggu")));
+    expect(waiting[0]!.n).toBe(0);
+  });
+
+  it("leaves nothing behind when publishing fails after the report was saved", async () => {
+    // Foto gagal disalin ke bucket publik saat terbit, setelah laporan disimpan di transaksi yang sama.
+    const created = await send("POST", "/admin/places", newPlace({ name: "Masjid gagal terbit" }));
+    const id = created.json().placeId as string;
+    const photo = await rig.uploadPhoto(admin.token);
+    const version = await versionOf(id);
+    const before = await reportCount();
+    const audits = (await rig.db.select({ n: count() }).from(auditLog))[0]!.n;
+    rig.memory.failing.put = true;
+    const res = await send("PATCH", `/admin/places/${id}`, { ...newPlace({ name: "Masjid gagal terbit" }), photos: [{ id: photo, tag: "pintu_masuk" }], version, removePhotos: [] });
+    rig.memory.failing.put = false;
+    expect(res.statusCode).toBe(502);
+    expect(await reportCount()).toBe(before);
+    expect((await rig.db.select({ n: count() }).from(auditLog))[0]!.n).toBe(audits);
+    expect(await versionOf(id)).toBe(version);
     const [row] = await rig.db.select({ reportId: photos.reportId, uploaderId: photos.uploaderId }).from(photos).where(eq(photos.id, photo));
     expect(row).toEqual({ reportId: null, uploaderId: admin.user.id });
   });

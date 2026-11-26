@@ -71,142 +71,16 @@ const snapshot = (p: { name: string; category: string; districtSlug: string; loc
   facilities: Object.fromEntries(facilities.map((f) => [f.facility, { answer: f.answer, reason: f.reason, note: f.note }])),
 });
 
-export async function publishReport(db: Db, store: PhotoStore | undefined, viewerId: string, id: string, input: PublishInput, now: Date, log?: Log, direct?: DirectPublish) {
-  // Berkas publik yang sudah disalin; dihapus lagi bila transaksi gagal.
+/**
+ * Menjalankan `work` dalam satu transaksi untuk menerbitkan. `copied` diisi berkas publik yang sudah disalin; bila transaksi
+ * gagal, berkas itu dihapus lagi. Berkas di `removeKeys` baru dihapus dari penyimpanan setelah transaksi berhasil.
+ */
+export async function inPublishTransaction<T extends { removeKeys: string[] }>(db: Db, store: PhotoStore | undefined, log: Log | undefined, work: (tx: Db, copied: string[]) => Promise<T>) {
   const copied: string[] = [];
   try {
-    const result = await db.transaction(async (tx) => {
-      // FR-37 berlaku untuk verifikator; admin yang menerbitkan langsung menerbitkan laporannya sendiri (ADR-0051).
-      const report = await lockReport(tx, id, direct ? null : viewerId);
-      const facilities = finalAnswers(input.facilities);
-
-      const [place] = report.placeId
-        ? await tx
-            .select({ id: places.id, updatedAt: places.updatedAt, name: places.name, category: places.category, districtSlug: places.districtSlug, location: places.location, landmark: places.landmark, description: places.description, status: places.status, unpublishedAt: places.unpublishedAt })
-            .from(places)
-            .where(eq(places.id, report.placeId))
-            .for("update")
-        : [];
-      if (report.kind !== "baru") {
-        if (!place) throw new HttpError(409, "lokasi_tidak_ada", "Lokasi yang dilaporkan sudah tidak ada. Tolak laporan ini.");
-        if (place.unpublishedAt) throw new HttpError(409, "lokasi_diturunkan", "Lokasi ini sudah diturunkan admin. Tolak laporan ini, atau minta admin menayangkannya lagi.");
-        if (input.placeVersion !== place.updatedAt.toISOString()) {
-          throw new HttpError(409, "lokasi_berubah", "Data lokasi ini baru saja berubah. Muat ulang halaman dan periksa lagi dengan data terbaru.");
-        }
-      }
-
-      // Laporan kekurangan tidak mengubah nama, kategori, titik, dan patokan (ADR-0033, ADR-0036).
-      const keep = report.kind === "kekurangan" ? place! : null;
-      const currentPoint = place ? { lat: place.location.y, lng: place.location.x } : null;
-      const name = keep?.name ?? input.name;
-      const category = keep?.category ?? input.category;
-      const location = keep ? currentPoint! : input.location;
-      if (!name || !category || !location) throw invalid("isian_wajib", "Nama, kategori, dan titik lokasi wajib diisi sebelum diterbitkan.");
-      const landmark = keep ? keep.landmark : (input.landmark ?? null);
-      const district = await requireDistrict(tx, location);
-      const placeId = place?.id ?? randomUUID();
-      const status = computeStatus(facilities);
-
-      // Foto: yang disembunyikan dihapus, sisanya disalin ke bucket publik dengan area kabur (ADR-0037).
-      const reportPhotos = await tx.select().from(photos).where(eq(photos.reportId, id));
-      const visible = reportPhotos.filter((p) => p.moderation !== "disembunyikan");
-      const hidden = reportPhotos.filter((p) => p.moderation === "disembunyikan");
-      if (visible.length > 0 && !store) throw new HttpError(503, "foto_belum_diatur", "Penyimpanan foto belum diatur di server.");
-      const published = [];
-      for (const photo of visible) {
-        const key = `lokasi/${placeId}/${photo.id}.webp`;
-        try {
-          const original = await store!.get(photo.storageKey);
-          const output = photo.blurRegions?.length ? await blurPhoto(original, photo.blurRegions) : { data: original, width: photo.width, height: photo.height, bytes: photo.bytes };
-          await store!.put(key, output.data, "image/webp");
-          copied.push(key);
-          published.push({ photo, key, width: output.width, height: output.height, bytes: output.bytes });
-        } catch (error) {
-          log?.warn({ err: error, photoId: photo.id }, "foto gagal disalin ke bucket publik");
-          throw new HttpError(502, "foto_gagal_diterbitkan", "Foto gagal diterbitkan ke penyimpanan publik. Laporan belum diterbitkan; coba lagi.");
-        }
-      }
-
-      const values = {
-        name,
-        category,
-        districtSlug: district.slug,
-        location: { x: location.lng, y: location.lat },
-        landmark,
-        description: input.description,
-        status: status.status,
-        facilitiesAvailable: status.available,
-        facilitiesRelevant: status.relevant,
-        facilitiesUnknown: status.unknown,
-        lastVerifiedAt: now,
-        // Diterbitkan verifikator: label "langsung oleh admin" tidak berlaku lagi; terbit langsung memasangnya (ADR-0051).
-        adminPublishedAt: direct ? now : null,
-        adminPublishedBy: direct ? viewerId : null,
-        updatedAt: now,
-      };
-      let before: Snapshot | null = null;
-      if (place) {
-        const current = await tx.select().from(placeFacilities).where(eq(placeFacilities.placeId, placeId));
-        before = snapshot({ ...place, location: currentPoint! }, FACILITIES.map((facility) => {
-          const f = current.find((c) => c.facility === facility);
-          return { facility, answer: f?.answer ?? "belum_tahu", reason: f?.reason ?? null, note: f?.note ?? null };
-        }));
-        await tx.update(places).set(values).where(eq(places.id, placeId));
-        await tx.delete(placeFacilities).where(eq(placeFacilities.placeId, placeId));
-      } else {
-        await tx.insert(places).values({ id: placeId, ...values, createdAt: now });
-      }
-      await tx.insert(placeFacilities).values(facilities.map((f) => ({ placeId, ...f, updatedAt: now })));
-
-      for (const { photo, key, width, height, bytes } of published) {
-        await tx
-          .update(photos)
-          .set({ placeId, storageKey: key, moderation: "tayang", altText: altText(photo.tag, name), width, height, bytes, blurRegions: null })
-          .where(eq(photos.id, photo.id));
-      }
-      const privateKeys = published.map(({ photo }) => photo.storageKey);
-      if (privateKeys.length) await tx.insert(photoDeletions).values(privateKeys.map((storageKey) => ({ storageKey }))).onConflictDoNothing();
-      const hiddenKeys = await dropReportPhotos(tx, { ids: hidden.map((p) => p.id) });
-      // Foto tempat yang dihapus admin: barisnya dibuang dan berkas publiknya diantrekan untuk dihapus.
-      const removed = direct?.removePhotoIds?.length && place
-        ? await tx.select({ id: photos.id, storageKey: photos.storageKey, tag: photos.tag }).from(photos).where(and(inArray(photos.id, direct.removePhotoIds), eq(photos.placeId, placeId), eq(photos.moderation, "tayang")))
-        : [];
-      const removedKeys = removed.length ? await dropReportPhotos(tx, { ids: removed.map((p) => p.id) }) : [];
-
-      await tx
-        .update(reports)
-        .set({
-          status: "diterbitkan",
-          placeId,
-          decidedAt: now,
-          reviewerId: viewerId,
-          ...(input.note !== undefined ? { reviewerNote: input.note } : {}),
-          rejectionReason: null,
-          clarificationQuestion: null,
-          clarificationDueAt: null,
-        })
-        .where(eq(reports.id, id));
-
-      const actor = { userId: viewerId };
-      const after = snapshot({ ...values, location }, facilities);
-      const why = direct ? { alasan: direct.reason, ...(direct.osm ? { osm: direct.osm } : {}) } : {};
-      const placeAction = direct ? (place ? "diubah_admin" : "dibuat_admin") : place ? "diubah" : "dibuat";
-      // Foto yang ditambah atau dihapus pada tempat yang sudah ada ikut tercatat di riwayat tempat; rinciannya di entri `foto`.
-      const photoChange = place && (published.length > 0 || removed.length > 0) ? { photos: { ditambah: published.length, dihapus: removed.length } } : {};
-      const entries: AuditEntry[] = [
-        { entity: "lokasi", entityId: placeId, actor, action: placeAction, changes: { ...diff(before, after), ...photoChange, laporan: id, ...why }, at: now },
-        { entity: "laporan", entityId: id, actor, action: direct ? "terbit_langsung" : "diterbitkan", changes: { status: { sebelum: report.status, sesudah: "diterbitkan" }, lokasi: placeId, ...why }, at: now },
-        ...removed.map((photo): AuditEntry => ({ entity: "foto", entityId: photo.id, actor, action: "dihapus", changes: { lokasi: placeId, tag: photo.tag, alasan: direct!.reason }, at: now })),
-        ...published.map(({ photo }): AuditEntry => ({ entity: "foto", entityId: photo.id, actor, action: "diterbitkan", changes: { laporan: id, tag: photo.tag, areaKabur: photo.blurRegions?.length ?? 0 }, at: now })),
-        ...hidden.map((photo): AuditEntry => ({ entity: "foto", entityId: photo.id, actor, action: "dihapus", changes: { laporan: id, disembunyikan: true }, at: now })),
-      ];
-      await audit(tx, ...entries);
-      // Admin yang menerbitkan laporannya sendiri tidak perlu email "laporan Anda diterbitkan".
-      if (!direct) await queueEmail(tx, id, "diterbitkan", now);
-      return { placeId, status: status.status, removeKeys: [...privateKeys, ...hiddenKeys, ...removedKeys] };
-    });
+    const result = await db.transaction((tx) => work(tx, copied));
     await removeQueuedFiles(db, store, result.removeKeys, log);
-    return { placeId: result.placeId, status: result.status };
+    return result;
   } catch (error) {
     if (copied.length > 0) {
       await db.insert(photoDeletions).values(copied.map((storageKey) => ({ storageKey }))).onConflictDoNothing();
@@ -214,4 +88,144 @@ export async function publishReport(db: Db, store: PhotoStore | undefined, viewe
     }
     throw error;
   }
+}
+
+export async function publishReport(db: Db, store: PhotoStore | undefined, viewerId: string, id: string, input: PublishInput, now: Date, log?: Log, direct?: DirectPublish) {
+  const result = await inPublishTransaction(db, store, log, (tx, copied) => publishInTransaction(tx, store, viewerId, id, input, now, copied, log, direct));
+  return { placeId: result.placeId, status: result.status };
+}
+
+/**
+ * Isi `publishReport` di dalam transaksi pemanggil. Berkas publik yang disalin dicatat di `copied`; berkas yang harus
+ * dihapus setelah commit dikembalikan di `removeKeys`. Pakai lewat `inPublishTransaction`.
+ */
+export async function publishInTransaction(tx: Db, store: PhotoStore | undefined, viewerId: string, id: string, input: PublishInput, now: Date, copied: string[], log?: Log, direct?: DirectPublish) {
+  // FR-37 berlaku untuk verifikator; admin yang menerbitkan langsung menerbitkan laporannya sendiri (ADR-0051).
+  const report = await lockReport(tx, id, direct ? null : viewerId);
+  const facilities = finalAnswers(input.facilities);
+
+  const [place] = report.placeId
+    ? await tx
+        .select({ id: places.id, updatedAt: places.updatedAt, name: places.name, category: places.category, districtSlug: places.districtSlug, location: places.location, landmark: places.landmark, description: places.description, status: places.status, unpublishedAt: places.unpublishedAt })
+        .from(places)
+        .where(eq(places.id, report.placeId))
+        .for("update")
+    : [];
+  if (report.kind !== "baru") {
+    if (!place) throw new HttpError(409, "lokasi_tidak_ada", "Lokasi yang dilaporkan sudah tidak ada. Tolak laporan ini.");
+    if (place.unpublishedAt) throw new HttpError(409, "lokasi_diturunkan", "Lokasi ini sudah diturunkan admin. Tolak laporan ini, atau minta admin menayangkannya lagi.");
+    if (input.placeVersion !== place.updatedAt.toISOString()) {
+      throw new HttpError(409, "lokasi_berubah", "Data lokasi ini baru saja berubah. Muat ulang halaman dan periksa lagi dengan data terbaru.");
+    }
+  }
+
+  // Laporan kekurangan tidak mengubah nama, kategori, titik, dan patokan (ADR-0033, ADR-0036).
+  const keep = report.kind === "kekurangan" ? place! : null;
+  const currentPoint = place ? { lat: place.location.y, lng: place.location.x } : null;
+  const name = keep?.name ?? input.name;
+  const category = keep?.category ?? input.category;
+  const location = keep ? currentPoint! : input.location;
+  if (!name || !category || !location) throw invalid("isian_wajib", "Nama, kategori, dan titik lokasi wajib diisi sebelum diterbitkan.");
+  const landmark = keep ? keep.landmark : (input.landmark ?? null);
+  const district = await requireDistrict(tx, location);
+  const placeId = place?.id ?? randomUUID();
+  const status = computeStatus(facilities);
+
+  // Foto: yang disembunyikan dihapus, sisanya disalin ke bucket publik dengan area kabur (ADR-0037).
+  const reportPhotos = await tx.select().from(photos).where(eq(photos.reportId, id));
+  const visible = reportPhotos.filter((p) => p.moderation !== "disembunyikan");
+  const hidden = reportPhotos.filter((p) => p.moderation === "disembunyikan");
+  if (visible.length > 0 && !store) throw new HttpError(503, "foto_belum_diatur", "Penyimpanan foto belum diatur di server.");
+  const published = [];
+  for (const photo of visible) {
+    const key = `lokasi/${placeId}/${photo.id}.webp`;
+    try {
+      const original = await store!.get(photo.storageKey);
+      const output = photo.blurRegions?.length ? await blurPhoto(original, photo.blurRegions) : { data: original, width: photo.width, height: photo.height, bytes: photo.bytes };
+      await store!.put(key, output.data, "image/webp");
+      copied.push(key);
+      published.push({ photo, key, width: output.width, height: output.height, bytes: output.bytes });
+    } catch (error) {
+      log?.warn({ err: error, photoId: photo.id }, "foto gagal disalin ke bucket publik");
+      throw new HttpError(502, "foto_gagal_diterbitkan", "Foto gagal diterbitkan ke penyimpanan publik. Laporan belum diterbitkan; coba lagi.");
+    }
+  }
+
+  const values = {
+    name,
+    category,
+    districtSlug: district.slug,
+    location: { x: location.lng, y: location.lat },
+    landmark,
+    description: input.description,
+    status: status.status,
+    facilitiesAvailable: status.available,
+    facilitiesRelevant: status.relevant,
+    facilitiesUnknown: status.unknown,
+    lastVerifiedAt: now,
+    // Diterbitkan verifikator: label "langsung oleh admin" tidak berlaku lagi; terbit langsung memasangnya (ADR-0051).
+    adminPublishedAt: direct ? now : null,
+    adminPublishedBy: direct ? viewerId : null,
+    updatedAt: now,
+  };
+  let before: Snapshot | null = null;
+  if (place) {
+    const current = await tx.select().from(placeFacilities).where(eq(placeFacilities.placeId, placeId));
+    before = snapshot({ ...place, location: currentPoint! }, FACILITIES.map((facility) => {
+      const f = current.find((c) => c.facility === facility);
+      return { facility, answer: f?.answer ?? "belum_tahu", reason: f?.reason ?? null, note: f?.note ?? null };
+    }));
+    await tx.update(places).set(values).where(eq(places.id, placeId));
+    await tx.delete(placeFacilities).where(eq(placeFacilities.placeId, placeId));
+  } else {
+    await tx.insert(places).values({ id: placeId, ...values, createdAt: now });
+  }
+  await tx.insert(placeFacilities).values(facilities.map((f) => ({ placeId, ...f, updatedAt: now })));
+
+  for (const { photo, key, width, height, bytes } of published) {
+    await tx
+      .update(photos)
+      .set({ placeId, storageKey: key, moderation: "tayang", altText: altText(photo.tag, name), width, height, bytes, blurRegions: null })
+      .where(eq(photos.id, photo.id));
+  }
+  const privateKeys = published.map(({ photo }) => photo.storageKey);
+  if (privateKeys.length) await tx.insert(photoDeletions).values(privateKeys.map((storageKey) => ({ storageKey }))).onConflictDoNothing();
+  const hiddenKeys = await dropReportPhotos(tx, { ids: hidden.map((p) => p.id) });
+  // Foto tempat yang dihapus admin: barisnya dibuang dan berkas publiknya diantrekan untuk dihapus.
+  const removed = direct?.removePhotoIds?.length && place
+    ? await tx.select({ id: photos.id, storageKey: photos.storageKey, tag: photos.tag }).from(photos).where(and(inArray(photos.id, direct.removePhotoIds), eq(photos.placeId, placeId), eq(photos.moderation, "tayang")))
+    : [];
+  const removedKeys = removed.length ? await dropReportPhotos(tx, { ids: removed.map((p) => p.id) }) : [];
+
+  await tx
+    .update(reports)
+    .set({
+      status: "diterbitkan",
+      placeId,
+      decidedAt: now,
+      reviewerId: viewerId,
+      ...(input.note !== undefined ? { reviewerNote: input.note } : {}),
+      rejectionReason: null,
+      clarificationQuestion: null,
+      clarificationDueAt: null,
+    })
+    .where(eq(reports.id, id));
+
+  const actor = { userId: viewerId };
+  const after = snapshot({ ...values, location }, facilities);
+  const why = direct ? { alasan: direct.reason, ...(direct.osm ? { osm: direct.osm } : {}) } : {};
+  const placeAction = direct ? (place ? "diubah_admin" : "dibuat_admin") : place ? "diubah" : "dibuat";
+  // Foto yang ditambah atau dihapus pada tempat yang sudah ada ikut tercatat di riwayat tempat; rinciannya di entri `foto`.
+  const photoChange = place && (published.length > 0 || removed.length > 0) ? { photos: { ditambah: published.length, dihapus: removed.length } } : {};
+  const entries: AuditEntry[] = [
+    { entity: "lokasi", entityId: placeId, actor, action: placeAction, changes: { ...diff(before, after), ...photoChange, laporan: id, ...why }, at: now },
+    { entity: "laporan", entityId: id, actor, action: direct ? "terbit_langsung" : "diterbitkan", changes: { status: { sebelum: report.status, sesudah: "diterbitkan" }, lokasi: placeId, ...why }, at: now },
+    ...removed.map((photo): AuditEntry => ({ entity: "foto", entityId: photo.id, actor, action: "dihapus", changes: { lokasi: placeId, tag: photo.tag, alasan: direct!.reason }, at: now })),
+    ...published.map(({ photo }): AuditEntry => ({ entity: "foto", entityId: photo.id, actor, action: "diterbitkan", changes: { laporan: id, tag: photo.tag, areaKabur: photo.blurRegions?.length ?? 0 }, at: now })),
+    ...hidden.map((photo): AuditEntry => ({ entity: "foto", entityId: photo.id, actor, action: "dihapus", changes: { laporan: id, disembunyikan: true }, at: now })),
+  ];
+  await audit(tx, ...entries);
+  // Admin yang menerbitkan laporannya sendiri tidak perlu email "laporan Anda diterbitkan".
+  if (!direct) await queueEmail(tx, id, "diterbitkan", now);
+  return { placeId, status: status.status, removeKeys: [...privateKeys, ...hiddenKeys, ...removedKeys] };
 }

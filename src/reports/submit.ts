@@ -27,7 +27,7 @@ export const altText = (tag: PhotoTag, placeName: string) => (TAG_LABEL[tag] ? `
 
 const iso = (date: Date) => new Date(date).toISOString();
 
-async function existing(db: Db, reporterId: string, submissionKey: string) {
+export async function existing(db: Db, reporterId: string, submissionKey: string) {
   const [row] = await db
     .select({
       id: reports.id,
@@ -71,17 +71,18 @@ async function checkLimits(db: Db, reporterId: string, now: Date) {
   }
 }
 
-/**
- * Menyimpan laporan dengan status menunggu. Kecamatan dihitung ulang dari titik (FR-22), lokasi terkait harus ada
- * untuk perubahan dan kekurangan (FR-27), dan foto yang diunggah akun ini dipasang beserta tag, keterangan, dan teks
- * alternatifnya. `created` salah berarti laporan dengan kunci draf yang sama sudah ada dan dikembalikan apa adanya.
- */
-export async function submitReport(db: Db, reporterId: string, body: ReportBody, now: Date, opts: { skipLimits?: boolean } = {}) {
-  const repeat = await existing(db, reporterId, body.submissionKey);
-  if (repeat) return { report: repeat, created: false };
-  // Batas per akun tidak berlaku untuk admin yang menerbitkan langsung (ADR-0051).
-  if (!opts.skipLimits) await checkLimits(db, reporterId, now);
+/** Kode galat Postgres dari error drizzle atau driver-nya. */
+const pgCode = (error: unknown) => (error as { code?: string }).code ?? (error as { cause?: { code?: string } }).cause?.code;
+/** Kiriman kedua dengan kunci draf yang sama kalah di indeks unik (`23505`). */
+export const isDuplicateSubmission = (error: unknown) => pgCode(error) === "23505";
 
+export type PreparedReport = Awaited<ReturnType<typeof prepareReport>>;
+
+/**
+ * Bacaan sebelum laporan disimpan: lokasi terkait harus ada dan masih tayang untuk perubahan dan kekurangan (FR-27), dan
+ * kecamatan dihitung ulang dari titik (FR-22). Laporan kekurangan memakai nama, kategori, titik, dan patokan lokasi saat ini.
+ */
+export async function prepareReport(db: Db, body: ReportBody) {
   let place: { name: string; category: NonNullable<ReportBody["category"]>; location: { lat: number; lng: number }; landmark: string | null } | null = null;
   if (body.placeId) {
     const [row] = await db
@@ -98,63 +99,76 @@ export async function submitReport(db: Db, reporterId: string, body: ReportBody,
   const location = fixed?.location ?? body.location!;
   const landmark = fixed ? fixed.landmark : (body.landmark ?? null);
   const district = await requireDistrict(db, location);
+  return { name, category, location, landmark, district };
+}
 
-  const insert = () => db.transaction(async (tx) => {
-    const [row] = await tx
-      .insert(reports)
-      .values({
-        reporterId,
-        kind: body.kind,
-        placeId: body.placeId ?? null,
-        status: "menunggu",
-        submission: {
-          versi: 1,
-          name,
-          category,
-          landmark,
-          description: body.description ?? null,
-          facilities: body.facilities.map((f) => ({ facility: f.facility, answer: f.answer, reason: f.reason ?? null, note: f.note ?? null })),
-        },
-        location: { x: location.lng, y: location.lat },
-        districtSlug: district.slug,
-        submissionKey: body.submissionKey,
-        submittedAt: now,
-      })
-      .returning({ id: reports.id, submittedAt: reports.submittedAt });
-    for (const photo of body.photos) {
-      const attached = await tx
-        .update(photos)
-        .set({ reportId: row!.id, uploaderId: null, tag: photo.tag, caption: photo.caption ?? null, altText: altText(photo.tag, name) })
-        .where(and(eq(photos.id, photo.id), eq(photos.uploaderId, reporterId), isNull(photos.reportId)))
-        .returning({ id: photos.id });
-      if (attached.length === 0) {
-        throw new HttpError(400, "foto_tidak_ditemukan", "Sebagian foto sudah tidak tersimpan di server. Unggah ulang fotonya, lalu kirim lagi.");
-      }
+/**
+ * Menyimpan laporan berstatus menunggu dan memasang foto yang diunggah akun ini beserta tag, keterangan, dan teks
+ * alternatifnya, di dalam transaksi pemanggil. Terbit langsung oleh admin memakai transaksi yang sama untuk menerbitkannya,
+ * jadi laporan itu tidak pernah terlihat di antrean (ADR-0051).
+ */
+export async function insertReport(tx: Db, reporterId: string, body: ReportBody, prepared: PreparedReport, now: Date) {
+  const { name, category, location, landmark, district } = prepared;
+  const [row] = await tx
+    .insert(reports)
+    .values({
+      reporterId,
+      kind: body.kind,
+      placeId: body.placeId ?? null,
+      status: "menunggu",
+      submission: {
+        versi: 1,
+        name,
+        category,
+        landmark,
+        description: body.description ?? null,
+        facilities: body.facilities.map((f) => ({ facility: f.facility, answer: f.answer, reason: f.reason ?? null, note: f.note ?? null })),
+      },
+      location: { x: location.lng, y: location.lat },
+      districtSlug: district.slug,
+      submissionKey: body.submissionKey,
+      submittedAt: now,
+    })
+    .returning({ id: reports.id, submittedAt: reports.submittedAt });
+  for (const photo of body.photos) {
+    const attached = await tx
+      .update(photos)
+      .set({ reportId: row!.id, uploaderId: null, tag: photo.tag, caption: photo.caption ?? null, altText: altText(photo.tag, name) })
+      .where(and(eq(photos.id, photo.id), eq(photos.uploaderId, reporterId), isNull(photos.reportId)))
+      .returning({ id: photos.id });
+    if (attached.length === 0) {
+      throw new HttpError(400, "foto_tidak_ditemukan", "Sebagian foto sudah tidak tersimpan di server. Unggah ulang fotonya, lalu kirim lagi.");
     }
-    return row!;
-  });
-  let report: Awaited<ReturnType<typeof insert>>;
+  }
+  return {
+    id: row!.id,
+    kind: body.kind,
+    status: "menunggu" as const,
+    placeId: body.placeId ?? null,
+    name,
+    district,
+    photos: body.photos.length,
+    submittedAt: iso(row!.submittedAt),
+  };
+}
+
+/**
+ * Menyimpan laporan dengan status menunggu. Kecamatan dihitung ulang dari titik (FR-22), lokasi terkait harus ada
+ * untuk perubahan dan kekurangan (FR-27), dan foto yang diunggah akun ini dipasang beserta tag, keterangan, dan teks
+ * alternatifnya. `created` salah berarti laporan dengan kunci draf yang sama sudah ada dan dikembalikan apa adanya.
+ */
+export async function submitReport(db: Db, reporterId: string, body: ReportBody, now: Date) {
+  const repeat = await existing(db, reporterId, body.submissionKey);
+  if (repeat) return { report: repeat, created: false };
+  await checkLimits(db, reporterId, now);
+  const prepared = await prepareReport(db, body);
   try {
-    report = await insert();
+    const report = await db.transaction((tx) => insertReport(tx, reporterId, body, prepared, now));
+    return { report, created: true };
   } catch (error) {
     // Dua kiriman dengan kunci draf yang sama pada saat bersamaan: yang kalah mengembalikan laporan yang menang.
-    const code = (error as { code?: string; cause?: { code?: string } }).code ?? (error as { cause?: { code?: string } }).cause?.code;
-    const winner = code === "23505" ? await existing(db, reporterId, body.submissionKey) : null;
+    const winner = isDuplicateSubmission(error) ? await existing(db, reporterId, body.submissionKey) : null;
     if (winner) return { report: winner, created: false };
     throw error;
   }
-
-  return {
-    created: true,
-    report: {
-      id: report.id,
-      kind: body.kind,
-      status: "menunggu" as const,
-      placeId: body.placeId ?? null,
-      name,
-      district,
-      photos: body.photos.length,
-      submittedAt: iso(report.submittedAt),
-    },
-  };
 }

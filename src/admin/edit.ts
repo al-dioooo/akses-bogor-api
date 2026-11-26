@@ -2,16 +2,16 @@
 // admin yang langsung diterbitkan lewat `publishReport`, jadi foto, kecamatan, status, dan log audit memakai jalur yang
 // sama dengan verifikasi. Hanya dipanggil route `/admin/*` yang sudah memeriksa peran admin.
 import { randomUUID } from "node:crypto";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { audit } from "../audit/log.js";
 import type { Db } from "../db/client.js";
-import { photos, places, reports } from "../db/schema.js";
+import { photos, places } from "../db/schema.js";
 import { FACILITIES, type Answer, type Facility, type Reason } from "../domain/status.js";
 import { HttpError } from "../http/errors.js";
 import type { PhotoStore } from "../photos/storage.js";
 import type { ReportBody } from "../reports/schemas.js";
-import { submitReport } from "../reports/submit.js";
-import { publishReport, type FinalFacility } from "../verification/publish.js";
+import { existing, insertReport, isDuplicateSubmission, prepareReport } from "../reports/submit.js";
+import { inPublishTransaction, publishInTransaction, type FinalFacility } from "../verification/publish.js";
 import { placeNotFound } from "./places.js";
 
 type PhotoTag = (typeof photos.tag.enumValues)[number];
@@ -50,20 +50,12 @@ export type AdminPlaceBody = {
   osm?: { type: string; id: number };
 };
 
-/** Diperiksa sebelum laporan dibuat, supaya isian yang pasti ditolak tidak meninggalkan laporan di antrean. */
+/** Diperiksa sebelum transaksi dibuka, supaya isian yang pasti ditolak tidak sampai mengunci apa pun. */
 function precheck(body: Pick<AdminPlaceBody, "facilities" | "photos">, store: PhotoStore | undefined) {
   if (body.facilities.some((f) => f.answer === "tidak_tersedia" && !f.reason)) {
     throw new HttpError(400, "alasan_wajib", "Setiap jawaban Tidak tersedia butuh alasan sebelum diterbitkan.");
   }
   if (body.photos.length > 0 && !store) throw new HttpError(503, "foto_belum_diatur", "Penyimpanan foto belum diatur di server.");
-}
-
-/** Mengembalikan foto ke pengunggahnya dan membuang laporan admin yang gagal diterbitkan, supaya tidak tertinggal di antrean. */
-async function undoReport(db: Db, reportId: string, adminId: string) {
-  await db.transaction(async (tx) => {
-    await tx.update(photos).set({ reportId: null, uploaderId: adminId }).where(and(eq(photos.reportId, reportId), isNull(photos.placeId)));
-    await tx.delete(reports).where(and(eq(reports.id, reportId), eq(reports.status, "menunggu")));
-  });
 }
 
 const reportOf = (body: AdminPlaceBody, kind: "baru" | "perubahan", placeId?: string): ReportBody => ({
@@ -81,31 +73,51 @@ const reportOf = (body: AdminPlaceBody, kind: "baru" | "perubahan", placeId?: st
 
 type DirectInput = Pick<AdminPlaceBody, "facilities" | "reason" | "osm"> & Partial<Pick<AdminPlaceBody, "name" | "category" | "location" | "landmark" | "description">>;
 
-async function publishDirect(db: Db, store: PhotoStore | undefined, adminId: string, reportId: string, body: DirectInput, tags: PhotoTag[], now: Date, log: Log | undefined, extra: { version?: string; removePhotoIds?: string[] }) {
-  const { final, downgraded } = directAnswers(body.facilities, tags);
-  try {
-    const published = await publishReport(
-      db,
+/**
+ * Laporan admin disimpan dan diterbitkan dalam **satu** transaksi (ADR-0051), jadi laporan berstatus menunggu tidak pernah
+ * terlihat di antrean verifikasi dan tidak bisa diambil verifikator di tengah jalan. Bila terbit gagal, laporan dan
+ * pemasangan fotonya ikut batal: foto kembali milik admin. `keptTags` memberi tag foto tayang tempat itu yang tetap ada,
+ * dibaca di dalam transaksi yang sama.
+ */
+async function submitAndPublish(
+  db: Db,
+  store: PhotoStore | undefined,
+  adminId: string,
+  report: ReportBody,
+  body: DirectInput,
+  now: Date,
+  log: Log | undefined,
+  extra: { version?: (tx: Db) => Promise<string | undefined>; keptTags: (tx: Db) => Promise<PhotoTag[]>; removePhotoIds?: string[] },
+) {
+  const prepared = await prepareReport(db, report);
+  const result = await inPublishTransaction(db, store, log, async (tx, copied) => {
+    const row = await insertReport(tx, adminId, report, prepared, now);
+    const { final, downgraded } = directAnswers(body.facilities, [...(await extra.keptTags(tx)), ...report.photos.map((p) => p.tag)]);
+    const published = await publishInTransaction(
+      tx,
       store,
       adminId,
-      reportId,
-      { placeVersion: extra.version, name: body.name, category: body.category, location: body.location, landmark: body.landmark ?? null, description: body.description ?? null, facilities: final },
+      row.id,
+      { placeVersion: await extra.version?.(tx), name: body.name, category: body.category, location: body.location, landmark: body.landmark ?? null, description: body.description ?? null, facilities: final },
       now,
+      copied,
       log,
       { reason: body.reason, removePhotoIds: extra.removePhotoIds, osm: body.osm },
     );
-    return { ...published, downgraded };
-  } catch (error) {
-    await undoReport(db, reportId, adminId);
-    throw error;
-  }
+    return { ...published, report: row, downgraded };
+  });
+  return { placeId: result.placeId, status: result.status, downgraded: result.downgraded, report: result.report };
 }
+
+const noTags = async () => [] as PhotoTag[];
+/** Foto yang sedang tayang di tempat ini. */
+const shownPhotos = (db: Db, placeId: string) => db.select({ id: photos.id, tag: photos.tag }).from(photos).where(and(eq(photos.placeId, placeId), eq(photos.moderation, "tayang")));
 
 /** Tempat baru yang langsung tayang sebagai tempat admin. */
 export async function createPlace(db: Db, store: PhotoStore | undefined, adminId: string, body: AdminPlaceBody, now: Date, log?: Log) {
   precheck(body, store);
-  const { report } = await submitReport(db, adminId, reportOf(body, "baru"), now, { skipLimits: true });
-  return publishDirect(db, store, adminId, report.id, body, body.photos.map((p) => p.tag), now, log, {});
+  const { placeId, status, downgraded } = await submitAndPublish(db, store, adminId, reportOf(body, "baru"), body, now, log, { keptTags: noTags });
+  return { placeId, status, downgraded };
 }
 
 /**
@@ -120,13 +132,16 @@ export async function updatePlace(db: Db, store: PhotoStore | undefined, adminId
     throw new HttpError(409, "lokasi_berubah", "Data lokasi ini baru saja berubah. Muat ulang halaman dan periksa lagi dengan data terbaru.");
   }
   precheck(body, store);
-  const current = await db.select({ id: photos.id, tag: photos.tag }).from(photos).where(and(eq(photos.placeId, placeId), eq(photos.moderation, "tayang")));
+  const current = await shownPhotos(db, placeId);
   if (body.removePhotos.some((id) => !current.some((p) => p.id === id))) {
     throw new HttpError(400, "foto_tidak_ditemukan", "Foto yang akan dihapus bukan foto tayang lokasi ini. Muat ulang halaman.");
   }
-  const kept = current.filter((p) => !body.removePhotos.includes(p.id)).map((p) => p.tag);
-  const { report } = await submitReport(db, adminId, reportOf(body, "perubahan", placeId), now, { skipLimits: true });
-  return publishDirect(db, store, adminId, report.id, body, [...kept, ...body.photos.map((p) => p.tag)], now, log, { version: body.version, removePhotoIds: body.removePhotos });
+  const { status, downgraded } = await submitAndPublish(db, store, adminId, reportOf(body, "perubahan", placeId), body, now, log, {
+    version: async () => body.version,
+    keptTags: async (tx) => (await shownPhotos(tx, placeId)).filter((p) => !body.removePhotos.includes(p.id)).map((p) => p.tag),
+    removePhotoIds: body.removePhotos,
+  });
+  return { placeId, status, downgraded };
 }
 
 /** Menurunkan tempat dari tayang dengan alasan; tidak ada yang dihapus (ADR-0051). */
@@ -158,9 +173,6 @@ export async function restorePlace(db: Db, adminId: string, placeId: string, rea
   });
 }
 
-const shownTags = async (db: Db, placeId: string) =>
-  (await db.select({ tag: photos.tag }).from(photos).where(and(eq(photos.placeId, placeId), eq(photos.moderation, "tayang")))).map((p) => p.tag);
-
 /**
  * Laporan Laporkan milik admin yang diterbitkan langsung (`publishDirectly`, ADR-0051). Untuk Edit lokasi dan Laporkan
  * kekurangan, foto tayang tempat itu ikut menjadi bukti. Kirim ulang dengan kunci draf yang sama mengembalikan laporan
@@ -168,11 +180,23 @@ const shownTags = async (db: Db, placeId: string) =>
  */
 export async function publishSubmission(db: Db, store: PhotoStore | undefined, adminId: string, body: ReportBody, reason: string, now: Date, log?: Log) {
   precheck(body, store);
-  const existing = body.placeId ? await shownTags(db, body.placeId) : [];
-  const { report, created } = await submitReport(db, adminId, body, now, { skipLimits: true });
-  if (!created) return { report, downgraded: [] };
-  const [place] = body.placeId ? await db.select({ updatedAt: places.updatedAt }).from(places).where(eq(places.id, body.placeId)) : [];
+  const repeat = await existing(db, adminId, body.submissionKey);
+  if (repeat) return { report: repeat, downgraded: [] };
   const input = { name: body.name, category: body.category, location: body.location, landmark: body.landmark, description: body.description, facilities: body.facilities, reason };
-  const published = await publishDirect(db, store, adminId, report.id, input, [...existing, ...body.photos.map((p) => p.tag)], now, log, { version: place?.updatedAt.toISOString() });
-  return { report: { ...report, status: "diterbitkan" as const, placeId: published.placeId }, downgraded: published.downgraded };
+  try {
+    const { placeId, downgraded, report } = await submitAndPublish(db, store, adminId, body, input, now, log, {
+      keptTags: async (tx) => (body.placeId ? (await shownPhotos(tx, body.placeId)).map((p) => p.tag) : []),
+      version: async (tx) => {
+        if (!body.placeId) return undefined;
+        const [place] = await tx.select({ updatedAt: places.updatedAt }).from(places).where(eq(places.id, body.placeId));
+        return place?.updatedAt.toISOString();
+      },
+    });
+    return { report: { ...report, status: "diterbitkan" as const, placeId }, downgraded };
+  } catch (error) {
+    // Dua kiriman dengan kunci draf yang sama pada saat bersamaan: yang kalah mengembalikan laporan yang menang.
+    const winner = isDuplicateSubmission(error) ? await existing(db, adminId, body.submissionKey) : null;
+    if (winner) return { report: winner, downgraded: [] };
+    throw error;
+  }
 }
