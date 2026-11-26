@@ -1,6 +1,7 @@
-// Jumlah penyandang disabilitas terdaftar per kecamatan dari Open Data Kota Bogor (ADR-0043). Angkanya hanya dipakai
-// untuk menentukan kecamatan prioritas bagi kontributor, dan hanya selama `DISABILITY_DATA_ENABLED` menyala, karena
-// syarat portal membatasi pemakaian untuk pihak ketiga tanpa izin Diskominfo.
+// Jumlah penyandang disabilitas terdaftar per kecamatan dari Open Data Kota Bogor (ADR-0043). Angkanya dipakai untuk
+// prioritas kecamatan bagi kontributor dan lapisan Persebaran disabilitas di Peta (ADR-0053), hanya selama
+// `DISABILITY_DATA_ENABLED` menyala, karena syarat portal membatasi pemakaian untuk pihak ketiga tanpa izin Diskominfo.
+import { sql } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import { disabilityCounts, type disabilityCategory } from "../db/schema.js";
 import { replaceSource } from "../knowledge/store.js";
@@ -69,4 +70,43 @@ export async function loadDisabilityCounts(db: Db, rows: readonly DisabilityRow[
     await tx.insert(disabilityCounts).values(rows.map((r) => ({ ...r, sourceId: source.id })));
   });
   return rows.length;
+}
+
+const rowsOf = <T>(result: unknown) => (result as { rows: T[] }).rows;
+/** Urutan jenis di jawaban API dan filter web. */
+export const DISABILITY_CATEGORIES = ["fisik", "netra", "mental", "lainnya"] as const satisfies readonly DisabilityCategory[];
+
+/**
+ * Semua jumlah terdaftar per kecamatan, tahun, dan jenis, untuk lapisan Persebaran disabilitas di Peta (ADR-0053), atau
+ * null bila data belum dimuat. Label sumber ("CACAT …") tidak ikut; kalimat batas data dan sumbernya selalu ikut.
+ */
+export async function disabilityByDistrict(db: Db) {
+  const rows = rowsOf<{ slug: string; name: string; year: number | null; category: DisabilityCategory | null; count: number | null }>(
+    await db.execute(sql`
+      SELECT d.slug, d.name, c.year, c.category, c.count
+      FROM districts d LEFT JOIN disability_counts c ON c.district_slug = d.slug AND c.source_id = ${DISABILITY_SOURCE.id}
+      ORDER BY d.slug, c.year, c.category`),
+  );
+  const [source] = rowsOf<{ retrieved_at: Date | string }>(await db.execute(sql`SELECT retrieved_at FROM knowledge_sources WHERE id = ${DISABILITY_SOURCE.id}`));
+  const years = [...new Set(rows.flatMap((r) => (r.year === null ? [] : [Number(r.year)])))].sort((a, b) => a - b);
+  if (!source || years.length === 0) return null;
+  const districts = new Map<string, { slug: string; name: string; counts: { year: number; category: DisabilityCategory; count: number }[] }>();
+  for (const r of rows) {
+    const district = districts.get(r.slug) ?? { slug: r.slug, name: r.name, counts: [] };
+    districts.set(r.slug, district);
+    if (r.year !== null && r.category !== null && r.count !== null) district.counts.push({ year: Number(r.year), category: r.category, count: Number(r.count) });
+  }
+  return {
+    years,
+    categories: [...DISABILITY_CATEGORIES],
+    districts: [...districts.values()],
+    caveat: DISABILITY_CAVEAT,
+    source: {
+      title: DISABILITY_SOURCE.title,
+      url: DISABILITY_SOURCE.url,
+      publisher: DISABILITY_SOURCE.publisher,
+      retrievedAt: new Date(source.retrieved_at).toISOString(),
+      terms: DISABILITY_SOURCE.terms,
+    },
+  };
 }

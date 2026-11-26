@@ -163,12 +163,32 @@
                         ],
                         "additionalProperties": false
                       }
+                    },
+                    "outline": {
+                      "nullable": true,
+                      "description": "Batas Kota Bogor: gabungan keenam batas kecamatan tanpa lubang di antaranya, disederhanakan, 5 desimal (ADR-0053)",
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "MultiPolygon"
+                          ]
+                        },
+                        "coordinates": {}
+                      },
+                      "required": [
+                        "type",
+                        "coordinates"
+                      ],
+                      "additionalProperties": false
                     }
                   },
                   "required": [
                     "type",
                     "attribution",
-                    "features"
+                    "features",
+                    "outline"
                   ],
                   "additionalProperties": false
                 }
@@ -351,6 +371,174 @@
                     "formula",
                     "source",
                     "facilitiesSource"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/districts/disability": {
+      "get": {
+        "summary": "Penyandang disabilitas terdaftar per kecamatan, jenis, dan tahun",
+        "tags": [
+          "Lokasi"
+        ],
+        "description": "Jumlah penyandang disabilitas yang terdaftar di Dinas Sosial Kota Bogor (Open Data Kota Bogor) per kecamatan, jenis, dan tahun, untuk lapisan Persebaran disabilitas di Peta (ADR-0053). Bukan jumlah seluruh penyandang disabilitas; kalimat batas data dan sumbernya selalu ikut. Menjawab 503 `data_disabilitas_belum_aktif` selama `DISABILITY_DATA_ENABLED` mati.",
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "years": {
+                      "type": "array",
+                      "items": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "description": "Tahun yang ada di data, dari yang terlama"
+                    },
+                    "categories": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "fisik",
+                          "netra",
+                          "mental",
+                          "lainnya"
+                        ]
+                      },
+                      "description": "Jenis disabilitas dalam istilah AksesBogor (ADR-0041); label sumber tidak ikut"
+                    },
+                    "districts": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "slug": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "counts": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "year": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                "category": {
+                                  "type": "string",
+                                  "enum": [
+                                    "fisik",
+                                    "netra",
+                                    "mental",
+                                    "lainnya"
+                                  ]
+                                },
+                                "count": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                }
+                              },
+                              "required": [
+                                "year",
+                                "category",
+                                "count"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "description": "Penyandang disabilitas terdaftar di Dinsos, bukan jumlah seluruh penduduk"
+                          }
+                        },
+                        "required": [
+                          "slug",
+                          "name",
+                          "counts"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "caveat": {
+                      "type": "string",
+                      "description": "Kalimat yang wajib ikut setiap angka disabilitas"
+                    },
+                    "source": {
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string",
+                          "format": "uri"
+                        },
+                        "publisher": {
+                          "type": "string"
+                        },
+                        "retrievedAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                        },
+                        "terms": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "title",
+                        "url",
+                        "publisher",
+                        "retrievedAt",
+                        "terms"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "years",
+                    "categories",
+                    "districts",
+                    "caveat",
+                    "source"
                   ],
                   "additionalProperties": false
                 }

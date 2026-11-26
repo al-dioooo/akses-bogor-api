@@ -94,16 +94,28 @@ export async function kecamatanPriority(db: Db): Promise<KecamatanPriority | nul
   };
 }
 
-/** Batas kecamatan ADR-0034 sebagai GeoJSON yang disederhanakan, untuk lapisan peta di web. */
+/**
+ * Batas kecamatan ADR-0034 sebagai GeoJSON yang disederhanakan, untuk lapisan peta di web, dan `outline`: batas Kota
+ * Bogor dari gabungan keenam batas (ADR-0053). Lubang dan potongan kecil di antara batas kecamatan dibuang, supaya
+ * garis kota hanya mengikuti tepi luar.
+ */
 export async function districtBoundaries(db: Db) {
   const rows = rowsOf<{ slug: string; name: string; geometry: string }>(
     await db.execute(
       sql`SELECT slug, name, ST_AsGeoJSON(ST_SimplifyPreserveTopology(boundary, 0.0001), 5) AS geometry FROM districts WHERE boundary IS NOT NULL ORDER BY slug`,
     ),
   );
+  const [outline] = rowsOf<{ geometry: string | null }>(
+    await db.execute(sql`
+      WITH kota AS (SELECT ST_Union(boundary) AS geom FROM districts WHERE boundary IS NOT NULL),
+        parts AS (SELECT (ST_Dump(geom)).geom AS geom FROM kota)
+      SELECT ST_AsGeoJSON(ST_Multi(ST_SimplifyPreserveTopology(ST_Collect(ST_MakePolygon(ST_ExteriorRing(geom))), 0.0001)), 5) AS geometry
+      FROM parts WHERE ST_Area(geom) >= 0.000001`),
+  );
   return {
     type: "FeatureCollection" as const,
     attribution: "© kontributor OpenStreetMap",
     features: rows.map((r) => ({ type: "Feature" as const, properties: { slug: r.slug, name: r.name }, geometry: JSON.parse(r.geometry) as { type: string; coordinates: unknown } })),
+    outline: outline?.geometry ? (JSON.parse(outline.geometry) as { type: "MultiPolygon"; coordinates: unknown }) : null,
   };
 }
