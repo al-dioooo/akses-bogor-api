@@ -43,15 +43,9 @@ function kilometers(a: LatLng, b: LatLng) {
  * Rute jalan kaki dari posisi pengguna ke pin lokasi. Posisi dibulatkan ke 4 desimal (sekitar 11 m) sebelum dikirim ke
  * Mapbox. Jawaban Mapbox tidak disimpan.
  */
-export async function walkingRoute(ctx: RouteContext, input: { from: LatLng; placeId?: string; osm?: { type: string; id: number } }) {
+export async function walkingRoute(ctx: RouteContext, input: RouteInput) {
   if (!ctx.walking) throw new HttpError(503, "rute_belum_diatur", "Rute jalan kaki belum diatur di server.");
-  const place = await destinationOf(ctx, input);
-  if (!place) throw new HttpError(404, "lokasi_tidak_ditemukan", "Lokasi tidak ditemukan.");
-  const from = { lat: Math.round(input.from.lat * 1e4) / 1e4, lng: Math.round(input.from.lng * 1e4) / 1e4 };
-  if (!insideBbox(from)) throw new HttpError(422, "di_luar_kota_bogor", "Posisi Anda berada di luar Kota Bogor. Rute hanya tersedia dari dalam Kota Bogor.");
-  if (kilometers(from, place.location) > MAX_ROUTE_KM) {
-    throw new HttpError(422, "terlalu_jauh", `Tujuan lebih dari ${MAX_ROUTE_KM} km dari posisi Anda. Rute jalan kaki hanya untuk jarak yang lebih dekat.`);
-  }
+  const { from, place } = await routeEnds(ctx, input);
   let route;
   try {
     route = await ctx.walking(from, place.location);
@@ -73,9 +67,25 @@ export async function walkingRoute(ctx: RouteContext, input: { from: LatLng; pla
 }
 
 type Destination = { placeId: string | null; osm: { type: string; id: number } | null; name: string | null; location: LatLng };
+export type RouteInput = { from: LatLng; placeId?: string; osm?: { type: string; id: number } };
+
+/**
+ * Titik awal dan tujuan sebuah rute: posisi pengguna dibulatkan ke 4 desimal (sekitar 11 m), harus di dalam Kota Bogor
+ * dan paling jauh `MAX_ROUTE_KM` dari pin tujuan. Dipakai rute Mapbox dan rute OpenStreetMap (ADR-0055).
+ */
+export async function routeEnds(ctx: Pick<RouteContext, "db" | "now">, input: RouteInput): Promise<{ from: LatLng; place: Destination }> {
+  const place = await destinationOf(ctx, input);
+  if (!place) throw new HttpError(404, "lokasi_tidak_ditemukan", "Lokasi tidak ditemukan.");
+  const from = { lat: Math.round(input.from.lat * 1e4) / 1e4, lng: Math.round(input.from.lng * 1e4) / 1e4 };
+  if (!insideBbox(from)) throw new HttpError(422, "di_luar_kota_bogor", "Posisi Anda berada di luar Kota Bogor. Rute hanya tersedia dari dalam Kota Bogor.");
+  if (kilometers(from, place.location) > MAX_ROUTE_KM) {
+    throw new HttpError(422, "terlalu_jauh", `Tujuan lebih dari ${MAX_ROUTE_KM} km dari posisi Anda. Rute jalan kaki hanya untuk jarak yang lebih dekat.`);
+  }
+  return { from, place };
+}
 
 /** Tujuan rute: lokasi AksesBogor, atau tempat OpenStreetMap tanpa data AksesBogor untuk kontributor (ADR-0043). */
-async function destinationOf(ctx: RouteContext, input: { placeId?: string; osm?: { type: string; id: number } }): Promise<Destination | null> {
+async function destinationOf(ctx: Pick<RouteContext, "db" | "now">, input: { placeId?: string; osm?: { type: string; id: number } }): Promise<Destination | null> {
   if (input.placeId) {
     const place = await getPlace(ctx.db, input.placeId, ctx.now());
     return place ? { placeId: place.id, osm: null, name: place.name, location: place.location } : null;
