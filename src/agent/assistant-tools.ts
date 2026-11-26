@@ -12,7 +12,7 @@ import { HttpError } from "../http/errors.js";
 import type { LatLng } from "../map/directions.js";
 import { KOTA_BOGOR_BBOX } from "../map/search.js";
 import { MAX_ROUTE_KM } from "../map/walking-route.js";
-import { listPlaces, placesNamed, published, verifiedBy } from "../places/queries.js";
+import { imageMonth, listPlaces, placesNamed, published, verifiedBy } from "../places/queries.js";
 import type { RouteCard } from "./cards.js";
 import { placeAccessibility, type ToolContext } from "./tools.js";
 
@@ -32,9 +32,14 @@ export const ADMIN_PUBLISHED_SOURCE = "Diterbitkan langsung oleh admin AksesBogo
  * pernah diperiksa tim harus mengembalikan salah di sini begitu kolom asalnya ada, supaya asisten menyebutnya "belum
  * diperiksa tim".
  */
-export function teamCheck(by: "tim" | "admin" = "tim"): { checkedByTeam: boolean; verifiedBy: "tim" | "admin"; source: string } {
-  return { checkedByTeam: true, verifiedBy: by, source: by === "admin" ? ADMIN_PUBLISHED_SOURCE : TEAM_CHECKED_SOURCE };
+export function teamCheck(place: { verifiedBy: "tim" | "admin"; streetViewImageDate?: string | null }): { checkedByTeam: boolean; verifiedBy: "tim" | "admin"; source: string } {
+  const by = place.verifiedBy;
+  const source = by === "admin" ? ADMIN_PUBLISHED_SOURCE : place.streetViewImageDate ? streetViewSource(place.streetViewImageDate) : TEAM_CHECKED_SOURCE;
+  return { checkedByTeam: true, verifiedBy: by, source };
 }
+
+/** Sumber lokasi yang diverifikasi dari bukti Street View (ADR-0057): bukan pemeriksaan di lokasi, dan bulan gambarnya ikut. */
+export const streetViewSource = (yyyyMm: string) => `Diverifikasi tim AksesBogor dari tangkapan Google Street View, gambar ${yyyyMm} (bulan dan tahun), bukan pemeriksaan di lokasi`;
 
 /** Sumber kandidat OpenStreetMap untuk model. */
 export const CANDIDATE_SOURCE = `Tempat dari OpenStreetMap (© kontributor OpenStreetMap, ${OSM_LICENSE}) yang belum punya data aksesibilitas dari tim AksesBogor`;
@@ -87,7 +92,7 @@ export async function findPlaceForAssistant(ctx: ToolContext, input: FindInput) 
       ).items;
   const candidates = await findCandidates(ctx, input);
   return {
-    places: [...found.map((p) => ({ id: p.id, kind: "lokasi" as const, name: p.name, category: p.category, status: p.status, district: p.district, ...teamCheck(p.verifiedBy) })), ...candidates],
+    places: [...found.map((p) => ({ id: p.id, kind: "lokasi" as const, name: p.name, category: p.category, status: p.status, district: p.district, ...teamCheck(p) })), ...candidates],
     ...(candidates.length > 0 ? { catatan: CANDIDATE_NOTE } : {}),
   };
 }
@@ -117,7 +122,7 @@ export async function placeAccessibilityForAssistant(ctx: ToolContext, input: { 
   const osm = parseCandidateId(input.placeId);
   if (!osm) {
     const place = await placeAccessibility(ctx, input);
-    return { ...place, kind: "lokasi" as const, ...teamCheck(place.verifiedBy) };
+    return { ...place, kind: "lokasi" as const, ...teamCheck(place) };
   }
   const candidate = await getOsmPlace(ctx.db, osm);
   if (!candidate) throw new HttpError(404, "lokasi_tidak_ditemukan", "Lokasi tidak ditemukan.");
@@ -153,7 +158,7 @@ export async function nearbyPlaces(ctx: ToolContext, input: NearbyInput) {
   const point = sql`ST_SetSRID(ST_MakePoint(${from.lng}, ${from.lat}), 4326)::geography`;
   const meters = sql<number>`ST_Distance(${places.location}::geography, ${point})`;
   const rows = await ctx.db
-    .select({ id: places.id, name: places.name, category: places.category, status: places.status, slug: places.districtSlug, district: districts.name, adminPublishedAt: places.adminPublishedAt, meters })
+    .select({ id: places.id, name: places.name, category: places.category, status: places.status, slug: places.districtSlug, district: districts.name, adminPublishedAt: places.adminPublishedAt, streetViewImageDate: places.streetViewImageDate, meters })
     .from(places)
     .innerJoin(districts, eq(districts.slug, places.districtSlug))
     .where(
@@ -186,7 +191,7 @@ export async function nearbyPlaces(ctx: ToolContext, input: NearbyInput) {
       status: r.status,
       district: { slug: r.slug, name: r.district },
       distanceMeters: roundDistance(Number(r.meters)),
-      ...teamCheck(verifiedBy(r.adminPublishedAt)),
+      ...teamCheck({ verifiedBy: verifiedBy(r.adminPublishedAt), streetViewImageDate: imageMonth(r.streetViewImageDate) }),
     })).map((place, i) => [Number(rows[i]!.meters), place] as const),
     ...candidates.map((r) => [Number(r.meters), { ...toCandidate(r), distanceMeters: roundDistance(Number(r.meters)) }] as const),
   ]
