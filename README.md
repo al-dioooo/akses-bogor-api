@@ -49,6 +49,8 @@ pnpm dev               # http://localhost:8080/healthz
 | `pnpm pengetahuan:fasilitas [--salinan]` | Mengambil kampus, masjid, halte, dan rumah sakit di Kota Bogor dari OpenStreetMap sebagai calon tujuan kontributor (ADR-0043) |
 | `pnpm pengetahuan:indeks` | Menghitung ulang bentuk dasar (`search_stem`, ADR-0044) semua potongan basis pengetahuan dari teks yang sudah tersimpan, tanpa mengunduh. Jalankan sekali setelah migrasi 0009, dan setiap kali `src/knowledge/stemmer.ts` atau `src/knowledge/kata-dasar.ts` berubah |
 | `pnpm pengetahuan:evaluasi [R01 …] [--terpisah] [--rinci] [--json berkas]` | Mengukur retrieval `search_knowledge` tanpa model: recall@3, recall@5, recall@8, dan MRR terhadap sitasi yang harus ditemukan untuk setiap pertanyaan di `scripts/pengetahuan/uji-retrieval.json`. Butuh basis pengetahuan yang sudah dimuat. `--terpisah` memakai set `uji-retrieval-terpisah.json`, yang hanya untuk memeriksa dan tidak dipakai untuk menyetel |
+| `pnpm petunjuk:google-ambil [--rencana] [--limit N]` | Mencari kandidat OSM bernama di Google Maps lewat aktor Apify `compass/crawler-google-places` dan menyimpan dataset mentahnya di `~/data/akses-bogor/google-maps/` (ADR-0056). `--rencana` hanya mencetak jumlah pencarian dan perkiraan biaya. Butuh `APIFY_TOKEN` (env atau `~/credentials/akses-bogor/apify.env`) dan memakai saldo Apify |
+| `pnpm petunjuk:google-impor [berkas] [--dry-run] [--kecuali node/1,way/2] [--timpa-cara-lain]` | Memuat dataset dari `petunjuk:google-ambil` (bawaan: berkas terbaru) ke tag `aksesbogor:google_maps` kandidat OSM dalam satu transaksi (ADR-0056): kategori sama, nama mirip, 400 m atau kurang, pasangan terdekat menang. Tidak menambah tempat dan tidak menimpa salinan yang sudah diperiksa tim. `--dry-run` hanya mencetak pasangan dan statistik; `--kecuali` tidak memasangkan kandidat yang pasangannya salah |
 | `pnpm agen:evaluasi [--asisten] [K01 …]` | Menjalankan pertanyaan uji agen kontributor (`scripts/agen/pertanyaan-uji.json`), atau dengan `--asisten` pertanyaan asisten rute publik (`scripts/agen/pertanyaan-uji-asisten.json`, dengan titik awal yang hanya dipakai server), sekali ke penyedia di `AGENT_PROVIDER`; untuk Claude mencetak token dan perkiraan biaya per pertanyaan. Butuh API key penyedianya di environment lokal dan memakai saldo atau kuota, jadi jalankan seperlunya. Berhenti setelah `EVALUASI_MAKS_BERHASIL` permintaan berhasil (bawaan 40 untuk Claude, 14 untuk OpenRouter) |
 | `pnpm peran --email <email> --peran <admin\|verifikator\|pengguna>` | Mengganti peran akun yang sudah dilengkapi, mis. membuat admin pertama; dicatat di log audit sebagai `skrip` (ADR-0035) |
 
@@ -246,6 +248,7 @@ Produksi berjalan di Evergarden, VM Ubuntu 24.04 di OCI region Batam, dan dibuka
 | Database | PostgreSQL 17 + PostGIS dari PGDG, cluster `17/main` di port 5433, koneksi lewat Unix socket dengan autentikasi peer |
 | Cadangan | `akses-bogor-backup.timer` pukul 02.30 WIB menjalankan [deploy/backup.sh](deploy/backup.sh); dump di `/var/backups/akses-bogor` |
 | Tunnel | Public hostname di dashboard Cloudflare Zero Trust, diarahkan ke `http://127.0.0.1:8090` |
+| Rute OpenStreetMap | `akses-bogor-valhalla.service` (Valhalla di Docker, `127.0.0.1:8002`) dan `akses-bogor-valhalla-ubin.timer` setiap Minggu 03.30 WIB, dari [deploy/valhalla/](deploy/valhalla/). Langkah pasang dan angka memori ada di runbook `operations/valhalla-rute-aksesibel.md` di akses-bogor-docs (ADR-0055) |
 
 ### Rilis
 
@@ -325,6 +328,25 @@ sudo -u aksesbogor -H sh -c 'cd /srv/akses-bogor/current && COREPACK_ENABLE_DOWN
 ```
 
 Sebelum itu, `search_knowledge` tetap berjalan, tetapi hanya dengan kata apa adanya.
+
+### Atribut Google Maps
+
+Salinan atribut aksesibilitas Google Maps di kandidat OSM (ADR-0056) diambil lewat Apify, lalu dimuat ke tag `aksesbogor:google_maps`. Token Apify ada di `/etc/akses-bogor/apify.env` (`root:aksesbogor`, mode `0640`, isi `APIFY_TOKEN=…`), terpisah dari `api.env` karena server API tidak memakainya. Langkah lengkap, termasuk memeriksa hasil dry run, ada di runbook `operations/impor-atribut-google-maps.md` di akses-bogor-docs. Singkatnya, di Evergarden:
+
+```bash
+# Jumlah pencarian dan perkiraan biaya, tanpa memanggil Apify
+sudo -u aksesbogor -H sh -c 'cd /srv/akses-bogor/current && COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
+  corepack pnpm exec tsx --env-file=/etc/akses-bogor/api.env scripts/petunjuk/google-maps-ambil.ts --rencana'
+# Ambil (mulai dengan --limit 20), lalu dry run dan impor berkas terbaru
+sudo -u aksesbogor -H sh -c 'cd /srv/akses-bogor/current && COREPACK_ENABLE_DOWNLOAD_PROMPT=0 APIFY_ENV_FILE=/etc/akses-bogor/apify.env \
+  corepack pnpm exec tsx --env-file=/etc/akses-bogor/api.env scripts/petunjuk/google-maps-ambil.ts --limit 20'
+sudo -u aksesbogor -H sh -c 'cd /srv/akses-bogor/current && COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
+  corepack pnpm exec tsx --env-file=/etc/akses-bogor/api.env scripts/petunjuk/google-maps-impor.ts --dry-run'
+sudo -u aksesbogor -H sh -c 'cd /srv/akses-bogor/current && COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
+  corepack pnpm exec tsx --env-file=/etc/akses-bogor/api.env scripts/petunjuk/google-maps-impor.ts'
+```
+
+`pnpm pengetahuan:fasilitas` mengganti semua baris `osm_places`, jadi salinan ini ikut hilang. Setelah memuat ulang OSM, jalankan impor lagi dengan berkas yang sama; tidak perlu mengambil ulang dari Apify.
 
 ### Data Preview
 
