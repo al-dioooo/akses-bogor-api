@@ -199,6 +199,15 @@ describe("POST /admin/places", () => {
       expect(await lastAudit(placeId)).toMatchObject({ action: "diubah_admin", changes: { photos: { ditambah: 0, dihapus: 1 }, alasan: "Foto pintu masuk memperlihatkan wajah" } });
       expect(await rig.db.select().from(photos).where(eq(photos.id, shown!.id))).toEqual([]);
       expect(rig.memory.files.has(shown!.key)).toBe(false);
+      const history = await rig.app.inject({ method: "GET", url: `/admin/places/${placeId}/history`, headers: rig.as(admin.token) });
+      expect(history.statusCode).toBe(200);
+      const items = history.json().items as { entity: string; photoId: string | null; action: string; changes: Record<string, unknown> }[];
+      expect(items.find((i) => i.entity === "foto")).toMatchObject({
+        photoId: shown!.id,
+        action: "dihapus",
+        changes: { lokasi: placeId, tag: "pintu_masuk", alasan: "Foto pintu masuk memperlihatkan wajah" },
+      });
+      expect(items.filter((i) => i.entity === "lokasi").every((i) => i.photoId === null)).toBe(true);
       expect(await rig.db.select().from(photoDeletions).where(eq(photoDeletions.storageKey, shown!.key))).toEqual([]);
     });
 

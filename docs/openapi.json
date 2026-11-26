@@ -7962,9 +7962,22 @@
                             "minimum": -9007199254740991,
                             "maximum": 9007199254740991
                           },
+                          "entity": {
+                            "type": "string",
+                            "enum": [
+                              "lokasi",
+                              "foto"
+                            ],
+                            "description": "`foto`: foto tayang tempat ini yang dihapus; `changes` berisi `tag` dan `alasan`"
+                          },
+                          "photoId": {
+                            "nullable": true,
+                            "description": "Id foto untuk entri `foto`, kosong untuk entri lokasi",
+                            "type": "string"
+                          },
                           "action": {
                             "type": "string",
-                            "description": "Mis. dibuat, diubah, dibuat_admin, diubah_admin, diturunkan, ditayangkan_lagi, terbit_langsung"
+                            "description": "Mis. dibuat, diubah, dibuat_admin, diubah_admin, diturunkan, ditayangkan_lagi; `dihapus` untuk entri foto"
                           },
                           "actor": {
                             "type": "object",
@@ -8003,6 +8016,8 @@
                         },
                         "required": [
                           "id",
+                          "entity",
+                          "photoId",
                           "action",
                           "actor",
                           "at",
