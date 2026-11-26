@@ -35,3 +35,12 @@ describe("systemPrompt", () => {
     expect(systemPrompt({ id: "x", name: "Tempat", lastVerifiedAt: "2026-10-17T18:00:00.000Z", verifiedBy: "tim" })).toContain('"lastVerifiedAt":"2026-10-18"');
   });
 });
+
+describe("systemPrompt (ADR-0058)", () => {
+  it("never lets the agent claim an on-site check, and does not mention Street View", () => {
+    const prompt = systemPrompt();
+    expect(prompt).toContain("jangan pernah mengatakan ada orang yang datang atau memeriksa langsung di lokasi");
+    expect(prompt).toContain("tim memeriksanya dari foto");
+    expect(prompt).not.toMatch(/street view/i);
+  });
+});

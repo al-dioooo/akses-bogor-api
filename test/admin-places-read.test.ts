@@ -85,6 +85,13 @@ describe("GET /admin/places", () => {
     expect(await ids("published=tidak")).toEqual([halteId]);
     expect(await ids("published=ya")).not.toContain(halteId);
     expect(await ids("origin=admin")).toEqual([kampusId]);
+    // Asal Street View tetap terlihat dan bisa disaring di Kelola tempat (ADR-0058).
+    const masjidId = await rig.placeId("Masjid contoh B");
+    await rig.db.update(places).set({ verificationSource: "street_view", streetViewImageDate: "2026-01-01" }).where(eq(places.id, masjidId));
+    expect(await ids("origin=street_view")).toEqual([masjidId]);
+    expect(await ids("origin=tim")).not.toContain(masjidId);
+    expect((await get(`/admin/places?origin=street_view`)).body.items[0]).toMatchObject({ verificationSource: "street_view", streetViewImageDate: "2026-01" });
+    await rig.db.update(places).set({ verificationSource: "laporan", streetViewImageDate: null }).where(eq(places.id, masjidId));
     expect(await ids("q=kampus%20contoh")).toContain(kampusId);
     expect(await ids("category=halte")).toContain(halteId);
     expect(await ids("category=halte&published=ya")).not.toContain(halteId);

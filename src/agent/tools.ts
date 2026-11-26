@@ -48,8 +48,6 @@ export async function placeAccessibility(ctx: ToolContext, input: { placeId: str
     facilities: place.facilities,
     lastVerifiedAt: place.lastVerifiedAt,
     verifiedBy: place.verifiedBy,
-    verificationSource: place.verificationSource,
-    streetViewImageDate: place.streetViewImageDate,
     needsRecheck: place.needsRecheck,
   };
 }

@@ -12,7 +12,7 @@ import { HttpError } from "../http/errors.js";
 import type { LatLng } from "../map/directions.js";
 import { KOTA_BOGOR_BBOX } from "../map/search.js";
 import { MAX_ROUTE_KM } from "../map/walking-route.js";
-import { imageMonth, listPlaces, placesNamed, published, verifiedBy } from "../places/queries.js";
+import { listPlaces, placesNamed, published, verifiedBy } from "../places/queries.js";
 import type { RouteCard } from "./cards.js";
 import { placeAccessibility, type ToolContext } from "./tools.js";
 
@@ -20,7 +20,7 @@ type PlaceStatus = (typeof places.status.enumValues)[number];
 type District = { slug: string; name: string };
 
 /** Sumber data aksesibilitas lokasi yang sudah terbit. */
-export const TEAM_CHECKED_SOURCE = "Laporan kontributor yang sudah diperiksa tim verifikator AksesBogor";
+export const TEAM_CHECKED_SOURCE = "Data AksesBogor yang sudah diperiksa tim verifikator";
 
 /** Sumber data lokasi yang diterbitkan langsung oleh admin (ADR-0051): tanpa verifikator kedua, jadi bukan "diverifikasi". */
 export const ADMIN_PUBLISHED_SOURCE = "Diterbitkan langsung oleh admin AksesBogor, tanpa pemeriksaan verifikator kedua";
@@ -32,14 +32,10 @@ export const ADMIN_PUBLISHED_SOURCE = "Diterbitkan langsung oleh admin AksesBogo
  * pernah diperiksa tim harus mengembalikan salah di sini begitu kolom asalnya ada, supaya asisten menyebutnya "belum
  * diperiksa tim".
  */
-export function teamCheck(place: { verifiedBy: "tim" | "admin"; streetViewImageDate?: string | null }): { checkedByTeam: boolean; verifiedBy: "tim" | "admin"; source: string } {
-  const by = place.verifiedBy;
-  const source = by === "admin" ? ADMIN_PUBLISHED_SOURCE : place.streetViewImageDate ? streetViewSource(place.streetViewImageDate) : TEAM_CHECKED_SOURCE;
-  return { checkedByTeam: true, verifiedBy: by, source };
+// Lokasi dari bukti Street View memakai sumber tim yang sama dengan lokasi dari laporan (ADR-0058).
+export function teamCheck(place: { verifiedBy: "tim" | "admin" }): { checkedByTeam: boolean; verifiedBy: "tim" | "admin"; source: string } {
+  return { checkedByTeam: true, verifiedBy: place.verifiedBy, source: place.verifiedBy === "admin" ? ADMIN_PUBLISHED_SOURCE : TEAM_CHECKED_SOURCE };
 }
-
-/** Sumber lokasi yang diverifikasi dari bukti Street View (ADR-0057): bukan pemeriksaan di lokasi, dan bulan gambarnya ikut. */
-export const streetViewSource = (yyyyMm: string) => `Diverifikasi tim AksesBogor dari tangkapan Google Street View, gambar ${yyyyMm} (bulan dan tahun), bukan pemeriksaan di lokasi`;
 
 /** Sumber kandidat OpenStreetMap untuk model. */
 export const CANDIDATE_SOURCE = `Tempat dari OpenStreetMap (© kontributor OpenStreetMap, ${OSM_LICENSE}) yang belum punya data aksesibilitas dari tim AksesBogor`;
@@ -158,7 +154,7 @@ export async function nearbyPlaces(ctx: ToolContext, input: NearbyInput) {
   const point = sql`ST_SetSRID(ST_MakePoint(${from.lng}, ${from.lat}), 4326)::geography`;
   const meters = sql<number>`ST_Distance(${places.location}::geography, ${point})`;
   const rows = await ctx.db
-    .select({ id: places.id, name: places.name, category: places.category, status: places.status, slug: places.districtSlug, district: districts.name, adminPublishedAt: places.adminPublishedAt, streetViewImageDate: places.streetViewImageDate, meters })
+    .select({ id: places.id, name: places.name, category: places.category, status: places.status, slug: places.districtSlug, district: districts.name, adminPublishedAt: places.adminPublishedAt, meters })
     .from(places)
     .innerJoin(districts, eq(districts.slug, places.districtSlug))
     .where(
@@ -191,7 +187,7 @@ export async function nearbyPlaces(ctx: ToolContext, input: NearbyInput) {
       status: r.status,
       district: { slug: r.slug, name: r.district },
       distanceMeters: roundDistance(Number(r.meters)),
-      ...teamCheck({ verifiedBy: verifiedBy(r.adminPublishedAt), streetViewImageDate: imageMonth(r.streetViewImageDate) }),
+      ...teamCheck({ verifiedBy: verifiedBy(r.adminPublishedAt) }),
     })).map((place, i) => [Number(rows[i]!.meters), place] as const),
     ...candidates.map((r) => [Number(r.meters), { ...toCandidate(r), distanceMeters: roundDistance(Number(r.meters)) }] as const),
   ]

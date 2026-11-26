@@ -14,7 +14,10 @@ export const adminPlaceQuery = z.object({
   category: category.optional(),
   district: z.string().max(40).optional().describe("Slug kecamatan"),
   status: status.optional(),
-  origin: z.enum(["tim", "admin"]).optional().describe("`tim`: terakhir diterbitkan verifikator. `admin`: dibuat, diubah, atau diterbitkan langsung oleh admin"),
+  origin: z
+    .enum(["tim", "admin", "street_view"])
+    .optional()
+    .describe("`tim`: terakhir diterbitkan verifikator dari laporan. `admin`: dibuat, diubah, atau diterbitkan langsung oleh admin. `street_view`: diverifikasi dari bukti Street View (ADR-0057, ADR-0058)"),
   published: z.enum(["ya", "tidak"]).optional().describe("`ya`: masih tayang. `tidak`: diturunkan. Kosong: semua"),
   limit: z.coerce.number().int().min(1).max(100).default(25),
   offset: z.coerce.number().int().min(0).default(0),
