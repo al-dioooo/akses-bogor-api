@@ -173,23 +173,30 @@ export async function restorePlace(db: Db, adminId: string, placeId: string, rea
   });
 }
 
+/** Draf terbit langsung yang dibuat dari versi lokasi yang lebih lama, atau tanpa versi. */
+export const staleDraft = () =>
+  new HttpError(409, "draf_usang", "Data lokasi ini sudah berubah sejak draf dibuat. Muat data terbaru ke draf, periksa lagi isiannya, lalu terbitkan.");
+
 /**
  * Laporan Laporkan milik admin yang diterbitkan langsung (`publishDirectly`, ADR-0051). Untuk Edit lokasi dan Laporkan
- * kekurangan, foto tayang tempat itu ikut menjadi bukti. Kirim ulang dengan kunci draf yang sama mengembalikan laporan
- * yang sudah ada.
+ * kekurangan, foto tayang tempat itu ikut menjadi bukti, dan `placeVersion` dari draf harus sama dengan versi lokasi saat
+ * ini: draf lama tidak boleh menimpa terbitan yang lebih baru tanpa terlihat. Kirim ulang dengan kunci draf yang sama
+ * mengembalikan laporan yang sudah ada.
  */
-export async function publishSubmission(db: Db, store: PhotoStore | undefined, adminId: string, body: ReportBody, reason: string, now: Date, log?: Log) {
+export async function publishSubmission(db: Db, store: PhotoStore | undefined, adminId: string, body: ReportBody, direct: { reason: string; placeVersion?: string }, now: Date, log?: Log) {
   precheck(body, store);
   const repeat = await existing(db, adminId, body.submissionKey);
   if (repeat) return { report: repeat, downgraded: [] };
-  const input = { name: body.name, category: body.category, location: body.location, landmark: body.landmark, description: body.description, facilities: body.facilities, reason };
+  const input = { name: body.name, category: body.category, location: body.location, landmark: body.landmark, description: body.description, facilities: body.facilities, reason: direct.reason };
   try {
     const { placeId, downgraded, report } = await submitAndPublish(db, store, adminId, body, input, now, log, {
       keptTags: async (tx) => (body.placeId ? (await shownPhotos(tx, body.placeId)).map((p) => p.tag) : []),
+      // Dikunci di transaksi yang sama dengan terbit, jadi tidak ada terbitan lain yang bisa menyelip setelah pemeriksaan ini.
       version: async (tx) => {
         if (!body.placeId) return undefined;
-        const [place] = await tx.select({ updatedAt: places.updatedAt }).from(places).where(eq(places.id, body.placeId));
-        return place?.updatedAt.toISOString();
+        const [place] = await tx.select({ updatedAt: places.updatedAt }).from(places).where(eq(places.id, body.placeId)).for("update");
+        if (place && place.updatedAt.toISOString() !== direct.placeVersion) throw staleDraft();
+        return direct.placeVersion;
       },
     });
     return { report: { ...report, status: "diterbitkan" as const, placeId }, downgraded };

@@ -114,6 +114,12 @@ export const reportSubmission = reportFields
       .regex(/^(?:[^\p{C}]|[\n\r\t])+$/u)
       .optional()
       .describe("Wajib bila `publishDirectly`: alasan admin, masuk log audit"),
+    placeVersion: z.iso
+      .datetime()
+      .optional()
+      .describe(
+        "Khusus `publishDirectly` untuk perubahan dan kekurangan: `version` lokasi saat draf dibuat. Bila kosong atau lokasi sudah berubah sejak itu, 409 `draf_usang` dan tidak ada yang disimpan. Diabaikan untuk kiriman biasa",
+      ),
   })
   .superRefine((body, ctx) => {
     reportRules(body, ctx);
