@@ -1,5 +1,6 @@
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
+import { DISABILITY_CATEGORIES, disabilityByDistrict } from "../contribute/disability.js";
 import { districtBoundaries, kecamatanPriority } from "../contribute/priority.js";
 import { HttpError, errorSchema } from "../http/errors.js";
 import { listDistricts } from "../places/queries.js";
@@ -11,6 +12,7 @@ export type DistrictRouteOptions = {
 };
 
 const level = z.enum(["rendah", "sedang", "tinggi", "sangat_tinggi"]);
+const sourceSchema = z.object({ title: z.string(), url: z.url(), publisher: z.string(), retrievedAt: z.iso.datetime(), terms: z.string() });
 export const prioritySchema = z.object({
   year: z.number().int().describe("Tahun terbaru di data Dinsos"),
   yearTotals: z.array(z.object({ year: z.number().int(), registered: z.number().int() })).describe("Jumlah terdaftar per tahun, untuk menunjukkan lonjakan antartahun"),
@@ -28,8 +30,23 @@ export const prioritySchema = z.object({
   ),
   caveat: z.string().describe("Kalimat yang wajib ikut setiap angka disabilitas"),
   formula: z.string(),
-  source: z.object({ title: z.string(), url: z.url(), publisher: z.string(), retrievedAt: z.iso.datetime(), terms: z.string() }),
+  source: sourceSchema,
   facilitiesSource: z.object({ retrievedAt: z.iso.datetime().nullable(), attribution: z.string() }),
+});
+const disabilitySchema = z.object({
+  years: z.array(z.number().int()).describe("Tahun yang ada di data, dari yang terlama"),
+  categories: z.array(z.enum(DISABILITY_CATEGORIES)).describe("Jenis disabilitas dalam istilah AksesBogor (ADR-0041); label sumber tidak ikut"),
+  districts: z.array(
+    z.object({
+      slug: z.string(),
+      name: z.string(),
+      counts: z
+        .array(z.object({ year: z.number().int(), category: z.enum(DISABILITY_CATEGORIES), count: z.number().int().min(0) }))
+        .describe("Penyandang disabilitas terdaftar di Dinsos, bukan jumlah seluruh penduduk"),
+    }),
+  ),
+  caveat: z.string().describe("Kalimat yang wajib ikut setiap angka disabilitas"),
+  source: sourceSchema,
 });
 const boundariesSchema = z.object({
   type: z.literal("FeatureCollection"),
@@ -93,6 +110,25 @@ export const districtRoutes: FastifyPluginAsyncZod<DistrictRouteOptions> = async
       const priority = await kecamatanPriority(app.db);
       if (!priority) throw new HttpError(503, "data_disabilitas_belum_dimuat", "Data prioritas kecamatan belum dimuat.");
       return priority;
+    },
+  );
+
+  app.get(
+    "/districts/disability",
+    {
+      schema: {
+        tags: ["Lokasi"],
+        summary: "Penyandang disabilitas terdaftar per kecamatan, jenis, dan tahun",
+        description:
+          "Jumlah penyandang disabilitas yang terdaftar di Dinas Sosial Kota Bogor (Open Data Kota Bogor) per kecamatan, jenis, dan tahun, untuk lapisan Persebaran disabilitas di Peta (ADR-0053). Bukan jumlah seluruh penyandang disabilitas; kalimat batas data dan sumbernya selalu ikut. Menjawab 503 `data_disabilitas_belum_aktif` selama `DISABILITY_DATA_ENABLED` mati.",
+        response: { 200: disabilitySchema, 503: errorSchema },
+      },
+    },
+    async () => {
+      if (!opts.disabilityData) throw new HttpError(503, "data_disabilitas_belum_aktif", "Data disabilitas belum dibuka.");
+      const data = await disabilityByDistrict(app.db);
+      if (!data) throw new HttpError(503, "data_disabilitas_belum_dimuat", "Data disabilitas belum dimuat.");
+      return data;
     },
   );
 };

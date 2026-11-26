@@ -54,6 +54,32 @@ describe("district routes", () => {
     expect(JSON.stringify(body)).not.toMatch(/cacat/i);
   });
 
+  it("keeps the disability counts closed while DISABILITY_DATA_ENABLED is off", async () => {
+    const res = await closed.inject({ method: "GET", url: "/districts/disability" });
+    expect(res.statusCode).toBe(503);
+    expect(res.json().galat).toBe("data_disabilitas_belum_aktif");
+  });
+
+  it("serves every count per kecamatan, jenis and year with the caveat and source, without the source labels", async () => {
+    const res = await app.inject({ method: "GET", url: "/districts/disability" });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body).toMatchObject({ years: [2023, 2024], categories: ["fisik", "netra", "mental", "lainnya"], caveat: DISABILITY_CAVEAT });
+    expect(body.source).toMatchObject({ publisher: expect.stringContaining("Dinas Sosial"), retrievedAt: "2026-11-22T10:00:00.000Z", terms: expect.stringContaining("pihak ketiga") });
+    // Keenam kecamatan selalu ada, juga yang tidak punya angka untuk suatu tahun atau jenis.
+    expect(body.districts).toHaveLength(6);
+    const barat = body.districts.find((d: { slug: string }) => d.slug === "bogor-barat");
+    expect(barat).toEqual({
+      slug: "bogor-barat",
+      name: "Bogor Barat",
+      counts: [
+        { year: 2023, category: "netra", count: 5 },
+        { year: 2024, category: "fisik", count: 10 },
+      ],
+    });
+    expect(JSON.stringify(body)).not.toMatch(/cacat/i);
+  });
+
   it("serves simplified kecamatan boundaries with OSM attribution, whatever the flag", async () => {
     const res = await closed.inject({ method: "GET", url: "/districts/boundaries" });
     expect(res.statusCode).toBe(200);
