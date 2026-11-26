@@ -1,0 +1,12 @@
+# Ubin Valhalla dibangun ulang setiap Minggu pukul 03.30 WIB (ADR-0055). Geofabrik memperbarui ekstrak Jawa setiap
+# hari; sepekan sekali cukup untuk data trotoar dan jalur yang jarang berubah.
+[Unit]
+Description=Bangun ulang ubin Valhalla AksesBogor setiap minggu
+
+[Timer]
+OnCalendar=Sun *-*-* 03:30 Asia/Jakarta
+RandomizedDelaySec=20min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
