@@ -4,9 +4,12 @@
 // diperiksa tim, atau yang bentuknya tidak dikenal, tidak pernah disentuh, begitu juga tabel `places`. Seperti petunjuk
 // lain, isinya tidak pernah diberikan ke AI (ADR-0052).
 import { isDeepStrictEqual } from "node:util";
-import type { PlaceCategory } from "../contribute/facilities.js";
+import { sql } from "drizzle-orm";
+import { FACILITIES_SOURCE_ID, withoutAksesBogorData, type PlaceCategory } from "../contribute/facilities.js";
+import type { Db } from "../db/client.js";
 import { APIFY_ACTOR } from "./apify.js";
 import { markers, nameScore, typeFits } from "./match.js";
+import { optionKey } from "./stored.js";
 
 export const GOOGLE_MAPS_TAG = "aksesbogor:google_maps";
 /** Jarak terjauh hasil Google dari titik OSM, sama dengan pencocokan dengan tangan 2026-11-23. */
@@ -196,4 +199,86 @@ export function decide(existing: unknown, value: TagValue, options: { replaceOth
   if (old.metode !== IMPORT_METHOD) return options.replaceOtherMethods ? "diperbarui" : "cara_lain";
   if (typeof old.diambil === "string" && new Date(old.diambil) > new Date(value.diambil)) return "lebih_baru";
   return isDeepStrictEqual(old, value) ? "sama" : "diperbarui";
+}
+
+export type ImportedMatch = Match & { decision: Decision; hasAksesBogorData: boolean; value: TagValue };
+export type ImportReport = { matches: ImportedMatch[]; unmatched: Unmatched[]; written: number };
+
+const rowsOf = <T>(result: unknown) => (result as { rows: T[] }).rows;
+
+/**
+ * Mencocokkan `places` ke `osm_places` dan menulis tag yang `baru` atau `diperbarui`, dalam satu transaksi. Dengan
+ * `dryRun`, tidak ada yang ditulis. Hanya baris OSM yang sudah ada yang diubah, dan hanya tag `aksesbogor:google_maps`-nya.
+ * Kandidat di `exclude` (mis. "node/123"), yaitu pasangan yang salah menurut pemeriksa dry run, tidak pernah dipasangkan.
+ */
+export async function importGoogleMaps(
+  db: Db,
+  places: readonly GooglePlace[],
+  options: { dryRun: boolean; replaceOtherMethods?: boolean; exclude?: ReadonlySet<string> },
+): Promise<ImportReport> {
+  return db.transaction(async (tx) => {
+    const points = JSON.stringify(places.map((place, i) => ({ i, lat: place.location.lat, lng: place.location.lng })));
+    const nearby = rowsOf<{ place: number; osm_type: string; osm_id: number | string; category: PlaceCategory; name: string; meters: number }>(
+      await tx.execute(sql`
+        SELECT g.i AS place, o.osm_type, o.osm_id, o.category, o.name,
+          ST_Distance(o.location::geography, ST_SetSRID(ST_MakePoint(g.lng, g.lat), 4326)::geography) AS meters
+        FROM jsonb_to_recordset(${points}::jsonb) AS g(i int, lat float8, lng float8)
+        JOIN osm_places o ON o.source_id = ${FACILITIES_SOURCE_ID} AND o.name IS NOT NULL
+          AND ST_DWithin(o.location::geography, ST_SetSRID(ST_MakePoint(g.lng, g.lat), 4326)::geography, ${MATCH_METERS})`),
+    )
+      .map((r) => ({ place: Number(r.place), osmType: r.osm_type, osmId: Number(r.osm_id), category: r.category, name: r.name, meters: Number(r.meters) }))
+      .filter((row) => !options.exclude?.has(`${row.osmType}/${row.osmId}`));
+    const { matches, unmatched } = matchPlaces(places, nearby);
+    if (matches.length === 0) return { matches: [], unmatched, written: 0 };
+
+    const refs = JSON.stringify(matches.map((m) => ({ osm_type: m.osm.osmType, osm_id: m.osm.osmId })));
+    const current = rowsOf<{ osm_type: string; osm_id: number | string; existing: unknown; has_data: boolean }>(
+      await tx.execute(sql`
+        SELECT o.osm_type, o.osm_id, o.tags->${GOOGLE_MAPS_TAG} AS existing, NOT (${withoutAksesBogorData}) AS has_data
+        FROM osm_places o JOIN jsonb_to_recordset(${refs}::jsonb) AS r(osm_type text, osm_id bigint) ON o.osm_type = r.osm_type AND o.osm_id = r.osm_id
+        ${options.dryRun ? sql`` : sql`FOR UPDATE OF o`}`),
+    );
+    const byRef = new Map(current.map((r) => [`${r.osm_type}/${r.osm_id}`, r]));
+    const imported = matches.map((match): ImportedMatch => {
+      const row = byRef.get(`${match.osm.osmType}/${match.osm.osmId}`);
+      const value = tagValue(match);
+      return { ...match, value, decision: decide(row?.existing, value, options), hasAksesBogorData: row?.has_data === true };
+    });
+
+    const writes = imported.filter((m) => m.decision === "baru" || m.decision === "diperbarui");
+    if (!options.dryRun && writes.length > 0) {
+      const values = JSON.stringify(writes.map((m) => ({ osm_type: m.osm.osmType, osm_id: m.osm.osmId, value: m.value })));
+      await tx.execute(sql`
+        UPDATE osm_places o SET tags = o.tags || jsonb_build_object(${GOOGLE_MAPS_TAG}::text, r.value)
+        FROM jsonb_to_recordset(${values}::jsonb) AS r(osm_type text, osm_id bigint, value jsonb)
+        WHERE o.osm_type = r.osm_type AND o.osm_id = r.osm_id`);
+    }
+    return { matches: imported, unmatched, written: options.dryRun ? 0 : writes.length };
+  });
+}
+
+type Flag = NonNullable<ReturnType<typeof optionKey>>;
+export type CategorySummary = { cocok: number; denganAtribut: number; flags: Record<Flag, { ada: number; tidak: number }>; lain: number };
+
+/** Ringkasan untuk dry run: hasil per keputusan dan per alasan, dan atribut yang ditemukan per kategori. */
+export function summarize(report: ImportReport) {
+  const decisions = Object.fromEntries((["baru", "diperbarui", "sama", "tanpa_atribut", "dilindungi", "cara_lain", "lebih_baru"] as const).map((d) => [d, 0])) as Record<Decision, number>;
+  const reasons: Record<Unmatched["reason"], number> = { kategori: 0, jarak: 0, nama: 0, ambigu: 0 };
+  const categories = new Map<PlaceCategory, CategorySummary>();
+  for (const m of report.matches) {
+    decisions[m.decision] += 1;
+    const c = categories.get(m.osm.category) ?? { cocok: 0, denganAtribut: 0, flags: { entrance: { ada: 0, tidak: 0 }, restroom: { ada: 0, tidak: 0 }, parking: { ada: 0, tidak: 0 }, seating: { ada: 0, tidak: 0 } }, lain: 0 };
+    c.cocok += 1;
+    if (m.place.available.length + m.place.unavailable.length > 0) c.denganAtribut += 1;
+    for (const [labels, side] of [[m.place.available, "ada"], [m.place.unavailable, "tidak"]] as const) {
+      for (const label of labels) {
+        const key = optionKey(label);
+        if (key) c.flags[key][side] += 1;
+        else c.lain += 1;
+      }
+    }
+    categories.set(m.osm.category, c);
+  }
+  for (const u of report.unmatched) reasons[u.reason] += 1;
+  return { decisions, reasons, categories, withAksesBogorData: report.matches.filter((m) => m.hasAksesBogorData).length };
 }
