@@ -125,6 +125,7 @@ export const placeDetail = placeSummary.omit({ coverPhoto: true }).extend({
   because: z.array(facilityDetail).describe("Fasilitas yang menentukan status, untuk kalimat alasan; kosong bila Aksesibel"),
   photos: z.array(photo).describe("Foto yang lolos moderasi, dikelompokkan menurut tag"),
   needsRecheck: z.boolean().describe("Terakhir diverifikasi lebih dari 12 bulan lalu (FR-38)"),
+  version: z.iso.datetime().describe("Versi data lokasi ini. Draf Edit lokasi dan Laporkan kekurangan menyimpannya sebagai `placeVersion` untuk terbit langsung oleh admin (ADR-0051)"),
 });
 
 export const placeMap = z.object({
