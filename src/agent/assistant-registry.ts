@@ -7,7 +7,7 @@ import { routeCardSchema } from "./cards.js";
 import { findPlaceForAssistant, nearbyPlaces, placeAccessibilityForAssistant, showRoute } from "./assistant-tools.js";
 import { AGENT_TOOLS } from "./registry.js";
 
-const placeId = z
+export const placeId = z
   .union([z.uuid(), z.string().regex(/^osm:(node|way|relation)\/\d{1,15}$/)])
   .describe("Id dari find_place atau nearby_places: id lokasi AksesBogor, atau osm:<tipe>/<id> untuk kandidat OpenStreetMap");
 const district = z.object({ slug: z.string(), name: z.string() });
