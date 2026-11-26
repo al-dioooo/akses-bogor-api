@@ -86,7 +86,8 @@ export async function askAgent(
   const place = input.placeId ? ((await runTool(ctx, "place_accessibility", { placeId: input.placeId }, profile.tools)) as ChosenPlace) : undefined;
   const seen: Seen = { checkedPlace: place ? hasCheckedPlace(place) : false };
   const sources = new Map<string, Source>();
-  const addPlace = (p: { id: string; name: string; lastVerifiedAt: string; verifiedBy: "tim" | "admin" }) =>
+  type PlaceResult = { id: string; name: string; lastVerifiedAt: string; verifiedBy: "tim" | "admin" };
+  const addPlace = (p: PlaceResult) =>
     sources.set(`lokasi:${p.id}`, { type: "lokasi", placeId: p.id, name: p.name, lastVerifiedAt: p.lastVerifiedAt, verifiedBy: p.verifiedBy });
   let searched = false;
   const addPassages = (passages: KnowledgeHit[]) => {
@@ -107,7 +108,7 @@ export async function askAgent(
       const result = await runTool(ctx, call.name, call.input, profile.tools);
       if (hasCheckedPlace(result)) seen.checkedPlace = true;
       // Kandidat OpenStreetMap (asisten rute publik) tidak punya tanggal verifikasi, jadi tidak menjadi sumber "lokasi".
-      if (call.name === "place_accessibility" && (result as { lastVerifiedAt?: unknown }).lastVerifiedAt) addPlace(result as { id: string; name: string; lastVerifiedAt: string; verifiedBy: "tim" | "admin" });
+      if (call.name === "place_accessibility" && (result as { lastVerifiedAt?: unknown }).lastVerifiedAt) addPlace(result as PlaceResult);
       if (hasCandidate(result)) sources.set("osm-kandidat", OSM_CANDIDATE_SOURCE);
       if (call.name === "search_knowledge") addPassages((result as { passages: KnowledgeHit[] }).passages);
       if (call.name === "kecamatan_priority") {

@@ -35,7 +35,9 @@ const placeAccessibilityTool = {
   description:
     "Status aksesibilitas sebuah tempat dan jawaban keempat fasilitas (ramp, toilet difabel, guiding block, lift) yang sudah diverifikasi, dengan alasan, catatan, dan tanggal verifikasi terakhir. Sampaikan jawaban apa adanya: belum_tahu berarti belum diketahui, bukan tidak tersedia, dan jangan ditebak dari sumber lain.",
   input: z.object({ placeId }),
-  output: placeDetail.omit({ photos: true, location: true, version: true }),
+  // Sumber verifikasi dan bulan gambar Street View tidak diberikan ke model: tempat Street View tampil sebagai
+  // terverifikasi tim seperti tempat lain (ADR-0058).
+  output: placeDetail.omit({ photos: true, location: true, version: true, verificationSource: true, streetViewImageDate: true }),
   run: placeAccessibility,
 };
 

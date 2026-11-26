@@ -20,7 +20,7 @@ type PlaceStatus = (typeof places.status.enumValues)[number];
 type District = { slug: string; name: string };
 
 /** Sumber data aksesibilitas lokasi yang sudah terbit. */
-export const TEAM_CHECKED_SOURCE = "Laporan kontributor yang sudah diperiksa tim verifikator AksesBogor";
+export const TEAM_CHECKED_SOURCE = "Data AksesBogor yang sudah diperiksa tim verifikator";
 
 /** Sumber data lokasi yang diterbitkan langsung oleh admin (ADR-0051): tanpa verifikator kedua, jadi bukan "diverifikasi". */
 export const ADMIN_PUBLISHED_SOURCE = "Diterbitkan langsung oleh admin AksesBogor, tanpa pemeriksaan verifikator kedua";
@@ -32,8 +32,9 @@ export const ADMIN_PUBLISHED_SOURCE = "Diterbitkan langsung oleh admin AksesBogo
  * pernah diperiksa tim harus mengembalikan salah di sini begitu kolom asalnya ada, supaya asisten menyebutnya "belum
  * diperiksa tim".
  */
-export function teamCheck(by: "tim" | "admin" = "tim"): { checkedByTeam: boolean; verifiedBy: "tim" | "admin"; source: string } {
-  return { checkedByTeam: true, verifiedBy: by, source: by === "admin" ? ADMIN_PUBLISHED_SOURCE : TEAM_CHECKED_SOURCE };
+// Lokasi dari bukti Street View memakai sumber tim yang sama dengan lokasi dari laporan (ADR-0058).
+export function teamCheck(place: { verifiedBy: "tim" | "admin" }): { checkedByTeam: boolean; verifiedBy: "tim" | "admin"; source: string } {
+  return { checkedByTeam: true, verifiedBy: place.verifiedBy, source: place.verifiedBy === "admin" ? ADMIN_PUBLISHED_SOURCE : TEAM_CHECKED_SOURCE };
 }
 
 /** Sumber kandidat OpenStreetMap untuk model. */
@@ -87,7 +88,7 @@ export async function findPlaceForAssistant(ctx: ToolContext, input: FindInput) 
       ).items;
   const candidates = await findCandidates(ctx, input);
   return {
-    places: [...found.map((p) => ({ id: p.id, kind: "lokasi" as const, name: p.name, category: p.category, status: p.status, district: p.district, ...teamCheck(p.verifiedBy) })), ...candidates],
+    places: [...found.map((p) => ({ id: p.id, kind: "lokasi" as const, name: p.name, category: p.category, status: p.status, district: p.district, ...teamCheck(p) })), ...candidates],
     ...(candidates.length > 0 ? { catatan: CANDIDATE_NOTE } : {}),
   };
 }
@@ -117,7 +118,7 @@ export async function placeAccessibilityForAssistant(ctx: ToolContext, input: { 
   const osm = parseCandidateId(input.placeId);
   if (!osm) {
     const place = await placeAccessibility(ctx, input);
-    return { ...place, kind: "lokasi" as const, ...teamCheck(place.verifiedBy) };
+    return { ...place, kind: "lokasi" as const, ...teamCheck(place) };
   }
   const candidate = await getOsmPlace(ctx.db, osm);
   if (!candidate) throw new HttpError(404, "lokasi_tidak_ditemukan", "Lokasi tidak ditemukan.");
@@ -186,7 +187,7 @@ export async function nearbyPlaces(ctx: ToolContext, input: NearbyInput) {
       status: r.status,
       district: { slug: r.slug, name: r.district },
       distanceMeters: roundDistance(Number(r.meters)),
-      ...teamCheck(verifiedBy(r.adminPublishedAt)),
+      ...teamCheck({ verifiedBy: verifiedBy(r.adminPublishedAt) }),
     })).map((place, i) => [Number(rows[i]!.meters), place] as const),
     ...candidates.map((r) => [Number(r.meters), { ...toCandidate(r), distanceMeters: roundDistance(Number(r.meters)) }] as const),
   ]

@@ -6,9 +6,18 @@ import { ASSISTANT_TOOLS } from "../src/agent/assistant-registry.js";
 import { AGENT_TOOLS } from "../src/agent/registry.js";
 
 // Petunjuk Mapbox dan Google, termasuk salinan tersimpan, tidak pernah menjadi masukan AI (ADR-0052; Product Terms
-// Mapbox §1.5). Hanya app.ts, routes/hints.ts, dan skrip Google Maps (ADR-0056) yang boleh memakai modul petunjuk.
+// Mapbox §1.5). Hanya app.ts, routes/hints.ts, skrip Google Maps (ADR-0056), dan skrip verifikasi Street View
+// (ADR-0057) yang boleh memakai modul petunjuk.
 const ROOT = new URL("../", import.meta.url);
-const ALLOWED_IMPORTERS = new Set(["src/app.ts", "src/routes/hints.ts", "scripts/petunjuk/google-maps-ambil.ts", "scripts/petunjuk/google-maps-impor.ts"]);
+const ALLOWED_IMPORTERS = new Set([
+  "src/app.ts",
+  "src/routes/hints.ts",
+  "scripts/petunjuk/google-maps-ambil.ts",
+  "scripts/petunjuk/google-maps-impor.ts",
+  // Verifikasi Street View (ADR-0057) membaca dan menyembunyikan salinan tersimpan.
+  "scripts/verifikasi/daftar.ts",
+  "scripts/verifikasi/street-view.ts",
+]);
 
 /** Semua berkas TypeScript di bawah `dir`, sebagai path relatif dari akar repo. */
 async function sourceFiles(dir: string): Promise<string[]> {

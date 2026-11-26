@@ -3,6 +3,7 @@ import { askAgent, type AgentProfile } from "../src/agent/ask.js";
 import { loadFacilities, parseFacilities } from "../src/contribute/facilities.js";
 import { ASSISTANT_TOOLS } from "../src/agent/assistant-registry.js";
 import {
+  ADMIN_PUBLISHED_SOURCE,
   CANDIDATE_SOURCE,
   findPlaceForAssistant,
   nearbyPlaces,
@@ -11,11 +12,14 @@ import {
   roundDistance,
   showRoute,
   TEAM_CHECKED_SOURCE,
+  teamCheck,
 } from "../src/agent/assistant-tools.js";
 import type { AgentModel, AgentStep, AgentTurn } from "../src/agent/model.js";
 import { runTool, toolDefinitions } from "../src/agent/registry.js";
 import type { ToolContext } from "../src/agent/tools.js";
+import { eq } from "drizzle-orm";
 import type { Db } from "../src/db/client.js";
+import { places } from "../src/db/schema.js";
 import { seedSampleData } from "../src/db/seed.js";
 import { placesNamed } from "../src/places/queries.js";
 import { createTestDb } from "./helpers/db.js";
@@ -206,5 +210,16 @@ describe("OpenStreetMap candidates", () => {
     const result = await askAgent({ model, ctx: context(), profile }, { question: "Rute ke RSUD Uji?" });
     expect(result.cards).toEqual([{ type: "rute", target: { kind: "osm", osmType: "node", osmId: 31 }, name: "RSUD Uji Kota Bogor" }]);
     expect(result.sources).toEqual([expect.objectContaining({ type: "pengetahuan", citation: "© kontributor OpenStreetMap", license: "Open Database License (ODbL) 1.0" })]);
+  });
+});
+
+describe("street view places (ADR-0058)", () => {
+  it("presents a street view place as team-checked, without its source or image month", async () => {
+    await db.update(places).set({ verificationSource: "street_view", streetViewImageDate: "2026-01-01" }).where(eq(places.id, halteId));
+    const place = await placeAccessibilityForAssistant(context(), { placeId: halteId });
+    expect(place).toMatchObject({ checkedByTeam: true, verifiedBy: "tim", source: TEAM_CHECKED_SOURCE });
+    expect(JSON.stringify(place)).not.toMatch(/street|verificationSource|streetViewImageDate/i);
+    expect(teamCheck({ verifiedBy: "admin" }).source).toBe(ADMIN_PUBLISHED_SOURCE);
+    await db.update(places).set({ verificationSource: "laporan", streetViewImageDate: null }).where(eq(places.id, halteId));
   });
 });

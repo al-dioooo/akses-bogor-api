@@ -20,7 +20,8 @@ export async function cleanUpPhotos(db: Db, store: PhotoStore | undefined, now: 
     const rows = await tx
       .select({ id: photos.id, storageKey: photos.storageKey })
       .from(photos)
-      .where(and(isNull(photos.reportId), lt(photos.createdAt, before)));
+      // Foto Street View memang tanpa laporan (ADR-0057), jadi hanya unggahan laporan yang dibersihkan.
+      .where(and(isNull(photos.reportId), eq(photos.source, "laporan"), lt(photos.createdAt, before)));
     if (rows.length === 0) return 0;
     await tx
       .insert(photoDeletions)

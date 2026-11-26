@@ -22,8 +22,11 @@ export const OSM_WHEELCHAIR = ["yes", "limited", "no", "designated"] as const;
 export type StoredOsmHint = { provider: "openstreetmap"; result: "stored"; wheelchair: (typeof OSM_WHEELCHAIR)[number] };
 export type StoredHint = StoredGoogleHint | StoredOsmHint;
 
+/** Kunci keterangan OSM tersimpan; salinan Google ada di `GOOGLE_MAPS_TAG` (`google-maps-import.ts`). */
+export const OSM_NOTE_TAG = "aksesbogor:osm_aksesibilitas";
+
 /** Objek JSON, juga bila tersimpan sebagai string JSON; null bila bukan objek. */
-function record(value: unknown): Record<string, unknown> | null {
+export function record(value: unknown): Record<string, unknown> | null {
   if (typeof value === "string") {
     try {
       return record(JSON.parse(value));
@@ -57,10 +60,19 @@ function googleMapsUrl(value: unknown): string | null {
   }
 }
 
-/** Salinan Google Maps, atau null bila tidak ada, tanpa tanggal pengambilan, atau tanpa satu pun tanda aksesibilitas. */
+/**
+ * Salinan yang sudah diperiksa (`belum_diperiksa_tim: false`, mis. lewat Street View, ADR-0057) tidak lagi tampil sebagai
+ * petunjuk "belum diperiksa tim": hasilnya sudah ada di data tempat.
+ */
+const checked = (data: Record<string, unknown>) => data.belum_diperiksa_tim === false;
+
+/**
+ * Salinan Google Maps, atau null bila tidak ada, sudah diperiksa, tanpa tanggal pengambilan, atau tanpa satu pun tanda
+ * aksesibilitas.
+ */
 export function storedGoogle(value: unknown): StoredGoogleHint | null {
   const data = record(value);
-  if (!data) return null;
+  if (!data || checked(data)) return null;
   const retrieved = typeof data.diambil === "string" ? new Date(data.diambil) : null;
   if (!retrieved || Number.isNaN(retrieved.getTime())) return null;
   const accessibility: Accessibility = { entrance: null, restroom: null, parking: null, seating: null };
@@ -90,7 +102,9 @@ export function storedGoogle(value: unknown): StoredGoogleHint | null {
  * yang sudah ditampilkan kartu kandidat.
  */
 export function storedOsm(value: unknown, ownWheelchair: string | null): StoredOsmHint | null {
-  const wheelchair = record(value)?.wheelchair;
+  const data = record(value);
+  if (data && checked(data)) return null;
+  const wheelchair = data?.wheelchair;
   if (typeof wheelchair !== "string" || !(OSM_WHEELCHAIR as readonly string[]).includes(wheelchair) || wheelchair === ownWheelchair) return null;
   return { provider: "openstreetmap", result: "stored", wheelchair: wheelchair as StoredOsmHint["wheelchair"] };
 }

@@ -31,6 +31,10 @@ describe("assistantPrompt", () => {
     expect(prompt).toContain("Jangan memberi saran medis");
     expect(prompt).toContain("juga bila titik awal belum dipilih");
     expect(prompt).toContain("jangan menyebut nomor telepon dari ingatan");
+    // ADR-0058: tidak ada klaim pemeriksaan di lokasi, dan Street View tidak disebut.
+    expect(prompt).toContain("Jangan pernah mengatakan ada orang yang datang atau memeriksa langsung di lokasi");
+    expect(prompt).toContain("tim memeriksanya dari foto");
+    expect(prompt).not.toMatch(/street view/i);
   });
 
   it("is the prompt of the assistant profile", () => {

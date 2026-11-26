@@ -1,7 +1,7 @@
 // Skema Drizzle untuk model data PRD bagian 9. Nama tabel dan kolom dalam bahasa Inggris; nilai enum
 // memakai istilah produk (ADR di akses-bogor-docs) supaya sama dengan yang dibaca tim dan pengguna.
 import { sql } from "drizzle-orm";
-import { bigint, bigserial, boolean, check, customType, geometry, index, integer, jsonb, pgEnum, pgTable, primaryKey, smallint, text, timestamp, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
+import { bigint, bigserial, boolean, check, customType, date, geometry, index, integer, jsonb, pgEnum, pgTable, primaryKey, smallint, text, timestamp, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
 
 // ADR-0004
 export const placeCategory = pgEnum("place_category", ["kampus", "masjid", "halte", "rumah_sakit"]);
@@ -28,6 +28,8 @@ export const rejectionReason = pgEnum("rejection_reason", [
 // ADR-0023
 export const photoTag = pgEnum("photo_tag", ["pintu_masuk", "toilet_difabel", "guiding_block", "lift", "lainnya"]);
 export const photoModeration = pgEnum("photo_moderation", ["menunggu", "tayang", "disembunyikan"]);
+// ADR-0057: data tempat dan foto dari laporan warga, atau dari bukti Street View
+export const verificationSource = pgEnum("verification_source", ["laporan", "street_view"]);
 // ADR-0039
 export const reportEmailKind = pgEnum("report_email_kind", ["diterbitkan", "ditolak", "klarifikasi"]);
 
@@ -83,10 +85,21 @@ export const places = pgTable(
     /** Tempat yang diturunkan admin, dengan alasannya, tidak tampil di route publik mana pun (ADR-0051). */
     unpublishedAt: timestamp("unpublished_at", { withTimezone: true }),
     unpublishedReason: varchar("unpublished_reason", { length: 500 }),
+    /**
+     * Asal data terakhir: laporan warga (lewat verifikator atau admin), atau bukti Street View (ADR-0057). Publik melihat
+     * "Diverifikasi dari Street View · gambar <bulan tahun>" untuk `street_view`, tidak pernah "Diverifikasi" saja.
+     */
+    verificationSource: verificationSource("verification_source").notNull().default("laporan"),
+    /** Bulan gambar Street View yang menjadi bukti, disimpan sebagai tanggal 1 bulan itu. Terisi hanya untuk `street_view`. */
+    streetViewImageDate: date("street_view_image_date", { mode: "string" }),
     ...timestamps,
   },
   (t) => [
     check("places_unpublished_with_reason", sql`(${t.unpublishedAt} IS NULL) = (${t.unpublishedReason} IS NULL)`),
+    check(
+      "places_street_view_image_date",
+      sql`(${t.verificationSource} = 'street_view') = (${t.streetViewImageDate} IS NOT NULL) AND (${t.streetViewImageDate} IS NULL OR extract(day from ${t.streetViewImageDate}) = 1)`,
+    ),
     index("places_location_idx").using("gist", t.location),
     index("places_name_trgm_idx").using("gin", t.name.op("gin_trgm_ops")),
     index("places_category_idx").on(t.category),
@@ -280,13 +293,18 @@ export const photos = pgTable(
     blurRegions: jsonb("blur_regions").$type<BlurRegion[]>(),
     /** Klarifikasi yang jawabannya membawa foto ini; kosong untuk foto dari laporan awal (ADR-0036). */
     clarificationId: uuid("clarification_id").references(() => reportClarifications.id, { onDelete: "set null" }),
+    /** Foto `street_view` dipasang langsung ke tempat oleh alat verifikasi, tanpa laporan dan tanpa pengunggah (ADR-0057). */
+    source: verificationSource("source").notNull().default("laporan"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     index("photos_place_idx").on(t.placeId),
     index("photos_report_idx").on(t.reportId),
     index("photos_uploader_idx").on(t.uploaderId),
-    check("photos_report_or_uploader", sql`(${t.reportId} IS NULL) = (${t.uploaderId} IS NOT NULL)`),
+    check(
+      "photos_report_or_uploader",
+      sql`(${t.reportId} IS NULL) = (${t.uploaderId} IS NOT NULL) OR (${t.source} = 'street_view' AND ${t.reportId} IS NULL AND ${t.uploaderId} IS NULL)`,
+    ),
   ],
 );
 

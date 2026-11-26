@@ -1,6 +1,6 @@
 // Skema Zod untuk route kelola tempat oleh admin (ADR-0051). Skema ini juga menjadi API spec (docs/openapi.json).
 import { z } from "zod";
-import { facilityAnswer, facilityKind, placeCategory, placeStatus, unavailableReason } from "../db/schema.js";
+import { facilityAnswer, facilityKind, placeCategory, placeStatus, unavailableReason, verificationSource } from "../db/schema.js";
 import { photo } from "../places/schemas.js";
 import { facilityInput, line, paragraph, photoInput, point } from "../reports/schemas.js";
 
@@ -14,7 +14,10 @@ export const adminPlaceQuery = z.object({
   category: category.optional(),
   district: z.string().max(40).optional().describe("Slug kecamatan"),
   status: status.optional(),
-  origin: z.enum(["tim", "admin"]).optional().describe("`tim`: terakhir diterbitkan verifikator. `admin`: dibuat, diubah, atau diterbitkan langsung oleh admin"),
+  origin: z
+    .enum(["tim", "admin", "street_view"])
+    .optional()
+    .describe("`tim`: terakhir diterbitkan verifikator dari laporan. `admin`: dibuat, diubah, atau diterbitkan langsung oleh admin. `street_view`: diverifikasi dari bukti Street View (ADR-0057, ADR-0058)"),
   published: z.enum(["ya", "tidak"]).optional().describe("`ya`: masih tayang. `tidak`: diturunkan. Kosong: semua"),
   limit: z.coerce.number().int().min(1).max(100).default(25),
   offset: z.coerce.number().int().min(0).default(0),
@@ -29,6 +32,8 @@ export const adminPlaceItem = z.object({
   status,
   summary: z.object({ available: z.number().int(), relevant: z.number().int(), unknown: z.number().int() }),
   verifiedBy: z.enum(["tim", "admin"]),
+  verificationSource: z.enum(verificationSource.enumValues).describe("`street_view`: diverifikasi dari bukti Street View (ADR-0057)"),
+  streetViewImageDate: z.string().nullable().describe("Bulan gambar Street View, `YYYY-MM`"),
   lastVerifiedAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
   published: z.boolean(),

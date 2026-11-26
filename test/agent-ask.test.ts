@@ -224,6 +224,7 @@ describe("askAgent", () => {
     expect(model.next).toHaveBeenCalledTimes(1);
     expect(result.answer).toBe("Ini kartunya.");
     expect(result.cards).toMatchObject([{ type: "tempat", target: { kind: "aksesbogor", placeId: halteId }, status: "sebagian" }]);
+    expect(result.cards[0]).not.toHaveProperty("verificationSource");
   });
 
   it("rejects a card call without exactly one target", async () => {
