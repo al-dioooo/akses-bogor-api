@@ -209,8 +209,13 @@ const rowsOf = <T>(result: unknown) => (result as { rows: T[] }).rows;
 /**
  * Mencocokkan `places` ke `osm_places` dan menulis tag yang `baru` atau `diperbarui`, dalam satu transaksi. Dengan
  * `dryRun`, tidak ada yang ditulis. Hanya baris OSM yang sudah ada yang diubah, dan hanya tag `aksesbogor:google_maps`-nya.
+ * Kandidat di `exclude` (mis. "node/123"), yaitu pasangan yang salah menurut pemeriksa dry run, tidak pernah dipasangkan.
  */
-export async function importGoogleMaps(db: Db, places: readonly GooglePlace[], options: { dryRun: boolean; replaceOtherMethods?: boolean }): Promise<ImportReport> {
+export async function importGoogleMaps(
+  db: Db,
+  places: readonly GooglePlace[],
+  options: { dryRun: boolean; replaceOtherMethods?: boolean; exclude?: ReadonlySet<string> },
+): Promise<ImportReport> {
   return db.transaction(async (tx) => {
     const points = JSON.stringify(places.map((place, i) => ({ i, lat: place.location.lat, lng: place.location.lng })));
     const nearby = rowsOf<{ place: number; osm_type: string; osm_id: number | string; category: PlaceCategory; name: string; meters: number }>(
@@ -220,7 +225,9 @@ export async function importGoogleMaps(db: Db, places: readonly GooglePlace[], o
         FROM jsonb_to_recordset(${points}::jsonb) AS g(i int, lat float8, lng float8)
         JOIN osm_places o ON o.source_id = ${FACILITIES_SOURCE_ID} AND o.name IS NOT NULL
           AND ST_DWithin(o.location::geography, ST_SetSRID(ST_MakePoint(g.lng, g.lat), 4326)::geography, ${MATCH_METERS})`),
-    ).map((r) => ({ place: Number(r.place), osmType: r.osm_type, osmId: Number(r.osm_id), category: r.category, name: r.name, meters: Number(r.meters) }));
+    )
+      .map((r) => ({ place: Number(r.place), osmType: r.osm_type, osmId: Number(r.osm_id), category: r.category, name: r.name, meters: Number(r.meters) }))
+      .filter((row) => !options.exclude?.has(`${row.osmType}/${row.osmId}`));
     const { matches, unmatched } = matchPlaces(places, nearby);
     if (matches.length === 0) return { matches: [], unmatched, written: 0 };
 

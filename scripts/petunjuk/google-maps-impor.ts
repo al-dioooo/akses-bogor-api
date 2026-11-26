@@ -5,6 +5,7 @@
 //   pnpm petunjuk:google-impor <berkas.json> --dry-run
 //   pnpm petunjuk:google-impor <berkas.json>
 //
+// --kecuali node/123,way/456 tidak memasangkan kandidat itu (pasangan yang salah di dry run).
 // --timpa-cara-lain juga mengganti salinan dari cara lain (mis. salinan 2026-11-23) yang belum diperiksa tim.
 // Salinan yang sudah diperiksa tim tidak pernah diganti.
 import { readdir, readFile } from "node:fs/promises";
@@ -17,8 +18,16 @@ import { importGoogleMaps, MATCH_METERS, parseApifyItems, summarize, type Unmatc
 
 const { values, positionals } = parseArgs({
   allowPositionals: true,
-  options: { "dry-run": { type: "boolean", default: false }, "timpa-cara-lain": { type: "boolean", default: false } },
+  options: { "dry-run": { type: "boolean", default: false }, "timpa-cara-lain": { type: "boolean", default: false }, kecuali: { type: "string", default: "" } },
 });
+
+/** Kandidat dari `--kecuali`, mis. "node/123,way/456". */
+function excluded(value: string) {
+  const refs = value.split(",").map((ref) => ref.trim()).filter(Boolean);
+  const wrong = refs.filter((ref) => !/^(node|way|relation)\/\d+$/.test(ref));
+  if (wrong.length > 0) throw new Error(`--kecuali berisi kandidat OSM, mis. node/123: ${wrong.join(", ")}`);
+  return new Set(refs);
+}
 
 const REASONS: Record<Unmatched["reason"], string> = {
   kategori: "kategori Google bukan kampus, masjid, halte, atau rumah sakit",
@@ -41,9 +50,10 @@ async function main() {
   const meta = await readFile(path.replace(/\.json$/, ".meta.json"), "utf8").then((t) => JSON.parse(t) as { selesai?: string }, () => null);
   const { places, skipped } = parseApifyItems(items, meta?.selesai ? new Date(meta.selesai) : undefined);
   const dryRun = values["dry-run"];
+  const exclude = excluded(values.kecuali);
 
   const { db, pool } = createDb(loadEnv().DATABASE_URL);
-  const report = await importGoogleMaps(db, places, { dryRun, replaceOtherMethods: values["timpa-cara-lain"] }).finally(() => pool.end());
+  const report = await importGoogleMaps(db, places, { dryRun, replaceOtherMethods: values["timpa-cara-lain"], exclude }).finally(() => pool.end());
   const summary = summarize(report);
 
   for (const m of report.matches) {
@@ -52,7 +62,7 @@ async function main() {
   for (const u of report.unmatched) console.log(`${u.reason === "ambigu" ? "ambigu " : "tidak  "} "${u.place.name}" (${u.place.categories[0] ?? "tanpa kategori"}): ${REASONS[u.reason]}`);
 
   const total = Array.isArray(items) ? items.length : 0;
-  console.log(`\nBerkas: ${path}`);
+  console.log(`\nBerkas: ${path}${exclude.size > 0 ? ` (dikecualikan: ${[...exclude].join(", ")})` : ""}`);
   console.log(`${total} hasil, ${places.length} tempat Google. Dibuang: ${skipped.incomplete} tanpa nama, titik, atau waktu ambil; ${skipped.closed} tutup permanen; ${skipped.duplicates} ganda.`);
   console.log(`Cocok: ${report.matches.length}. Ambigu: ${summary.reasons.ambigu}. Tidak cocok: ${summary.reasons.kategori + summary.reasons.jarak + summary.reasons.nama} (kategori lain ${summary.reasons.kategori}, jarak ${summary.reasons.jarak}, nama ${summary.reasons.nama}).`);
   for (const [category, c] of summary.categories) {

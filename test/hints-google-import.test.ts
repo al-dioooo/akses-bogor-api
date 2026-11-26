@@ -152,6 +152,12 @@ describe("importGoogleMaps", () => {
     expect({ tags: await tags(), counts: await counts() }).toEqual(before);
   });
 
+  it("never pairs a candidate the reviewer excluded", async () => {
+    const report = await importGoogleMaps(db, places, { dryRun: true, exclude: new Set(["node/2", "way/999"]) });
+    expect(report.matches.some((m) => m.osm.osmId === 2)).toBe(false);
+    expect(report.unmatched.find((u) => u.place.placeId === "palsu-2")?.reason).toBe("ambigu");
+  });
+
   it("writes only new copies that the hints route can read, without adding places", async () => {
     const before = await counts();
     const report = await importGoogleMaps(db, places, { dryRun: false });
