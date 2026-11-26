@@ -139,6 +139,16 @@ describe("publishing change reports (FR-27)", () => {
     expect(Object.keys(entry!.changes as object).sort()).toEqual(["description", "facilities", "laporan", "name", "status"]);
   });
 
+  it("turns a street view place back into a report place once a report is published (ADR-0057)", async () => {
+    const placeId = await rig.placeId("Kampus Contoh A");
+    await rig.db.update(places).set({ verificationSource: "street_view", streetViewImageDate: "2026-01-01" }).where(eq(places.id, placeId));
+    const id = await rig.submit(reporter.token, { kind: "kekurangan", placeId, facilities: facilities({ ramp: { answer: "tersedia" } }) });
+    const res = await publish(id, { placeVersion: (await review(id)).place.version, description: null, facilities: checked({ ramp: { answer: "tersedia" } }) });
+    expect(res.statusCode).toBe(200);
+    const [place] = await rig.db.select().from(places).where(eq(places.id, placeId));
+    expect(place).toMatchObject({ verificationSource: "laporan", streetViewImageDate: null });
+  });
+
   it("keeps name, category, point, and landmark for Laporkan kekurangan", async () => {
     const placeId = await rig.placeId("Halte contoh");
     const id = await rig.submit(reporter.token, { kind: "kekurangan", placeId, facilities: facilities({ ramp: { answer: "tersedia" }, lift: { answer: "tidak_tersedia", reason: "rusak" } }) });
