@@ -12,7 +12,10 @@ import { currentSession, needsCompletion, requireSession } from "../auth/session
 import { osmFeatureKind } from "../db/schema.js";
 import { prioritySchema } from "./districts.js";
 import { HttpError, errorSchema } from "../http/errors.js";
+import { accessibleRoute, type AccessibleRouteContext } from "../map/accessible-route.js";
+import type { WayFlagsSource } from "../map/accessible-ways.js";
 import type { WalkingRouter } from "../map/directions.js";
+import { ACCESSIBLE_PROFILES, type AccessibleRouter } from "../map/valhalla.js";
 import { routeObstacles, walkingRoute, type RouteContext } from "../map/walking-route.js";
 
 const TAG_AGENT = "Agen rute";
@@ -22,6 +25,8 @@ const HOUR_MS = 60 * 60 * 1000;
 export const AGENT_CALLS_PER_HOUR = 120;
 /** Rute jalan kaki per akun per jam; setiap rute memakai satu permintaan Mapbox Directions. */
 export const WALKING_ROUTES_PER_HOUR = 30;
+/** Rute OpenStreetMap per akun per jam; Valhalla berjalan di host sendiri, jadi batas ini menjaga beban server. */
+export const ACCESSIBLE_ROUTES_PER_HOUR = 30;
 
 export type AgentRouteOptions = {
   /** Kosong bila `BETTER_AUTH_SECRET` belum diatur di production. */
@@ -30,6 +35,8 @@ export type AgentRouteOptions = {
   enabled: boolean;
   /** Kosong bila `MAPBOX_SECRET_TOKEN` belum diatur. */
   walking?: WalkingRouter;
+  /** Kosong bila `ACCESSIBLE_ROUTER_URL` belum diatur: `POST /route/accessible` menjawab 503 (ADR-0055). */
+  accessible?: { router: AccessibleRouter; ways?: WayFlagsSource };
   /** `DISABILITY_DATA_ENABLED`: alat prioritas kecamatan boleh memakai data disabilitas (ADR-0043). */
   disabilityData?: boolean;
   /** Model agen (`provider.ts`); kosong bila OpenRouter dipilih tanpa API key, dan `POST /agent/ask` menjawab sibuk. */
@@ -55,7 +62,7 @@ const definitions = z.object({
 });
 
 const location = z.object({ lat: z.number(), lng: z.number() });
-const walkingBody = z
+const routeTarget = z
   .object({
     from: z
       .object({ lat: z.number().min(-90).max(90).describe("Lintang (derajat, WGS 84)"), lng: z.number().min(-180).max(180).describe("Bujur (derajat, WGS 84)") })
@@ -65,8 +72,9 @@ const walkingBody = z
       .object({ type: z.enum(["node", "way", "relation"]), id: z.number().int() })
       .optional()
       .describe("Atau tempat OpenStreetMap tanpa data AksesBogor, dari kartu rute agen untuk kontributor (ADR-0043)"),
-  })
-  .refine((body) => Boolean(body.placeId) !== Boolean(body.osm), { message: "Isi placeId atau osm, salah satu" });
+  });
+const oneTarget = (body: { placeId?: string; osm?: unknown }) => Boolean(body.placeId) !== Boolean(body.osm);
+const walkingBody = routeTarget.refine(oneTarget, { message: "Isi placeId atau osm, salah satu" });
 const walkingResponse = z.object({
   destination: z.object({
     placeId: z.uuid().nullable(),
@@ -84,8 +92,25 @@ const walkingResponse = z.object({
   warning: z.string().describe("Kalimat peringatan tetap yang selalu ditampilkan bersama rute"),
   attribution: z.string(),
 });
+const accessibleBody = routeTarget
+  .extend({ profil: z.enum(ACCESSIBLE_PROFILES).describe("`kursi_roda`: tanpa tangga dan lebih memilih trotoar. `jalan_kaki`: pejalan kaki biasa") })
+  .refine(oneTarget, { message: "Isi placeId atau osm, salah satu" });
+const accessibleResponse = walkingResponse.omit({ warning: true }).extend({
+  profil: z.enum(ACCESSIBLE_PROFILES),
+  coverage: z
+    .object({
+      sidewalkPercent: z.number().int().nullable().describe("Persen panjang rute di jalur pejalan kaki atau jalan yang trotoarnya tercatat di OSM"),
+      surfacePercent: z.number().int().nullable().describe("Persen panjang rute yang jenis permukaannya tercatat"),
+      crossings: z.number().int().nullable().describe("Jalur penyeberangan OSM yang dilewati"),
+      crossingsWithKerb: z.number().int().nullable().describe("Penyeberangan yang kerb-nya tercatat"),
+      dataDate: z.string().nullable().describe("Tanggal ekstrak OSM yang dipakai"),
+    })
+    .describe("Cakupan data OSM di sepanjang rute; null bila tidak bisa dihitung"),
+  warnings: z.array(z.object({ code: z.string(), message: z.string() })).describe("Peringatan untuk ditampilkan bersama rute, urut dari hambatan lalu kekurangan data"),
+  note: z.string().describe("Label tetap: rute dihitung dari data OpenStreetMap dan kondisi lapangan bisa berbeda"),
+});
 const obstaclesBody = z.object({
-  polyline: z.string().min(2).max(60_000).describe("Nilai `polyline` dari POST /route/walking"),
+  polyline: z.string().min(2).max(60_000).describe("Nilai `polyline` dari POST /route/walking atau POST /route/accessible"),
   bufferMeters: z.number().int().min(5).max(50).optional().describe("Jarak paling jauh dari garis rute, dalam meter; bawaan 20"),
 });
 const obstaclesResponse = z.object({
@@ -157,6 +182,8 @@ export const agentRoutes: FastifyPluginAsyncZod<AgentRouteOptions> = async (app,
   const questionLimit = opts.accountQuestions ?? dailyLimit(QUESTIONS_PER_ACCOUNT_PER_DAY, opts.now, 7);
   const busy = () => new HttpError(503, "agen_sibuk", "Agen sedang sibuk, coba lagi nanti.");
   const walkingLimit = limit("agen-rute", WALKING_ROUTES_PER_HOUR);
+  const accessibleLimit = limit("rute-aksesibel", ACCESSIBLE_ROUTES_PER_HOUR);
+  const accessibleCtx: AccessibleRouteContext = { db: app.db, now: opts.now, router: opts.accessible?.router, ways: opts.accessible?.ways };
 
   /** Batas per akun, atau per IP untuk pengunjung asisten rute publik. */
   const checkLimits = async (request: FastifyRequest, reply: FastifyReply, limits: ReturnType<typeof limit>[]) => {
@@ -236,6 +263,25 @@ export const agentRoutes: FastifyPluginAsyncZod<AgentRouteOptions> = async (app,
     async (request, reply) => {
       await routeCaller(request, reply, [agentLimit, walkingLimit]);
       return walkingRoute(routeCtx, request.body);
+    },
+  );
+
+  app.post(
+    "/route/accessible",
+    {
+      schema: {
+        tags: [TAG_ROUTE],
+        summary: "Rute pejalan kaki dari data OpenStreetMap",
+        description: `Rute dari Valhalla di server AksesBogor sendiri, dengan data OpenStreetMap Kota Bogor (ADR-0055): profil \`kursi_roda\` (tanpa tangga, lebih memilih trotoar dan jalur pejalan kaki) atau \`jalan_kaki\`. Jawabannya memuat jarak, waktu, langkah dalam bahasa Indonesia, garis rute, cakupan data trotoar, permukaan, dan kerb, peringatan, label tetap \`note\`, dan atribusi OSM. Rute tidak pernah dijamin bisa dilewati. Menjawab 503 \`rute_aksesibel_belum_aktif\` selama \`ACCESSIBLE_ROUTER_URL\` kosong; API tidak menggantinya dengan rute Mapbox. 422 \`tanpa_rute_kursi_roda\` bila profil kursi roda tidak menemukan jalur. Posisi dibulatkan ke 4 desimal, harus di dalam Kota Bogor dan paling jauh 10 km dari tujuan, dan tidak disimpan. Dipanggil browser pengguna sendiri dan hasilnya hanya ditampilkan kepadanya; tidak pernah dikirim ke model.\n\n${COMMON} ${VISITORS} Batas tambahan ${ACCESSIBLE_ROUTES_PER_HOUR} rute per akun atau per IP per jam.`,
+        body: accessibleBody,
+        response: { 200: accessibleResponse, ...errors },
+      },
+    },
+    async (request, reply) => {
+      // Diperiksa sebelum batas pemakaian, supaya web bisa tahu fitur ini mati tanpa memakai jatah.
+      if (!opts.accessible) throw new HttpError(503, "rute_aksesibel_belum_aktif", "Rute dari data OpenStreetMap belum diatur di server.");
+      await routeCaller(request, reply, [agentLimit, accessibleLimit]);
+      return accessibleRoute(accessibleCtx, request.body);
     },
   );
 
