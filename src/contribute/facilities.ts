@@ -87,9 +87,19 @@ export type OsmTarget = { osmType: string; osmId: number };
 export type ContributionPlace = { osm: OsmTarget; name: string | null; category: PlaceCategory; district: { slug: string; name: string } };
 type CandidateRow = { osm_type: string; osm_id: number | string; name: string | null; category: PlaceCategory; slug: string; district: string };
 
-/** Syarat SQL: tidak ada lokasi AksesBogor berkategori sama dalam `SAME_PLACE_METERS` dari tempat OSM `o`. */
+/**
+ * Tag kandidat yang disembunyikan alat verifikasi Street View atas permintaan eksplisit (ADR-0057). Kandidat itu hilang
+ * dari Peta, daftar kandidat, hitungan kecamatan, dan alat agen, sampai tagnya dihapus `--batalkan`.
+ */
+export const HIDDEN_CANDIDATE_TAG = "aksesbogor:kandidat_disembunyikan";
+const hiddenCandidate = sql`o.tags ? ${HIDDEN_CANDIDATE_TAG}`;
+
+/**
+ * Syarat SQL: tempat OSM `o` tampil sebagai kandidat, yaitu tidak disembunyikan dan tidak ada lokasi AksesBogor
+ * berkategori sama dalam `SAME_PLACE_METERS` darinya.
+ */
 // Lokasi yang diturunkan admin tidak dihitung, jadi kandidat OSM di dekatnya tampil lagi (ADR-0051).
-export const withoutAksesBogorData = sql`NOT EXISTS (SELECT 1 FROM places p WHERE p.unpublished_at IS NULL AND p.category = o.category AND ST_DWithin(p.location::geography, o.location::geography, ${SAME_PLACE_METERS}))`;
+export const withoutAksesBogorData = sql`NOT (${hiddenCandidate}) AND NOT EXISTS (SELECT 1 FROM places p WHERE p.unpublished_at IS NULL AND p.category = o.category AND ST_DWithin(p.location::geography, o.location::geography, ${SAME_PLACE_METERS}))`;
 
 /**
  * Tempat OSM yang belum punya data AksesBogor, bisa dibatasi kecamatan dan kategori. Urutannya mengikuti `districtOrder`
@@ -116,7 +126,7 @@ export async function getOsmPlace(db: Db, target: OsmTarget) {
     await db.execute(sql`
       SELECT o.osm_type, o.osm_id, o.name, o.category, d.slug, d.name AS district, ST_Y(o.location) AS lat, ST_X(o.location) AS lng, NOT (${withoutAksesBogorData}) AS has_data
       FROM osm_places o JOIN districts d ON d.slug = o.district_slug
-      WHERE o.osm_type = ${target.osmType} AND o.osm_id = ${target.osmId}`),
+      WHERE o.osm_type = ${target.osmType} AND o.osm_id = ${target.osmId} AND NOT (${hiddenCandidate})`),
   );
   if (!row) return null;
   return {

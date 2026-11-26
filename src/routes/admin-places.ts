@@ -161,7 +161,7 @@ export const adminPlaceRoutes: FastifyPluginAsyncZod<AdminPlaceRouteOptions> = a
     },
     async (request, reply) => {
       const user = await admin(request);
-      await unpublishPlace(app.db, user.id, request.params.id, request.body.reason, opts.now());
+      await unpublishPlace(app.db, { userId: user.id }, request.params.id, request.body.reason, opts.now());
       return reply.code(204).send(null);
     },
   );
@@ -180,7 +180,7 @@ export const adminPlaceRoutes: FastifyPluginAsyncZod<AdminPlaceRouteOptions> = a
     },
     async (request, reply) => {
       const user = await admin(request);
-      await restorePlace(app.db, user.id, request.params.id, request.body.reason, opts.now());
+      await restorePlace(app.db, { userId: user.id }, request.params.id, request.body.reason, opts.now());
       return reply.code(204).send(null);
     },
   );
