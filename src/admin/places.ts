@@ -5,7 +5,7 @@ import { withoutAksesBogorData } from "../contribute/facilities.js";
 import type { Db } from "../db/client.js";
 import { auditLog, districts, placeFacilities, places, users } from "../db/schema.js";
 import { HttpError } from "../http/errors.js";
-import { publishedPhotosOf, toPhoto, verifiedBy, type ReadOptions } from "../places/queries.js";
+import { imageMonth, publishedPhotosOf, toPhoto, verifiedBy, type ReadOptions } from "../places/queries.js";
 import type { AdminPlaceQuery } from "./schemas.js";
 
 const escapeLike = (value: string) => value.replace(/[\\%_]/g, (c) => `\\${c}`);
@@ -36,6 +36,8 @@ const itemColumns = {
   unknown: places.facilitiesUnknown,
   lastVerifiedAt: places.lastVerifiedAt,
   adminPublishedAt: places.adminPublishedAt,
+  verificationSource: places.verificationSource,
+  streetViewImageDate: places.streetViewImageDate,
   updatedAt: places.updatedAt,
   unpublishedAt: places.unpublishedAt,
   unpublishedReason: places.unpublishedReason,
@@ -53,6 +55,8 @@ type ItemRow = {
   unknown: number;
   lastVerifiedAt: Date;
   adminPublishedAt: Date | null;
+  verificationSource: (typeof places.verificationSource.enumValues)[number];
+  streetViewImageDate: string | null;
   updatedAt: Date;
   unpublishedAt: Date | null;
   unpublishedReason: string | null;
@@ -66,6 +70,8 @@ const toItem = (r: ItemRow) => ({
   status: r.status,
   summary: { available: r.available, relevant: r.relevant, unknown: r.unknown },
   verifiedBy: verifiedBy(r.adminPublishedAt),
+  verificationSource: r.verificationSource,
+  streetViewImageDate: imageMonth(r.streetViewImageDate),
   lastVerifiedAt: iso(r.lastVerifiedAt)!,
   updatedAt: iso(r.updatedAt)!,
   published: r.unpublishedAt === null,

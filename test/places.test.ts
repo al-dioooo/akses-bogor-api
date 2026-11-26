@@ -10,6 +10,7 @@ let app: Awaited<ReturnType<typeof buildApp>>;
 let close: () => Promise<void>;
 let halteId: string;
 let halteBId: string;
+let masjidBId: string;
 
 beforeAll(async () => {
   const test = await createTestDb();
@@ -33,6 +34,13 @@ beforeAll(async () => {
     photo("laporan/halte/pintu masuk.jpg", "pintu_masuk", "tayang"),
     photo("laporan/halte/wajah.jpg", "pintu_masuk", "disembunyikan"),
   ]);
+  // Masjid contoh B was verified from Street View evidence (ADR-0057), with one Street View photo and no report.
+  masjidBId = await byName("Masjid contoh B");
+  await db.update(places).set({ verificationSource: "street_view", streetViewImageDate: "2026-01-01" }).where(eq(places.id, masjidBId));
+  await db.insert(photos).values({
+    placeId: masjidBId, source: "street_view", storageKey: "lokasi/masjid-b/sv.webp", tag: "pintu_masuk", moderation: "tayang",
+    altText: "Pintu masuk Masjid contoh B dilihat dari jalan", caption: "Sumber: Google Street View, gambar Januari 2026", width: 1280, height: 800, bytes: 90_000,
+  });
   const env = loadEnv({ NODE_ENV: "test", DATABASE_URL: "postgresql://test@localhost/test", PHOTO_PUBLIC_URL: "https://foto.aksesbogor.id/" });
   app = await buildApp(env, { db, now: () => new Date("2026-10-26T00:00:00Z") });
   await app.ready();
@@ -158,6 +166,19 @@ describe("GET /places/:id", () => {
   it("flags places last verified more than 12 months ago (FR-38)", async () => {
     const { body } = await get(`/places/${halteBId}`);
     expect(body).toMatchObject({ status: "belum_diketahui", needsRecheck: true });
+  });
+
+  it("names the verification source and the street view image month (ADR-0057)", async () => {
+    const report = await get(`/places/${halteId}`);
+    expect(report.body).toMatchObject({ verificationSource: "laporan", streetViewImageDate: null });
+    expect(report.body.photos[0].source).toBe("laporan");
+    const streetView = await get(`/places/${masjidBId}`);
+    expect(streetView.body).toMatchObject({ verificationSource: "street_view", streetViewImageDate: "2026-01", verifiedBy: "tim" });
+    expect(streetView.body.photos).toEqual([
+      expect.objectContaining({ source: "street_view", tag: "pintu_masuk", caption: "Sumber: Google Street View, gambar Januari 2026" }),
+    ]);
+    const list = await get("/places?q=Masjid%20contoh%20B");
+    expect(list.body.items[0]).toMatchObject({ verificationSource: "street_view", streetViewImageDate: "2026-01", coverPhoto: { source: "street_view" } });
   });
 
   it("answers 404 for an unknown place and 400 for a malformed id", async () => {
