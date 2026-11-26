@@ -17,6 +17,8 @@ export const SILOAM: Ref = { type: "node", id: 4994301869, lat: -6.5955895, lng:
 export const PMI: Ref = { type: "way", id: 782982224, lat: -6.598455, lng: 106.8060592 };
 export const ATTAQWA: Ref = { type: "node", id: 14096317881, lat: -6.5439664, lng: 106.8133994 };
 export const KESATUAN: Ref = { type: "way", id: 158830244, lat: -6.6064527, lng: 106.7991792 };
+/** Kampus Kesatuan Gedung B, kandidat lain sekitar 32 m dari gedung STIE Kesatuan. Hanya dimuat bila diminta. */
+export const KESATUAN_B: Ref = { type: "way", id: 304211992, lat: -6.606165, lng: 106.79919 };
 export const ref = (r: Ref) => `${r.type}/${r.id}`;
 
 const point = (r: Ref) => (r.type === "node" ? { lat: r.lat, lon: r.lng } : { center: { lat: r.lat, lon: r.lng } });
@@ -26,6 +28,7 @@ const ELEMENTS: OverpassElement[] = [
   { type: "node", id: ATTAQWA.id, ...point(ATTAQWA), tags: { amenity: "place_of_worship", religion: "muslim", name: "Masjid Attaqwa VBI", wheelchair: "limited" } },
   { type: "way", id: KESATUAN.id, ...point(KESATUAN), tags: { amenity: "college", name: "STIE Kesatuan Bogor", wheelchair: "no" } },
 ];
+export const KESATUAN_B_ELEMENT: OverpassElement = { type: "way", id: KESATUAN_B.id, ...point(KESATUAN_B), tags: { amenity: "college", name: "Kampus Kesatuan Gedung B" } };
 
 export const GOOGLE_COPY = {
   sumber: "Google Maps",
@@ -43,10 +46,10 @@ export const OSM_NOTE = { wheelchair: "yes", arti: "bisa dimasuki kursi roda" };
 const GOOGLE = "aksesbogor:google_maps";
 const NOTE = "aksesbogor:osm_aksesibilitas";
 
-export async function streetViewRig() {
+export async function streetViewRig(extra: OverpassElement[] = []) {
   const { db, close } = await createTestDb();
   await seedSampleData(db);
-  await loadFacilities(db, parseFacilities({ elements: ELEMENTS }), { url: "https://overpass.contoh/api", retrievedAt: new Date("2026-11-22T00:00:00Z"), sha256: "0".repeat(64) });
+  await loadFacilities(db, parseFacilities({ elements: [...ELEMENTS, ...extra] }), { url: "https://overpass.contoh/api", retrievedAt: new Date("2026-11-22T00:00:00Z"), sha256: "0".repeat(64) });
 
   const tag = (r: Ref, key: string, value: unknown) =>
     db.execute(sql`UPDATE osm_places SET tags = tags || jsonb_build_object(${key}::text, ${JSON.stringify(value)}::jsonb) WHERE osm_type = ${r.type} AND osm_id = ${r.id}`);
