@@ -241,6 +241,7 @@ Produksi berjalan di Evergarden, VM Ubuntu 24.04 di OCI region Batam, dan dibuka
 | Database | PostgreSQL 17 + PostGIS dari PGDG, cluster `17/main` di port 5433, koneksi lewat Unix socket dengan autentikasi peer |
 | Cadangan | `akses-bogor-backup.timer` pukul 02.30 WIB menjalankan [deploy/backup.sh](deploy/backup.sh); dump di `/var/backups/akses-bogor` |
 | Tunnel | Public hostname di dashboard Cloudflare Zero Trust, diarahkan ke `http://127.0.0.1:8090` |
+| Rute OpenStreetMap | `akses-bogor-valhalla.service` (Valhalla di Docker, `127.0.0.1:8002`) dan `akses-bogor-valhalla-ubin.timer` setiap Minggu 03.30 WIB, dari [deploy/valhalla/](deploy/valhalla/). Langkah pasang dan angka memori ada di runbook `operations/valhalla-rute-aksesibel.md` di akses-bogor-docs (ADR-0055) |
 
 ### Rilis
 
