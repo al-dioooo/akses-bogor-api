@@ -11,14 +11,15 @@ import {
   placeAccessibilityForAssistant,
   roundDistance,
   showRoute,
-  streetViewSource,
   TEAM_CHECKED_SOURCE,
   teamCheck,
 } from "../src/agent/assistant-tools.js";
 import type { AgentModel, AgentStep, AgentTurn } from "../src/agent/model.js";
 import { runTool, toolDefinitions } from "../src/agent/registry.js";
 import type { ToolContext } from "../src/agent/tools.js";
+import { eq } from "drizzle-orm";
 import type { Db } from "../src/db/client.js";
+import { places } from "../src/db/schema.js";
 import { seedSampleData } from "../src/db/seed.js";
 import { placesNamed } from "../src/places/queries.js";
 import { createTestDb } from "./helpers/db.js";
@@ -212,11 +213,13 @@ describe("OpenStreetMap candidates", () => {
   });
 });
 
-describe("street view places (ADR-0057)", () => {
-  it("names Street View and the image month as the source instead of a team check", () => {
-    expect(teamCheck({ verifiedBy: "tim", streetViewImageDate: "2026-01" })).toEqual({ checkedByTeam: true, verifiedBy: "tim", source: streetViewSource("2026-01") });
-    expect(streetViewSource("2026-01")).toMatch(/Street View, gambar 2026-01.*bukan pemeriksaan di lokasi/);
-    expect(teamCheck({ verifiedBy: "tim" }).source).toBe(TEAM_CHECKED_SOURCE);
-    expect(teamCheck({ verifiedBy: "admin", streetViewImageDate: null }).source).toBe(ADMIN_PUBLISHED_SOURCE);
+describe("street view places (ADR-0058)", () => {
+  it("presents a street view place as team-checked, without its source or image month", async () => {
+    await db.update(places).set({ verificationSource: "street_view", streetViewImageDate: "2026-01-01" }).where(eq(places.id, halteId));
+    const place = await placeAccessibilityForAssistant(context(), { placeId: halteId });
+    expect(place).toMatchObject({ checkedByTeam: true, verifiedBy: "tim", source: TEAM_CHECKED_SOURCE });
+    expect(JSON.stringify(place)).not.toMatch(/street|verificationSource|streetViewImageDate/i);
+    expect(teamCheck({ verifiedBy: "admin" }).source).toBe(ADMIN_PUBLISHED_SOURCE);
+    await db.update(places).set({ verificationSource: "laporan", streetViewImageDate: null }).where(eq(places.id, halteId));
   });
 });

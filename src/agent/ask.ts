@@ -25,7 +25,7 @@ export const NO_ANSWER =
 
 export type Turn = { role: "user" | "assistant"; content: string };
 export type Source =
-  | { type: "lokasi"; placeId: string; name: string; lastVerifiedAt: string; verifiedBy: "tim" | "admin"; verificationSource: "laporan" | "street_view"; streetViewImageDate: string | null }
+  | { type: "lokasi"; placeId: string; name: string; lastVerifiedAt: string; verifiedBy: "tim" | "admin" }
   | { type: "pengetahuan"; citation: string; title: string; url: string; license: string; attribution: string | null };
 /** Kartu untuk web: tempat, rute (dihitung web dari posisi pengguna), atau prioritas kecamatan. Tidak pernah ke model. */
 export type Card = PlaceCard | RouteCard | ({ type: "prioritas" } & KecamatanPriority);
@@ -86,18 +86,9 @@ export async function askAgent(
   const place = input.placeId ? ((await runTool(ctx, "place_accessibility", { placeId: input.placeId }, profile.tools)) as ChosenPlace) : undefined;
   const seen: Seen = { checkedPlace: place ? hasCheckedPlace(place) : false };
   const sources = new Map<string, Source>();
-  // Bulan gambar Street View ikut, supaya web tidak menulis "terverifikasi" saja untuk data Street View (ADR-0057).
-  type PlaceResult = { id: string; name: string; lastVerifiedAt: string; verifiedBy: "tim" | "admin"; verificationSource?: "laporan" | "street_view"; streetViewImageDate?: string | null };
+  type PlaceResult = { id: string; name: string; lastVerifiedAt: string; verifiedBy: "tim" | "admin" };
   const addPlace = (p: PlaceResult) =>
-    sources.set(`lokasi:${p.id}`, {
-      type: "lokasi",
-      placeId: p.id,
-      name: p.name,
-      lastVerifiedAt: p.lastVerifiedAt,
-      verifiedBy: p.verifiedBy,
-      verificationSource: p.verificationSource ?? "laporan",
-      streetViewImageDate: p.streetViewImageDate ?? null,
-    });
+    sources.set(`lokasi:${p.id}`, { type: "lokasi", placeId: p.id, name: p.name, lastVerifiedAt: p.lastVerifiedAt, verifiedBy: p.verifiedBy });
   let searched = false;
   const addPassages = (passages: KnowledgeHit[]) => {
     searched = true;

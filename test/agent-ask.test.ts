@@ -49,7 +49,7 @@ describe("askAgent", () => {
     expect(result).toEqual({
       answer: "Ramp tersedia (data terverifikasi AksesBogor, diverifikasi 2026-10-18).",
       model: "a/satu:free",
-      sources: [{ type: "lokasi", placeId: halteId, name: "Halte contoh", lastVerifiedAt: "2026-10-18T03:00:00.000Z", verifiedBy: "tim", verificationSource: "laporan", streetViewImageDate: null }],
+      sources: [{ type: "lokasi", placeId: halteId, name: "Halte contoh", lastVerifiedAt: "2026-10-18T03:00:00.000Z", verifiedBy: "tim" }],
       cards: [],
     });
     expect(steps[0]!.system).toContain('"name":"Halte contoh"');
@@ -223,7 +223,8 @@ describe("askAgent", () => {
     const result = await askAgent({ model, ctx: ctx() }, { question: "Tunjukkan Halte contoh" });
     expect(model.next).toHaveBeenCalledTimes(1);
     expect(result.answer).toBe("Ini kartunya.");
-    expect(result.cards).toMatchObject([{ type: "tempat", target: { kind: "aksesbogor", placeId: halteId }, status: "sebagian", verificationSource: "laporan", streetViewImageDate: null }]);
+    expect(result.cards).toMatchObject([{ type: "tempat", target: { kind: "aksesbogor", placeId: halteId }, status: "sebagian" }]);
+    expect(result.cards[0]).not.toHaveProperty("verificationSource");
   });
 
   it("rejects a card call without exactly one target", async () => {

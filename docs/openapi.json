@@ -12591,20 +12591,6 @@
                       ],
                       "description": "`tim`: diterbitkan verifikator dari laporan. `admin`: dibuat, diubah, atau diterbitkan langsung oleh admin tanpa pemeriksaan orang kedua; web menulis \"Diterbitkan langsung oleh admin\", bukan \"Diverifikasi\" (ADR-0051)"
                     },
-                    "verificationSource": {
-                      "type": "string",
-                      "enum": [
-                        "laporan",
-                        "street_view"
-                      ],
-                      "description": "`laporan`: dari laporan warga. `street_view`: dari bukti Street View; web menulis \"Diverifikasi dari Street View · gambar <bulan tahun>\", tidak pernah \"Diverifikasi\" saja (ADR-0057)"
-                    },
-                    "streetViewImageDate": {
-                      "nullable": true,
-                      "description": "Bulan gambar Street View yang menjadi bukti, `YYYY-MM`; terisi hanya untuk `street_view`. `lastVerifiedAt` tempat ini adalah awal bulan itu",
-                      "type": "string",
-                      "pattern": "^\\d{4}-\\d{2}$"
-                    },
                     "landmark": {
                       "nullable": true,
                       "type": "string"
@@ -12720,8 +12706,6 @@
                     "summary",
                     "lastVerifiedAt",
                     "verifiedBy",
-                    "verificationSource",
-                    "streetViewImageDate",
                     "landmark",
                     "description",
                     "facilities",
@@ -14188,19 +14172,6 @@
                                 "admin"
                               ],
                               "description": "`admin`: diterbitkan langsung oleh admin, tanpa pemeriksaan orang kedua (ADR-0051)"
-                            },
-                            "verificationSource": {
-                              "type": "string",
-                              "enum": [
-                                "laporan",
-                                "street_view"
-                              ],
-                              "description": "`street_view`: web menulis \"Diverifikasi dari Street View · gambar <bulan tahun>\" (ADR-0057)"
-                            },
-                            "streetViewImageDate": {
-                              "nullable": true,
-                              "description": "Bulan gambar Street View, `YYYY-MM`",
-                              "type": "string"
                             }
                           },
                           "required": [
@@ -14211,9 +14182,7 @@
                             "district",
                             "status",
                             "lastVerifiedAt",
-                            "verifiedBy",
-                            "verificationSource",
-                            "streetViewImageDate"
+                            "verifiedBy"
                           ],
                           "additionalProperties": false
                         },
@@ -16390,19 +16359,6 @@
                                   "admin"
                                 ],
                                 "description": "`admin`: diterbitkan langsung oleh admin, web tidak menyebutnya terverifikasi (ADR-0051)"
-                              },
-                              "verificationSource": {
-                                "type": "string",
-                                "enum": [
-                                  "laporan",
-                                  "street_view"
-                                ],
-                                "description": "`street_view`: web menulis \"diverifikasi dari Street View\" dengan bulan gambarnya (ADR-0057)"
-                              },
-                              "streetViewImageDate": {
-                                "nullable": true,
-                                "description": "Bulan gambar Street View, `YYYY-MM`",
-                                "type": "string"
                               }
                             },
                             "required": [
@@ -16410,9 +16366,7 @@
                               "placeId",
                               "name",
                               "lastVerifiedAt",
-                              "verifiedBy",
-                              "verificationSource",
-                              "streetViewImageDate"
+                              "verifiedBy"
                             ],
                             "additionalProperties": false
                           },
@@ -16547,19 +16501,6 @@
                                       "admin"
                                     ],
                                     "description": "`admin`: diterbitkan langsung oleh admin, tanpa pemeriksaan orang kedua (ADR-0051)"
-                                  },
-                                  "verificationSource": {
-                                    "type": "string",
-                                    "enum": [
-                                      "laporan",
-                                      "street_view"
-                                    ],
-                                    "description": "`street_view`: web menulis \"Diverifikasi dari Street View · gambar <bulan tahun>\" (ADR-0057)"
-                                  },
-                                  "streetViewImageDate": {
-                                    "nullable": true,
-                                    "description": "Bulan gambar Street View, `YYYY-MM`",
-                                    "type": "string"
                                   }
                                 },
                                 "required": [
@@ -16570,9 +16511,7 @@
                                   "district",
                                   "status",
                                   "lastVerifiedAt",
-                                  "verifiedBy",
-                                  "verificationSource",
-                                  "streetViewImageDate"
+                                  "verifiedBy"
                                 ],
                                 "additionalProperties": false
                               },
@@ -17325,19 +17264,6 @@
                                   "admin"
                                 ],
                                 "description": "`admin`: diterbitkan langsung oleh admin, web tidak menyebutnya terverifikasi (ADR-0051)"
-                              },
-                              "verificationSource": {
-                                "type": "string",
-                                "enum": [
-                                  "laporan",
-                                  "street_view"
-                                ],
-                                "description": "`street_view`: web menulis \"diverifikasi dari Street View\" dengan bulan gambarnya (ADR-0057)"
-                              },
-                              "streetViewImageDate": {
-                                "nullable": true,
-                                "description": "Bulan gambar Street View, `YYYY-MM`",
-                                "type": "string"
                               }
                             },
                             "required": [
@@ -17345,9 +17271,7 @@
                               "placeId",
                               "name",
                               "lastVerifiedAt",
-                              "verifiedBy",
-                              "verificationSource",
-                              "streetViewImageDate"
+                              "verifiedBy"
                             ],
                             "additionalProperties": false
                           },
@@ -17558,19 +17482,6 @@
                                       "admin"
                                     ],
                                     "description": "`admin`: diterbitkan langsung oleh admin, tanpa pemeriksaan orang kedua (ADR-0051)"
-                                  },
-                                  "verificationSource": {
-                                    "type": "string",
-                                    "enum": [
-                                      "laporan",
-                                      "street_view"
-                                    ],
-                                    "description": "`street_view`: web menulis \"Diverifikasi dari Street View · gambar <bulan tahun>\" (ADR-0057)"
-                                  },
-                                  "streetViewImageDate": {
-                                    "nullable": true,
-                                    "description": "Bulan gambar Street View, `YYYY-MM`",
-                                    "type": "string"
                                   }
                                 },
                                 "required": [
@@ -17581,9 +17492,7 @@
                                   "district",
                                   "status",
                                   "lastVerifiedAt",
-                                  "verifiedBy",
-                                  "verificationSource",
-                                  "streetViewImageDate"
+                                  "verifiedBy"
                                 ],
                                 "additionalProperties": false
                               },
