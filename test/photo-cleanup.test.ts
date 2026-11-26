@@ -73,6 +73,16 @@ describe("cleanUpPhotos", () => {
     await db.delete(reports);
   });
 
+  it("keeps street view photos, which never have a report or an uploader", async () => {
+    await db.insert(photos).values({ source: "street_view", storageKey: "lokasi/sv/foto.webp", altText: "Foto", width: 10, height: 10, bytes: 100, moderation: "tayang", createdAt: new Date(0) });
+    expect((await cleanUpPhotos(db, store, NOW)).expired).toBe(0);
+    expect(await db.select().from(photos)).toHaveLength(1);
+  });
+
+  it("still refuses a report photo without a report or an uploader", async () => {
+    await expect(db.insert(photos).values({ storageKey: "laporan/yatim.webp", altText: "Foto", width: 10, height: 10, bytes: 100 })).rejects.toThrow();
+  });
+
   it("keeps a deletion queued when the file cannot be removed yet", async () => {
     await db.insert(photoDeletions).values({ storageKey: "laporan/tertunda.webp" });
     failing.remove = true;
