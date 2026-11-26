@@ -196,11 +196,13 @@ export async function buildApp(env: Env, deps: { db?: Db; now?: () => Date; fetc
     accountQuestions,
     now,
   });
-  // Asisten rute publik (ADR-0050): model dengan hitungan sendiri, jadi tidak memakai `AGENT_REQUESTS_PER_DAY`; biayanya
-  // dibatasi `ROUTE_ASSISTANT_QUESTIONS_PER_DAY`.
+  // Asisten rute publik (ADR-0050) dan Agen AI (ADR-0054): model dengan hitungan sendiri, jadi tidak memakai
+  // `AGENT_REQUESTS_PER_DAY`; biayanya dibatasi `ROUTE_ASSISTANT_QUESTIONS_PER_DAY`, juga untuk pertanyaan kontributor.
   await app.register(assistantRoutes, {
     auth,
     enabled: env.ROUTE_ASSISTANT_ENABLED,
+    contributorEnabled: env.ROUTE_AGENT_ENABLED,
+    disabilityData: env.DISABILITY_DATA_ENABLED,
     model: agentModel(env, { fetch: deps.fetch, log: app.log }),
     questionsPerDay: env.ROUTE_ASSISTANT_QUESTIONS_PER_DAY,
     accountQuestions,
