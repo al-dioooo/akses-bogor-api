@@ -51,7 +51,7 @@ export const verifierRoutes: FastifyPluginAsyncZod<VerifierRouteOptions> = async
         tags: [TAG],
         summary: "Antrean verifikasi",
         description:
-          "Laporan baru, perubahan, dan kekurangan, terlama dulu (FR-30). `status=klarifikasi` berisi laporan yang menunggu jawaban pelapor. Laporan milik verifikator itu sendiri tidak ikut (FR-37).",
+          "Laporan baru, perubahan, dan kekurangan, terlama dulu (FR-30). `status=klarifikasi` berisi laporan yang menunggu jawaban pelapor. Laporan milik verifikator itu sendiri tidak ikut (FR-37); jumlahnya ada di `ownWaiting`, supaya antrean kosong tidak terbaca semua laporan sudah diperiksa.",
         querystring: queueQuery,
         response: { 200: queue, 400: errorSchema, ...guarded },
       },
