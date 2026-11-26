@@ -68,6 +68,8 @@ const askResponse = z.object({
           name: z.string(),
           lastVerifiedAt: z.iso.datetime(),
           verifiedBy: z.enum(["tim", "admin"]).describe("`admin`: diterbitkan langsung oleh admin, web tidak menyebutnya terverifikasi (ADR-0051)"),
+          verificationSource: z.enum(["laporan", "street_view"]).describe("`street_view`: web menulis \"diverifikasi dari Street View\" dengan bulan gambarnya (ADR-0057)"),
+          streetViewImageDate: z.string().nullable().describe("Bulan gambar Street View, `YYYY-MM`"),
         }),
         z.object({ type: z.literal("pengetahuan"), citation: z.string(), title: z.string(), url: z.url(), license: z.string(), attribution: z.string().nullable() }),
       ]),

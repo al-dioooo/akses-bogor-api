@@ -3,7 +3,7 @@
 // hanya berisi tujuan: web menghitung rutenya sendiri dari posisi pengguna lewat `/route/walking`.
 import { z } from "zod";
 import { getOsmPlace } from "../contribute/facilities.js";
-import { placeCategory, placeStatus } from "../db/schema.js";
+import { placeCategory, placeStatus, verificationSource } from "../db/schema.js";
 import { HttpError } from "../http/errors.js";
 import { getPlace } from "../places/queries.js";
 import type { ToolContext } from "./tools.js";
@@ -24,6 +24,8 @@ export const placeCardSchema = z.union([
     status: z.enum(placeStatus.enumValues),
     lastVerifiedAt: z.iso.datetime(),
     verifiedBy: z.enum(["tim", "admin"]).describe("`admin`: diterbitkan langsung oleh admin, tanpa pemeriksaan orang kedua (ADR-0051)"),
+    verificationSource: z.enum(verificationSource.enumValues).describe("`street_view`: web menulis \"Diverifikasi dari Street View · gambar <bulan tahun>\" (ADR-0057)"),
+    streetViewImageDate: z.string().nullable().describe("Bulan gambar Street View, `YYYY-MM`"),
   }),
   z.object({
     type: z.literal("tempat"),
@@ -65,6 +67,8 @@ export async function placeCard(ctx: ToolContext, input: z.infer<typeof cardInpu
       status: place.status,
       lastVerifiedAt: place.lastVerifiedAt,
       verifiedBy: place.verifiedBy,
+      verificationSource: place.verificationSource,
+      streetViewImageDate: place.streetViewImageDate,
     };
   }
   const place = await getOsmPlace(ctx.db, { osmType: input.osmType!, osmId: input.osmId! });
