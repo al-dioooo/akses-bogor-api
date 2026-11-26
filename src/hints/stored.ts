@@ -22,8 +22,11 @@ export const OSM_WHEELCHAIR = ["yes", "limited", "no", "designated"] as const;
 export type StoredOsmHint = { provider: "openstreetmap"; result: "stored"; wheelchair: (typeof OSM_WHEELCHAIR)[number] };
 export type StoredHint = StoredGoogleHint | StoredOsmHint;
 
+/** Kunci keterangan OSM tersimpan; salinan Google ada di `GOOGLE_MAPS_TAG` (`google-maps-import.ts`). */
+export const OSM_NOTE_TAG = "aksesbogor:osm_aksesibilitas";
+
 /** Objek JSON, juga bila tersimpan sebagai string JSON; null bila bukan objek. */
-function record(value: unknown): Record<string, unknown> | null {
+export function record(value: unknown): Record<string, unknown> | null {
   if (typeof value === "string") {
     try {
       return record(JSON.parse(value));
