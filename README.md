@@ -352,7 +352,7 @@ sudo -u aksesbogor -H sh -c 'cd /srv/akses-bogor/current && COREPACK_ENABLE_DOWN
 
 ### Verifikasi Street View
 
-Data yang belum diperiksa diverifikasi dari tangkapan Street View atau disembunyikan (ADR-0057). Gambar diambil dan dinilai di host pekerja; Evergarden hanya menerima manifest dan gambarnya di `/srv/akses-bogor/data/street-view/<putaran>/`. Bentuk manifest dan langkah lengkapnya (cadangan, daftar, dry run, terapkan, periksa, batalkan) ada di runbook `operations/verifikasi-street-view.md` di akses-bogor-docs. Web dengan label "Diverifikasi dari Street View" harus tayang lebih dulu. Foto masuk bucket publik R2 lewat `R2_*` yang sudah ada di `api.env`.
+Data yang belum diperiksa diverifikasi dari tangkapan Street View atau disembunyikan (ADR-0057). Gambar diambil dan dinilai di host pekerja; server produksi (fatir-mitya) hanya menerima manifest dan gambarnya di `/srv/akses-bogor/data/street-view/<putaran>/`. Bentuk manifest dan langkah lengkapnya (cadangan, daftar, dry run, terapkan, periksa, batalkan) ada di runbook `operations/verifikasi-street-view.md` di akses-bogor-docs. Web dengan label "Diverifikasi dari Street View" harus tayang lebih dulu. Foto masuk bucket publik R2 lewat `R2_*` yang sudah ada di `api.env`.
 
 ```bash
 api() { sudo -u aksesbogor -H sh -c "cd /srv/akses-bogor/current && COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack pnpm exec tsx --env-file=/etc/akses-bogor/api.env $*"; }
