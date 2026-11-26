@@ -78,6 +78,13 @@
       "when": 1795390645536,
       "tag": "0010_kelola_tempat",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1795715767830,
+      "tag": "0011_street_view",
+      "breakpoints": true
     }
   ]
 }
