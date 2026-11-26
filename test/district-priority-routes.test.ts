@@ -64,4 +64,19 @@ describe("district routes", () => {
     expect(body.features[0].geometry.type).toMatch(/Polygon/);
     expect(JSON.stringify(body.features[0].geometry.coordinates)).not.toMatch(/\d\.\d{6,}/);
   });
+
+  it("adds the Kota Bogor outline: one outer ring per part, no holes between kecamatan, 5 decimals", async () => {
+    const body = (await closed.inject({ method: "GET", url: "/districts/boundaries" })).json();
+    expect(body.outline.type).toBe("MultiPolygon");
+    const polygons = body.outline.coordinates as [number, number][][][];
+    // Kota Bogor satu wilayah yang menyambung; potongan kecil di antara batas tidak ikut.
+    expect(polygons).toHaveLength(1);
+    expect(polygons.every((rings) => rings.length === 1)).toBe(true);
+    expect(JSON.stringify(polygons)).not.toMatch(/\d\.\d{6,}/);
+    // Garis luar mencakup semua kecamatan: kotak batasnya sama dengan gabungan kotak batas kecamatan.
+    const points = (value: unknown): number[][] => (Array.isArray(value) && typeof value[0] === "number" ? [value as number[]] : (value as unknown[]).flatMap(points));
+    const bounds = (all: number[][]) => [0, 1].flatMap((axis) => [Math.min(...all.map((p) => p[axis]!)), Math.max(...all.map((p) => p[axis]!))]);
+    const districts = bounds((body.features as { geometry: { coordinates: unknown } }[]).flatMap((f) => points(f.geometry.coordinates)));
+    bounds(points(polygons)).forEach((value, i) => expect(value).toBeCloseTo(districts[i]!, 3));
+  });
 });

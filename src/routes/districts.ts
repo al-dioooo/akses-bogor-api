@@ -41,6 +41,10 @@ const boundariesSchema = z.object({
       geometry: z.object({ type: z.string(), coordinates: z.unknown() }).describe("MultiPolygon, disederhanakan, 5 desimal"),
     }),
   ),
+  outline: z
+    .object({ type: z.literal("MultiPolygon"), coordinates: z.unknown() })
+    .nullable()
+    .describe("Batas Kota Bogor: gabungan keenam batas kecamatan tanpa lubang di antaranya, disederhanakan, 5 desimal (ADR-0053)"),
 });
 
 export const districtRoutes: FastifyPluginAsyncZod<DistrictRouteOptions> = async (app, opts) => {
