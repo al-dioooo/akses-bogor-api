@@ -46,3 +46,35 @@ export const candidateHintParams = z.object({
   osmType: z.enum(["node", "way", "relation"]),
   osmId: z.coerce.number().int().positive(),
 });
+
+const tally = z.object({ withData: z.number().int().min(0), accessible: z.number().int().min(0) });
+/** Jawaban GET /districts/accessibility (ADR-0053). */
+export const districtAccessibilityResponse = z.object({
+  minimumPlaces: z.number().int().describe("Kecamatan dengan tempat ber-keterangan kurang dari ini tidak diberi skor"),
+  formula: z.string(),
+  caveat: z.string().describe("Kalimat yang wajib ikut skor: keterangan pihak ketiga belum diperiksa tim"),
+  districts: z.array(
+    z.object({
+      slug: z.string(),
+      name: z.string(),
+      places: z.number().int().describe("Lokasi AksesBogor terbit ditambah kandidat OSM tanpa data AksesBogor"),
+      withData: z.number().int().describe("Tempat yang punya keterangan pintu masuk dari salah satu sumber"),
+      accessible: z.number().int().describe("Pintu masuknya bisa dimasuki kursi roda"),
+      limited: z.number().int().describe("OSM `wheelchair=limited`: ber-keterangan, tetapi tidak dihitung bisa dimasuki"),
+      notAccessible: z.number().int(),
+      score: z.number().int().min(0).max(100).nullable().describe("null: data belum cukup"),
+      rank: z.number().int().min(1).nullable(),
+      bySource: z
+        .object({ aksesbogor: tally, openstreetmap: tally, google_maps: tally })
+        .describe("Rincian per sumber. Hanya `aksesbogor` yang diperiksa tim; sisanya selalu ditampilkan sebagai belum diperiksa tim"),
+    }),
+  ),
+  sources: z.object({
+    aksesbogor: z.object({ checkedByTeam: z.literal(true) }),
+    openstreetmap: z.object({ checkedByTeam: z.literal(false), attribution: z.string(), url: z.url(), retrievedAt: z.iso.datetime().nullable() }),
+    google_maps: z
+      .object({ checkedByTeam: z.literal(false), attribution: z.string(), retrievedAt: z.iso.date().nullable().describe("Tanggal (WIB) salinan terbaru yang dihitung") })
+      .nullable()
+      .describe("null selama petunjuk mati: Google Maps tidak dihitung"),
+  }),
+});
