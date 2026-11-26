@@ -105,6 +105,14 @@ const schema = z
     OPENROUTER_API_KEY: optional(z.string().startsWith("sk-or-")),
     /** Model OpenRouter berurutan, dipisah koma; yang pertama dicoba dulu. Kosong berarti daftar bawaan API. */
     OPENROUTER_MODELS: csv(),
+    /**
+     * Alamat Valhalla di host yang sama, mis. http://127.0.0.1:8002, untuk rute pejalan kaki dari data OpenStreetMap
+     * dengan profil kursi roda atau jalan kaki (ADR-0055). Kosong berarti fitur ini mati dan kartu rute tetap memakai
+     * rute jalan kaki Mapbox.
+     */
+    ACCESSIBLE_ROUTER_URL: optional(z.url()),
+    /** Ringkasan tag jalur dari pembangunan ubin, mis. /srv/valhalla/aktif/jalur.json. Kosong berarti cakupan data tidak dihitung. */
+    ACCESSIBLE_ROUTER_WAYS_FILE: optional(z.string().min(1)),
     /** Rahasia bersama dengan server Next.js, minimal 32 karakter. Kosong berarti header IP pengunjung diabaikan. */
     WEB_SERVER_SECRET: optional(z.string().min(32)),
   })

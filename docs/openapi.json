@@ -15237,6 +15237,566 @@
         }
       }
     },
+    "/route/accessible": {
+      "post": {
+        "summary": "Rute pejalan kaki dari data OpenStreetMap",
+        "tags": [
+          "Rute jalan kaki"
+        ],
+        "description": "Rute dari Valhalla di server AksesBogor sendiri, dengan data OpenStreetMap Kota Bogor (ADR-0055): profil `kursi_roda` (tanpa tangga, lebih memilih trotoar dan jalur pejalan kaki) atau `jalan_kaki`. Jawabannya memuat jarak, waktu, langkah dalam bahasa Indonesia, garis rute, cakupan data trotoar, permukaan, dan kerb, peringatan, label tetap `note`, dan atribusi OSM. Rute tidak pernah dijamin bisa dilewati. Menjawab 503 `rute_aksesibel_belum_aktif` selama `ACCESSIBLE_ROUTER_URL` kosong; API tidak menggantinya dengan rute Mapbox. 422 `tanpa_rute_kursi_roda` bila profil kursi roda tidak menemukan jalur. Posisi dibulatkan ke 4 desimal, harus di dalam Kota Bogor dan paling jauh 10 km dari tujuan, dan tidak disimpan. Dipanggil browser pengguna sendiri dan hasilnya hanya ditampilkan kepadanya; tidak pernah dikirim ke model.\n\nHanya untuk akun yang sudah masuk dan melengkapi akun (ADR-0042). Menjawab 503 `agen_rute_belum_aktif` selama `ROUTE_AGENT_ENABLED` mati. Semua route agen dan rute berbagi batas 120 permintaan per akun per jam. Data dikirim di badan permintaan supaya tidak tercatat di log. Selama `ROUTE_ASSISTANT_ENABLED` menyala, route ini juga untuk pengunjung tanpa akun asisten rute publik, untuk lokasi AksesBogor dan kandidat OpenStreetMap, dengan batas per IP (ADR-0050). Batas tambahan 30 rute per akun atau per IP per jam.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "from": {
+                    "type": "object",
+                    "properties": {
+                      "lat": {
+                        "type": "number",
+                        "minimum": -90,
+                        "maximum": 90,
+                        "description": "Lintang (derajat, WGS 84)"
+                      },
+                      "lng": {
+                        "type": "number",
+                        "minimum": -180,
+                        "maximum": 180,
+                        "description": "Bujur (derajat, WGS 84)"
+                      }
+                    },
+                    "required": [
+                      "lat",
+                      "lng"
+                    ],
+                    "description": "Posisi pengguna saat ini, dari browser atau titik yang dipilih di peta"
+                  },
+                  "placeId": {
+                    "description": "Id lokasi AksesBogor tujuan",
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "osm": {
+                    "description": "Atau tempat OpenStreetMap tanpa data AksesBogor, dari kartu rute agen untuk kontributor (ADR-0043)",
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "node",
+                          "way",
+                          "relation"
+                        ]
+                      },
+                      "id": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "id"
+                    ]
+                  },
+                  "profil": {
+                    "type": "string",
+                    "enum": [
+                      "kursi_roda",
+                      "jalan_kaki"
+                    ],
+                    "description": "`kursi_roda`: tanpa tangga dan lebih memilih trotoar. `jalan_kaki`: pejalan kaki biasa"
+                  }
+                },
+                "required": [
+                  "from",
+                  "profil"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "destination": {
+                      "type": "object",
+                      "properties": {
+                        "placeId": {
+                          "nullable": true,
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "osm": {
+                          "nullable": true,
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string"
+                            },
+                            "id": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "id"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "name": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "location": {
+                          "type": "object",
+                          "properties": {
+                            "lat": {
+                              "type": "number"
+                            },
+                            "lng": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "lat",
+                            "lng"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "placeId",
+                        "osm",
+                        "name",
+                        "location"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "distanceMeters": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "durationSeconds": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "steps": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "instruction": {
+                            "type": "string"
+                          },
+                          "distanceMeters": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "durationSeconds": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "name": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "maneuver": {
+                            "type": "string"
+                          },
+                          "location": {
+                            "type": "object",
+                            "properties": {
+                              "lat": {
+                                "type": "number"
+                              },
+                              "lng": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "lat",
+                              "lng"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "instruction",
+                          "distanceMeters",
+                          "durationSeconds",
+                          "name",
+                          "maneuver",
+                          "location"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "geometry": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "LineString"
+                          ]
+                        },
+                        "coordinates": {
+                          "type": "array",
+                          "items": {
+                            "type": "array",
+                            "items": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "number"
+                                }
+                              ]
+                            },
+                            "minItems": 2,
+                            "maxItems": 2
+                          }
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "coordinates"
+                      ],
+                      "additionalProperties": false,
+                      "description": "GeoJSON [bujur, lintang]"
+                    },
+                    "polyline": {
+                      "type": "string",
+                      "description": "Garis rute sebagai polyline presisi 6, untuk POST /route/obstacles"
+                    },
+                    "attribution": {
+                      "type": "string"
+                    },
+                    "profil": {
+                      "type": "string",
+                      "enum": [
+                        "kursi_roda",
+                        "jalan_kaki"
+                      ]
+                    },
+                    "coverage": {
+                      "type": "object",
+                      "properties": {
+                        "sidewalkPercent": {
+                          "nullable": true,
+                          "description": "Persen panjang rute di jalur pejalan kaki atau jalan yang trotoarnya tercatat di OSM",
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "surfacePercent": {
+                          "nullable": true,
+                          "description": "Persen panjang rute yang jenis permukaannya tercatat",
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "crossings": {
+                          "nullable": true,
+                          "description": "Jalur penyeberangan OSM yang dilewati",
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "crossingsWithKerb": {
+                          "nullable": true,
+                          "description": "Penyeberangan yang kerb-nya tercatat",
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "dataDate": {
+                          "nullable": true,
+                          "description": "Tanggal ekstrak OSM yang dipakai",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "sidewalkPercent",
+                        "surfacePercent",
+                        "crossings",
+                        "crossingsWithKerb",
+                        "dataDate"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Cakupan data OSM di sepanjang rute; null bila tidak bisa dihitung"
+                    },
+                    "warnings": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Peringatan untuk ditampilkan bersama rute, urut dari hambatan lalu kekurangan data"
+                    },
+                    "note": {
+                      "type": "string",
+                      "description": "Label tetap: rute dihitung dari data OpenStreetMap dan kondisi lapangan bisa berbeda"
+                    }
+                  },
+                  "required": [
+                    "destination",
+                    "distanceMeters",
+                    "durationSeconds",
+                    "steps",
+                    "geometry",
+                    "polyline",
+                    "attribution",
+                    "profil",
+                    "coverage",
+                    "warnings",
+                    "note"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Galat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string",
+                      "description": "Kode galat snake_case yang stabil"
+                    },
+                    "pesan": {
+                      "type": "string",
+                      "description": "Pesan singkat untuk pengguna, dalam bahasa Indonesia"
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "pesan"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Galat"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/route/obstacles": {
       "post": {
         "summary": "Hambatan OpenStreetMap di dekat rute",
@@ -15255,7 +15815,7 @@
                     "type": "string",
                     "minLength": 2,
                     "maxLength": 60000,
-                    "description": "Nilai `polyline` dari POST /route/walking"
+                    "description": "Nilai `polyline` dari POST /route/walking atau POST /route/accessible"
                   },
                   "bufferMeters": {
                     "description": "Jarak paling jauh dari garis rute, dalam meter; bawaan 20",
