@@ -27,7 +27,8 @@
     "agen:evaluasi": "tsx --env-file-if-exists=.env scripts/agen/evaluasi.ts",
     "pengetahuan:evaluasi": "tsx --env-file-if-exists=.env scripts/pengetahuan/evaluasi.ts",
     "pengetahuan:indeks": "tsx --env-file-if-exists=.env scripts/pengetahuan/indeks.ts",
-    "petunjuk:google-ambil": "tsx --env-file-if-exists=.env scripts/petunjuk/google-maps-ambil.ts"
+    "petunjuk:google-ambil": "tsx --env-file-if-exists=.env scripts/petunjuk/google-maps-ambil.ts",
+    "petunjuk:google-impor": "tsx --env-file-if-exists=.env scripts/petunjuk/google-maps-impor.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.12.0",
