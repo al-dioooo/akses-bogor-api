@@ -26,9 +26,7 @@
     "pengetahuan:fasilitas": "tsx --env-file-if-exists=.env scripts/pengetahuan/fasilitas.ts",
     "agen:evaluasi": "tsx --env-file-if-exists=.env scripts/agen/evaluasi.ts",
     "pengetahuan:evaluasi": "tsx --env-file-if-exists=.env scripts/pengetahuan/evaluasi.ts",
-    "pengetahuan:indeks": "tsx --env-file-if-exists=.env scripts/pengetahuan/indeks.ts",
-    "petunjuk:google-ambil": "tsx --env-file-if-exists=.env scripts/petunjuk/google-maps-ambil.ts",
-    "petunjuk:google-impor": "tsx --env-file-if-exists=.env scripts/petunjuk/google-maps-impor.ts"
+    "pengetahuan:indeks": "tsx --env-file-if-exists=.env scripts/pengetahuan/indeks.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.12.0",
@@ -50,7 +48,6 @@
     "@eslint/js": "^10.0.1",
     "@types/node": "^24.19.2",
     "@types/pg": "^8.23.1",
-    "apify-client": "^2.26.0",
     "drizzle-kit": "^0.31.11",
     "eslint": "^10.13.0",
     "fflate": "0.8.3",
