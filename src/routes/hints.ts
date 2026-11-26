@@ -1,6 +1,7 @@
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { getOsmPlace } from "../contribute/facilities.js";
-import { candidateHintParams, candidateHintsResponse, hintsResponse } from "../hints/schemas.js";
+import { districtAccessibility } from "../hints/districts.js";
+import { candidateHintParams, candidateHintsResponse, districtAccessibilityResponse, hintsResponse } from "../hints/schemas.js";
 import { lookupHints, type HintProvider } from "../hints/provider.js";
 import { storedHints, withStored } from "../hints/stored.js";
 import { HttpError, errorSchema } from "../http/errors.js";
@@ -68,6 +69,23 @@ export const hintRoutes: FastifyPluginAsyncZod<HintRouteOptions> = async (app, o
       if (!place) throw new HttpError(404, "kandidat_tidak_ditemukan", "Tempat tidak ditemukan.");
       const live = await lookupHints({ name: place.name, location: place.location, category: place.category }, opts.providers, request.log);
       return { hints: opts.stored ? withStored(live, await storedHints(app.db, request.params)) : live };
+    },
+  );
+
+  app.get(
+    "/districts/accessibility",
+    {
+      schema: {
+        tags: ["Lokasi"],
+        summary: "Kecamatan paling aksesibel menurut keterangan pintu masuk",
+        description:
+          "Per kecamatan: tempat (lokasi AksesBogor terbit dan kandidat OSM tanpa data AksesBogor) yang punya keterangan pintu masuk, berapa yang bisa dimasuki kursi roda, skor, peringkat, dan rincian per sumber (ADR-0053). Setiap tempat memakai sumber pertama yang punya keterangan: jawaban Ramp AksesBogor, tag `wheelchair` OSM, lalu salinan tersimpan OSM dan Google Maps (hanya selama `PROVIDER_HINTS_ENABLED` menyala). Keterangan selain AksesBogor belum diperiksa tim. Kecamatan dengan kurang dari `minimumPlaces` tempat ber-keterangan tidak diberi skor. Tidak disimpan browser atau Cloudflare, seperti petunjuk penyedia.",
+        response: { 200: districtAccessibilityResponse },
+      },
+    },
+    async (_request, reply) => {
+      reply.header("cache-control", "private, no-store");
+      return districtAccessibility(app.db, { stored: opts.stored });
     },
   );
 };

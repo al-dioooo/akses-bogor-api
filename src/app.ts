@@ -18,7 +18,9 @@ import { HttpError } from "./http/errors.js";
 import { createRateLimitKey, WEB_SERVER_SECRET_HEADER } from "./http/rate-limit.js";
 import { QUESTIONS_PER_ACCOUNT_PER_DAY, dailyLimit } from "./agent/limits.js";
 import { agentModel } from "./agent/provider.js";
+import { wayFlagsFile } from "./map/accessible-ways.js";
 import { mapboxWalking } from "./map/directions.js";
+import { valhallaRouter } from "./map/valhalla.js";
 import { mapboxSearch } from "./map/search.js";
 import { googleHints } from "./hints/google.js";
 import { mapboxHints } from "./hints/mapbox.js";
@@ -190,17 +192,23 @@ export async function buildApp(env: Env, deps: { db?: Db; now?: () => Date; fetc
     enabled: env.ROUTE_AGENT_ENABLED,
     disabilityData: env.DISABILITY_DATA_ENABLED,
     walking: secretToken ? mapboxWalking({ token: secretToken, now, fetch: deps.fetch }) : undefined,
+    // Rute OpenStreetMap lewat Valhalla di host yang sama (ADR-0055); mati bila alamatnya kosong.
+    accessible: env.ACCESSIBLE_ROUTER_URL
+      ? { router: valhallaRouter({ url: env.ACCESSIBLE_ROUTER_URL, fetch: deps.fetch }), ways: env.ACCESSIBLE_ROUTER_WAYS_FILE ? wayFlagsFile(env.ACCESSIBLE_ROUTER_WAYS_FILE) : undefined }
+      : undefined,
     model: agentModel(env, { fetch: deps.fetch, budget: agentBudget, log: app.log }),
     assistantEnabled: env.ROUTE_ASSISTANT_ENABLED,
     visitorKey,
     accountQuestions,
     now,
   });
-  // Asisten rute publik (ADR-0050): model dengan hitungan sendiri, jadi tidak memakai `AGENT_REQUESTS_PER_DAY`; biayanya
-  // dibatasi `ROUTE_ASSISTANT_QUESTIONS_PER_DAY`.
+  // Asisten rute publik (ADR-0050) dan Agen AI (ADR-0054): model dengan hitungan sendiri, jadi tidak memakai
+  // `AGENT_REQUESTS_PER_DAY`; biayanya dibatasi `ROUTE_ASSISTANT_QUESTIONS_PER_DAY`, juga untuk pertanyaan kontributor.
   await app.register(assistantRoutes, {
     auth,
     enabled: env.ROUTE_ASSISTANT_ENABLED,
+    contributorEnabled: env.ROUTE_AGENT_ENABLED,
+    disabilityData: env.DISABILITY_DATA_ENABLED,
     model: agentModel(env, { fetch: deps.fetch, log: app.log }),
     questionsPerDay: env.ROUTE_ASSISTANT_QUESTIONS_PER_DAY,
     accountQuestions,

@@ -43,6 +43,7 @@ let close: () => Promise<void>;
 let app: Awaited<ReturnType<typeof buildApp>>;
 let closed: Awaited<ReturnType<typeof buildApp>>;
 let small: Awaited<ReturnType<typeof buildApp>>;
+let noContributor: Awaited<ReturnType<typeof buildApp>>;
 let sari: { token: string };
 let halteId: string;
 const sent: Email[] = [];
@@ -57,13 +58,14 @@ beforeAll(async () => {
   app = await buildApp(loadEnv({ ...base, ROUTE_ASSISTANT_ENABLED: "true", ROUTE_AGENT_ENABLED: "true" }), deps);
   closed = await buildApp(loadEnv(base), deps);
   small = await buildApp(loadEnv({ ...base, ROUTE_ASSISTANT_ENABLED: "true", ROUTE_ASSISTANT_QUESTIONS_PER_DAY: "2" }), deps);
-  await Promise.all([app.ready(), closed.ready(), small.ready()]);
+  noContributor = await buildApp(loadEnv({ ...base, ROUTE_ASSISTANT_ENABLED: "true" }), deps);
+  await Promise.all([app.ready(), closed.ready(), small.ready(), noContributor.ready()]);
   sari = await accounts(app, sent).reporter("sari@contoh.id", "Sari");
   halteId = (await placesNamed(db, "Halte contoh", 5)).find((p) => p.name === "Halte contoh")!.id;
 }, 60_000);
 
 afterAll(async () => {
-  await Promise.all([app.close(), closed.close(), small.close()]);
+  await Promise.all([app.close(), closed.close(), small.close(), noContributor.close()]);
   await close();
 });
 
@@ -170,5 +172,43 @@ describe("POST /route-assistant/ask", () => {
     replies = [text("Rute ke Halte contoh ramah kursi roda.")];
     const res = await ask({ question: "Rute ke halte?", placeId: halteId });
     expect(res.json().answer).not.toContain("ramah kursi roda.");
+  });
+});
+
+describe("POST /route-assistant/ask with contributorTools (Agen AI)", () => {
+  const toolNames = (body: string) => (JSON.parse(body) as { tools: { name: string }[] }).tools.map((t) => t.name);
+
+  it("gives a complete account the contributor tools and returns place cards", async () => {
+    const dewi = await accounts(app, sent).reporter("dewi@contoh.id", "Dewi");
+    replies = [tool("show_place_card", { placeId: halteId }), text("Halte contoh sudah punya data; kartu ada di bawah.")];
+    const res = await ask({ question: "Tempat mana yang perlu didata?", contributorTools: true }, { token: dewi.token });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().cards).toEqual([expect.objectContaining({ type: "tempat", target: { kind: "aksesbogor", placeId: halteId }, name: "Halte contoh" })]);
+    const [first] = claudeBodies();
+    expect(toolNames(first!)).toEqual(expect.arrayContaining(["nearby_places", "show_route", "find_places_to_contribute", "kecamatan_priority", "show_place_card"]));
+    expect(first).toContain("Penanya ini masuk dengan akun AksesBogor");
+  });
+
+  it("keeps the public assistant for visitors, incomplete accounts, accounts that do not ask, and while the contributor agent is off", async () => {
+    const helpers = accounts(app, sent);
+    const incomplete = await helpers.signIn("baru@contoh.id");
+    const rina = await helpers.reporter("rina@contoh.id", "Rina");
+    const cases = [
+      { payload: { contributorTools: true }, options: {} },
+      { payload: { contributorTools: true }, options: { token: incomplete.token } },
+      { payload: {}, options: { token: rina.token } },
+      { payload: { contributorTools: true }, options: { token: rina.token, target: noContributor } },
+    ];
+    for (const { payload, options } of cases) {
+      fetch.mockClear();
+      replies = [tool("show_place_card", { placeId: halteId }), text("Halte contoh ada di AksesBogor.")];
+      const res = await ask({ question: "Tempat mana yang perlu didata?", ...payload }, options);
+      expect(res.statusCode).toBe(200);
+      expect(res.json().cards).toEqual([]);
+      const [first, second] = claudeBodies();
+      expect(toolNames(first!)).not.toContain("find_places_to_contribute");
+      expect(first).not.toContain("Penanya ini masuk dengan akun AksesBogor");
+      expect(second).toContain("alat_tidak_dikenal");
+    }
   });
 });

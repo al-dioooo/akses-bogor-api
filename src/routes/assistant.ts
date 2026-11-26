@@ -3,13 +3,15 @@ import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { askAgent } from "../agent/ask.js";
 import { ASSISTANT_PROFILE } from "../agent/assistant-prompt.js";
-import { routeCardSchema } from "../agent/cards.js";
+import { placeCardSchema, routeCardSchema } from "../agent/cards.js";
+import { CONTRIBUTOR_ASSISTANT_PROFILE } from "../agent/contributor-assistant.js";
 import { QUESTIONS_PER_ACCOUNT_PER_DAY, QUESTIONS_PER_VISITOR_PER_DAY, dailyLimit, type DailyLimit } from "../agent/limits.js";
 import { AgentBusyError, type AgentModel } from "../agent/model.js";
 import type { ToolContext } from "../agent/tools.js";
 import type { Auth } from "../auth/auth.js";
 import { currentSession, needsCompletion } from "../auth/session.js";
 import { HttpError, errorSchema } from "../http/errors.js";
+import { prioritySchema } from "./districts.js";
 
 const TAG = "Asisten rute publik";
 const HOUR_MS = 60 * 60 * 1000;
@@ -21,6 +23,10 @@ export type AssistantRouteOptions = {
   auth?: Auth;
   /** `ROUTE_ASSISTANT_ENABLED` (ADR-0050). */
   enabled: boolean;
+  /** `ROUTE_AGENT_ENABLED`: akun yang sudah lengkap boleh meminta alat kontributor (Agen AI, ADR-0054). */
+  contributorEnabled?: boolean;
+  /** `DISABILITY_DATA_ENABLED`: prioritas kecamatan untuk alat kontributor (ADR-0043). */
+  disabilityData?: boolean;
   /** Model asisten, tanpa hitungan `AGENT_REQUESTS_PER_DAY` milik Bantu memetakan. Kosong berarti sibuk. */
   model?: AgentModel;
   /** `ROUTE_ASSISTANT_QUESTIONS_PER_DAY`: pertanyaan untuk semua penanya per hari WIB. */
@@ -44,6 +50,12 @@ const askBody = z.object({
     .optional()
     .describe("Giliran sebelumnya yang disimpan browser selama halaman terbuka; server tidak menyimpannya"),
   from: point.optional(),
+  contributorTools: z
+    .boolean()
+    .optional()
+    .describe(
+      "Agen AI (ADR-0054): minta alat kontributor (tempat tanpa data, prioritas kecamatan, kartu tempat). Dipakai hanya bila penanya akun yang sudah lengkap dan `ROUTE_AGENT_ENABLED` menyala; tanpa itu jawaban hanya memuat kartu rute",
+    ),
 });
 const askResponse = z.object({
   answer: z.string().describe("Jawaban asisten dalam bahasa Indonesia"),
@@ -62,7 +74,11 @@ const askResponse = z.object({
     )
     .describe("Data AksesBogor dan potongan basis pengetahuan yang dibaca asisten untuk jawaban ini"),
   model: z.string().nullable().describe("Model yang menjawab, mis. claude-haiku-5-5"),
-  cards: z.array(routeCardSchema).describe("Kartu rute jalan kaki untuk ditampilkan web; web menghitung rutenya dari titik awal pengunjung"),
+  cards: z
+    .array(z.union([routeCardSchema, placeCardSchema, prioritySchema.extend({ type: z.literal("prioritas") })]))
+    .describe(
+      "Kartu untuk ditampilkan web: rute jalan kaki (web menghitung rutenya dari titik awal pengunjung), dan tempat atau prioritas kecamatan hanya bila alat kontributor dipakai. Isinya tidak dikirim ke model",
+    ),
 });
 const status = z.object({
   enabled: z.boolean().describe("Asisten dibuka (`ROUTE_ASSISTANT_ENABLED`)"),
@@ -99,7 +115,7 @@ export const assistantRoutes: FastifyPluginAsyncZod<AssistantRouteOptions> = asy
       schema: {
         tags: [TAG],
         summary: "Bertanya rute kepada asisten AksesBogor",
-        description: `Pertanyaan siapa pun tentang cara ke lokasi AksesBogor, lokasi terdekat, dan data aksesibilitasnya (ADR-0050). Model hanya menerima pertanyaan, giliran sebelumnya, data lokasi, hasil alat, dan apakah titik awal ada; tidak pernah titik awal itu sendiri, koordinat, atau rute. Titik awal dibulatkan ke 4 desimal untuk jarak garis lurus ke lokasi terdekat, tidak disimpan, dan tidak dicatat. Tidak ada percakapan yang disimpan.\n\nAkun yang sudah masuk dan lengkap memakai jatah ${QUESTIONS_PER_ACCOUNT_PER_DAY} pertanyaan per akun per hari WIB, satu hitungan dengan \`POST /agent/ask\`; penanya lain ${QUESTIONS_PER_VISITOR_PER_DAY} pertanyaan per IP per hari WIB. Jatah habis dijawab 429 \`kuota_habis\`. Menjawab 503 \`agen_sibuk\` bila batas harian semua penanya (\`ROUTE_ASSISTANT_QUESTIONS_PER_DAY\`) habis, API key belum diatur, atau model gagal, dan 503 \`asisten_rute_belum_aktif\` selama \`ROUTE_ASSISTANT_ENABLED\` mati. Batas tambahan ${ASSISTANT_CALLS_PER_HOUR} permintaan per akun atau per IP per jam.`,
+        description: `Pertanyaan siapa pun tentang cara ke lokasi AksesBogor, lokasi terdekat, dan data aksesibilitasnya (ADR-0050). Model hanya menerima pertanyaan, giliran sebelumnya, data lokasi, hasil alat, dan apakah titik awal ada; tidak pernah titik awal itu sendiri, koordinat, atau rute. Titik awal dibulatkan ke 4 desimal untuk jarak garis lurus ke lokasi terdekat, tidak disimpan, dan tidak dicatat. Tidak ada percakapan yang disimpan.\n\nAkun yang sudah masuk dan lengkap memakai jatah ${QUESTIONS_PER_ACCOUNT_PER_DAY} pertanyaan per akun per hari WIB, satu hitungan dengan \`POST /agent/ask\`; penanya lain ${QUESTIONS_PER_VISITOR_PER_DAY} pertanyaan per IP per hari WIB. Jatah habis dijawab 429 \`kuota_habis\`. Menjawab 503 \`agen_sibuk\` bila batas harian semua penanya (\`ROUTE_ASSISTANT_QUESTIONS_PER_DAY\`) habis, API key belum diatur, atau model gagal, dan 503 \`asisten_rute_belum_aktif\` selama \`ROUTE_ASSISTANT_ENABLED\` mati. Batas tambahan ${ASSISTANT_CALLS_PER_HOUR} permintaan per akun atau per IP per jam.\n\nAgen AI (ADR-0054): dengan \`contributorTools\`, akun yang sudah lengkap juga mendapat alat agen kontributor (\`find_places_to_contribute\`, \`kecamatan_priority\`, \`show_place_card\`) selama \`ROUTE_AGENT_ENABLED\` menyala, dan jawabannya boleh memuat kartu tempat dan prioritas. Penanya lain tetap mendapat asisten rute publik dan kartu rute saja.`,
         body: askBody,
         response: { 200: askResponse, 400: errorSchema, 404: errorSchema, 429: errorSchema, 503: errorSchema },
       },
@@ -128,11 +144,14 @@ export const assistantRoutes: FastifyPluginAsyncZod<AssistantRouteOptions> = asy
         quota.give(key);
         throw busy();
       }
-      const { from, ...question } = request.body;
-      const ctx: ToolContext = { db: app.db, now: opts.now, position: from };
+      const { from, contributorTools, ...question } = request.body;
+      // Alat kontributor hanya untuk akun yang sudah lengkap, dan hanya bila web memintanya: halaman Tanya rute di web
+      // lama tidak mengenal kartu tempat dan prioritas.
+      const contributor = Boolean(contributorTools && account && opts.contributorEnabled);
+      const ctx: ToolContext = { db: app.db, now: opts.now, position: from, ...(contributor ? { disabilityData: opts.disabilityData } : {}) };
       try {
-        const result = await askAgent({ model: opts.model, ctx, profile: ASSISTANT_PROFILE }, question);
-        return { ...result, cards: result.cards.filter((card) => card.type === "rute") };
+        const result = await askAgent({ model: opts.model, ctx, profile: contributor ? CONTRIBUTOR_ASSISTANT_PROFILE : ASSISTANT_PROFILE }, question);
+        return contributor ? result : { ...result, cards: result.cards.filter((card) => card.type === "rute") };
       } catch (error) {
         // Pertanyaan yang tidak terjawab tidak memakai jatah.
         quota.give(key);
