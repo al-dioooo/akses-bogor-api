@@ -8675,7 +8675,7 @@
         "tags": [
           "Verifikasi"
         ],
-        "description": "Laporan baru, perubahan, dan kekurangan, terlama dulu (FR-30). `status=klarifikasi` berisi laporan yang menunggu jawaban pelapor. Laporan milik verifikator itu sendiri tidak ikut (FR-37).",
+        "description": "Laporan baru, perubahan, dan kekurangan, terlama dulu (FR-30). `status=klarifikasi` berisi laporan yang menunggu jawaban pelapor. Laporan milik verifikator itu sendiri tidak ikut (FR-37); jumlahnya ada di `ownWaiting`, supaya antrean kosong tidak terbaca semua laporan sudah diperiksa.",
         "parameters": [
           {
             "schema": {
@@ -8704,6 +8704,12 @@
                       "type": "integer",
                       "minimum": -9007199254740991,
                       "maximum": 9007199254740991
+                    },
+                    "ownWaiting": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Laporan milik verifikator ini dengan status yang sama. Tidak ikut antreannya karena diperiksa verifikator lain (FR-37)"
                     },
                     "items": {
                       "type": "array",
@@ -8817,6 +8823,7 @@
                   },
                   "required": [
                     "total",
+                    "ownWaiting",
                     "items"
                   ],
                   "additionalProperties": false,
