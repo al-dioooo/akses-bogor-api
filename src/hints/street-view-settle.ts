@@ -101,7 +101,7 @@ export function fullState(place: Place, answers: Answers) {
     streetViewImageDate: place.streetViewImageDate,
     unpublishedAt: place.unpublishedAt?.toISOString() ?? null,
     unpublishedReason: place.unpublishedReason,
-    facilities: FACILITIES.map((facility) => answers.find((a) => a.facility === facility) ?? { facility, answer: "belum_tahu", reason: null, note: null }),
+    facilities: FACILITIES.map((facility): Answers[number] => answers.find((a) => a.facility === facility) ?? { facility, answer: "belum_tahu", reason: null, note: null }),
   };
 }
 export type FullState = ReturnType<typeof fullState>;
