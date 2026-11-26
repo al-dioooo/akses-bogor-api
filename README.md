@@ -51,6 +51,8 @@ pnpm dev               # http://localhost:8080/healthz
 | `pnpm pengetahuan:evaluasi [R01 …] [--terpisah] [--rinci] [--json berkas]` | Mengukur retrieval `search_knowledge` tanpa model: recall@3, recall@5, recall@8, dan MRR terhadap sitasi yang harus ditemukan untuk setiap pertanyaan di `scripts/pengetahuan/uji-retrieval.json`. Butuh basis pengetahuan yang sudah dimuat. `--terpisah` memakai set `uji-retrieval-terpisah.json`, yang hanya untuk memeriksa dan tidak dipakai untuk menyetel |
 | `pnpm petunjuk:google-ambil [--rencana] [--limit N]` | Mencari kandidat OSM bernama di Google Maps lewat aktor Apify `compass/crawler-google-places` dan menyimpan dataset mentahnya di `~/data/akses-bogor/google-maps/` (ADR-0056). `--rencana` hanya mencetak jumlah pencarian dan perkiraan biaya. Butuh `APIFY_TOKEN` (env atau `~/credentials/akses-bogor/apify.env`) dan memakai saldo Apify |
 | `pnpm petunjuk:google-impor [berkas] [--dry-run] [--kecuali node/1,way/2] [--timpa-cara-lain]` | Memuat dataset dari `petunjuk:google-ambil` (bawaan: berkas terbaru) ke tag `aksesbogor:google_maps` kandidat OSM dalam satu transaksi (ADR-0056): kategori sama, nama mirip, 400 m atau kurang, pasangan terdekat menang. Tidak menambah tempat dan tidak menimpa salinan yang sudah diperiksa tim. `--dry-run` hanya mencetak pasangan dan statistik; `--kecuali` tidak memasangkan kandidat yang pasangannya salah |
+| `pnpm verifikasi:daftar` | CSV semua data yang belum diperiksa (salinan petunjuk, tempat admin, laporan yang menunggu, kandidat OSM) ke stdout dan jumlahnya ke stderr, di dalam transaksi read-only (ADR-0057). Laporan hanya id, jenis, dan status |
+| `pnpm verifikasi:street-view <manifest.json> [--dry-run] [--batalkan] [--sembunyikan-kandidat]` | Menerapkan manifest verifikasi Street View dalam satu transaksi (ADR-0057): data terjawab menjadi tempat bersumber `street_view` dengan fotonya, data tidak terjawab disembunyikan tanpa dihapus. Aman dijalankan ulang; `--batalkan` mengembalikan yang dibuat manifest itu. Tidak pernah menulis `reports` |
 | `pnpm agen:evaluasi [--asisten] [K01 …]` | Menjalankan pertanyaan uji agen kontributor (`scripts/agen/pertanyaan-uji.json`), atau dengan `--asisten` pertanyaan asisten rute publik (`scripts/agen/pertanyaan-uji-asisten.json`, dengan titik awal yang hanya dipakai server), sekali ke penyedia di `AGENT_PROVIDER`; untuk Claude mencetak token dan perkiraan biaya per pertanyaan. Butuh API key penyedianya di environment lokal dan memakai saldo atau kuota, jadi jalankan seperlunya. Berhenti setelah `EVALUASI_MAKS_BERHASIL` permintaan berhasil (bawaan 40 untuk Claude, 14 untuk OpenRouter) |
 | `pnpm peran --email <email> --peran <admin\|verifikator\|pengguna>` | Mengganti peran akun yang sudah dilengkapi, mis. membuat admin pertama; dicatat di log audit sebagai `skrip` (ADR-0035) |
 
@@ -347,6 +349,17 @@ sudo -u aksesbogor -H sh -c 'cd /srv/akses-bogor/current && COREPACK_ENABLE_DOWN
 ```
 
 `pnpm pengetahuan:fasilitas` mengganti semua baris `osm_places`, jadi salinan ini ikut hilang. Setelah memuat ulang OSM, jalankan impor lagi dengan berkas yang sama; tidak perlu mengambil ulang dari Apify.
+
+### Verifikasi Street View
+
+Data yang belum diperiksa diverifikasi dari tangkapan Street View atau disembunyikan (ADR-0057). Gambar diambil dan dinilai di host pekerja; server produksi (fatir-mitya) hanya menerima manifest dan gambarnya di `/srv/akses-bogor/data/street-view/<putaran>/`. Bentuk manifest dan langkah lengkapnya (cadangan, daftar, dry run, terapkan, periksa, batalkan) ada di runbook `operations/verifikasi-street-view.md` di akses-bogor-docs. Web dengan label "Diverifikasi dari Street View" harus tayang lebih dulu. Foto masuk bucket publik R2 lewat `R2_*` yang sudah ada di `api.env`.
+
+```bash
+api() { sudo -u aksesbogor -H sh -c "cd /srv/akses-bogor/current && COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack pnpm exec tsx --env-file=/etc/akses-bogor/api.env $*"; }
+api scripts/verifikasi/daftar.ts > ~/verifikasi-daftar.csv
+api scripts/verifikasi/street-view.ts /srv/akses-bogor/data/street-view/<putaran>/manifest.json --dry-run
+api scripts/verifikasi/street-view.ts /srv/akses-bogor/data/street-view/<putaran>/manifest.json
+```
 
 ### Data Preview
 

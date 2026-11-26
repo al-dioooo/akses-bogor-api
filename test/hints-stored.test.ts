@@ -32,6 +32,13 @@ describe("stored Google Maps copy", () => {
     expect(copy?.distanceMeters).toBeNull();
   });
 
+  it("drops copies already checked, e.g. from Street View evidence (ADR-0057)", () => {
+    expect(storedGoogle({ ...GOOGLE, belum_diperiksa_tim: false })).toBeNull();
+    expect(storedGoogle({ ...GOOGLE, belum_diperiksa_tim: true })).not.toBeNull();
+    expect(storedOsm({ wheelchair: "yes", belum_diperiksa_tim: false }, null)).toBeNull();
+    expect(storedOsm({ wheelchair: "yes" }, null)).toEqual({ provider: "openstreetmap", result: "stored", wheelchair: "yes" });
+  });
+
   it("drops a copy without a date or without any flag, and links that are not Google Maps over https", () => {
     expect(storedGoogle({ ...GOOGLE, diambil: "kemarin" })).toBeNull();
     expect(storedGoogle({ ...GOOGLE, aksesibilitas: [], tidak_tersedia: [] })).toBeNull();

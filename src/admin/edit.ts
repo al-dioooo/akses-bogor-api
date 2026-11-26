@@ -3,7 +3,7 @@
 // sama dengan verifikasi. Hanya dipanggil route `/admin/*` yang sudah memeriksa peran admin.
 import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
-import { audit } from "../audit/log.js";
+import { audit, type Actor } from "../audit/log.js";
 import type { Db } from "../db/client.js";
 import { photos, places } from "../db/schema.js";
 import { FACILITIES, type Answer, type Facility, type Reason } from "../domain/status.js";
@@ -144,19 +144,19 @@ export async function updatePlace(db: Db, store: PhotoStore | undefined, adminId
   return { placeId, status, downgraded };
 }
 
-/** Menurunkan tempat dari tayang dengan alasan; tidak ada yang dihapus (ADR-0051). */
-export async function unpublishPlace(db: Db, adminId: string, placeId: string, reason: string, now: Date) {
+/** Menurunkan tempat dari tayang dengan alasan; tidak ada yang dihapus (ADR-0051). Pelakunya admin, atau skrip (ADR-0057). */
+export async function unpublishPlace(db: Db, actor: Actor, placeId: string, reason: string, now: Date) {
   await db.transaction(async (tx) => {
     const [place] = await tx.select({ unpublishedAt: places.unpublishedAt }).from(places).where(eq(places.id, placeId)).for("update");
     if (!place) throw placeNotFound();
     if (place.unpublishedAt) throw new HttpError(409, "sudah_diturunkan", "Lokasi ini sudah diturunkan.");
     await tx.update(places).set({ unpublishedAt: now, unpublishedReason: reason, updatedAt: now }).where(eq(places.id, placeId));
-    await audit(tx, { entity: "lokasi", entityId: placeId, actor: { userId: adminId }, action: "diturunkan", changes: { tayang: { sebelum: true, sesudah: false }, alasan: reason }, at: now });
+    await audit(tx, { entity: "lokasi", entityId: placeId, actor, action: "diturunkan", changes: { tayang: { sebelum: true, sesudah: false }, alasan: reason }, at: now });
   });
 }
 
 /** Menayangkan lagi tempat yang diturunkan, dengan alasan. Datanya tidak berubah. */
-export async function restorePlace(db: Db, adminId: string, placeId: string, reason: string, now: Date) {
+export async function restorePlace(db: Db, actor: Actor, placeId: string, reason: string, now: Date) {
   await db.transaction(async (tx) => {
     const [place] = await tx.select({ unpublishedAt: places.unpublishedAt, unpublishedReason: places.unpublishedReason }).from(places).where(eq(places.id, placeId)).for("update");
     if (!place) throw placeNotFound();
@@ -165,7 +165,7 @@ export async function restorePlace(db: Db, adminId: string, placeId: string, rea
     await audit(tx, {
       entity: "lokasi",
       entityId: placeId,
-      actor: { userId: adminId },
+      actor,
       action: "ditayangkan_lagi",
       changes: { tayang: { sebelum: false, sesudah: true }, alasanTurun: place.unpublishedReason, alasan: reason },
       at: now,

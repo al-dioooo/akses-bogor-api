@@ -3,6 +3,7 @@
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { AwsClient } from "aws4fetch";
+import type { Env } from "../config/env.js";
 
 export type PhotoStore = {
   /** Menyimpan berkas; galat bila gagal. */
@@ -80,4 +81,13 @@ export function localStore(dir: string): PhotoStore {
       await rm(file(key), { force: true });
     },
   };
+}
+
+/** R2 bila kelima variabelnya diisi, folder lokal di development, dan tidak ada di production tanpa R2 (ADR-0031). */
+export function photoStoreFromEnv(env: Env): PhotoStore | undefined {
+  const { R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_LAPORAN, R2_BUCKET_PUBLIK } = env;
+  if (R2_ACCOUNT_ID && R2_ACCESS_KEY_ID && R2_SECRET_ACCESS_KEY && R2_BUCKET_LAPORAN && R2_BUCKET_PUBLIK) {
+    return r2Store({ accountId: R2_ACCOUNT_ID, accessKeyId: R2_ACCESS_KEY_ID, secretAccessKey: R2_SECRET_ACCESS_KEY, privateBucket: R2_BUCKET_LAPORAN, publicBucket: R2_BUCKET_PUBLIK });
+  }
+  return env.NODE_ENV === "development" ? localStore(env.PHOTO_STORAGE_DIR ?? ".data/foto") : undefined;
 }
