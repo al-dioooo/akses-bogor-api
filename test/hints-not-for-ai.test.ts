@@ -6,9 +6,9 @@ import { ASSISTANT_TOOLS } from "../src/agent/assistant-registry.js";
 import { AGENT_TOOLS } from "../src/agent/registry.js";
 
 // Petunjuk Mapbox dan Google, termasuk salinan tersimpan, tidak pernah menjadi masukan AI (ADR-0052; Product Terms
-// Mapbox §1.5). Hanya app.ts dan routes/hints.ts yang boleh memakai modul petunjuk.
+// Mapbox §1.5). Hanya app.ts, routes/hints.ts, dan skrip Google Maps (ADR-0056) yang boleh memakai modul petunjuk.
 const ROOT = new URL("../", import.meta.url);
-const ALLOWED_IMPORTERS = new Set(["src/app.ts", "src/routes/hints.ts"]);
+const ALLOWED_IMPORTERS = new Set(["src/app.ts", "src/routes/hints.ts", "scripts/petunjuk/google-maps-ambil.ts"]);
 
 /** Semua berkas TypeScript di bawah `dir`, sebagai path relatif dari akar repo. */
 async function sourceFiles(dir: string): Promise<string[]> {
@@ -29,7 +29,7 @@ describe("provider hints stay away from the AI", () => {
     for (const text of names) expect(text).not.toMatch(/hint|petunjuk|wheelchair_accessible|accessibilityOptions|google/i);
   });
 
-  it("only app.ts and routes/hints.ts import the hints module or its route, anywhere in src/ and scripts/", async () => {
+  it("only app.ts, routes/hints.ts and the Google Maps scripts import the hints module or its route, anywhere in src/ and scripts/", async () => {
     const files = await sources();
     expect(files.length).toBeGreaterThan(50);
     expect(files.map((f) => f.file)).toContain("src/agent/assistant-tools.ts");
