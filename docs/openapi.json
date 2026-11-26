@@ -16022,7 +16022,7 @@
         "tags": [
           "Asisten rute publik"
         ],
-        "description": "Pertanyaan siapa pun tentang cara ke lokasi AksesBogor, lokasi terdekat, dan data aksesibilitasnya (ADR-0050). Model hanya menerima pertanyaan, giliran sebelumnya, data lokasi, hasil alat, dan apakah titik awal ada; tidak pernah titik awal itu sendiri, koordinat, atau rute. Titik awal dibulatkan ke 4 desimal untuk jarak garis lurus ke lokasi terdekat, tidak disimpan, dan tidak dicatat. Tidak ada percakapan yang disimpan.\n\nAkun yang sudah masuk dan lengkap memakai jatah 5 pertanyaan per akun per hari WIB, satu hitungan dengan `POST /agent/ask`; penanya lain 5 pertanyaan per IP per hari WIB. Jatah habis dijawab 429 `kuota_habis`. Menjawab 503 `agen_sibuk` bila batas harian semua penanya (`ROUTE_ASSISTANT_QUESTIONS_PER_DAY`) habis, API key belum diatur, atau model gagal, dan 503 `asisten_rute_belum_aktif` selama `ROUTE_ASSISTANT_ENABLED` mati. Batas tambahan 120 permintaan per akun atau per IP per jam.",
+        "description": "Pertanyaan siapa pun tentang cara ke lokasi AksesBogor, lokasi terdekat, dan data aksesibilitasnya (ADR-0050). Model hanya menerima pertanyaan, giliran sebelumnya, data lokasi, hasil alat, dan apakah titik awal ada; tidak pernah titik awal itu sendiri, koordinat, atau rute. Titik awal dibulatkan ke 4 desimal untuk jarak garis lurus ke lokasi terdekat, tidak disimpan, dan tidak dicatat. Tidak ada percakapan yang disimpan.\n\nAkun yang sudah masuk dan lengkap memakai jatah 5 pertanyaan per akun per hari WIB, satu hitungan dengan `POST /agent/ask`; penanya lain 5 pertanyaan per IP per hari WIB. Jatah habis dijawab 429 `kuota_habis`. Menjawab 503 `agen_sibuk` bila batas harian semua penanya (`ROUTE_ASSISTANT_QUESTIONS_PER_DAY`) habis, API key belum diatur, atau model gagal, dan 503 `asisten_rute_belum_aktif` selama `ROUTE_ASSISTANT_ENABLED` mati. Batas tambahan 120 permintaan per akun atau per IP per jam.\n\nAgen AI (ADR-0054): dengan `contributorTools`, akun yang sudah lengkap juga mendapat alat agen kontributor (`find_places_to_contribute`, `kecamatan_priority`, `show_place_card`) selama `ROUTE_AGENT_ENABLED` menyala, dan jawabannya boleh memuat kartu tempat dan prioritas. Penanya lain tetap mendapat asisten rute publik dan kartu rute saja.",
         "requestBody": {
           "required": true,
           "content": {
@@ -16089,6 +16089,10 @@
                       "lng"
                     ],
                     "description": "Titik awal pengunjung dari browser atau titik yang dipilih di peta. Hanya dipakai server untuk tempat terdekat; tidak pernah dikirim ke model"
+                  },
+                  "contributorTools": {
+                    "description": "Agen AI (ADR-0054): minta alat kontributor (tempat tanpa data, prioritas kecamatan, kartu tempat). Dipakai hanya bila penanya akun yang sudah lengkap dan `ROUTE_AGENT_ENABLED` menyala; tanpa itu jawaban hanya memuat kartu rute",
+                    "type": "boolean"
                   }
                 },
                 "required": [
@@ -16203,82 +16207,458 @@
                     "cards": {
                       "type": "array",
                       "items": {
-                        "type": "object",
-                        "properties": {
-                          "type": {
-                            "type": "string",
-                            "enum": [
-                              "rute"
-                            ]
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "rute"
+                                ]
+                              },
+                              "target": {
+                                "oneOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": [
+                                          "aksesbogor"
+                                        ]
+                                      },
+                                      "placeId": {
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "placeId"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": [
+                                          "osm"
+                                        ]
+                                      },
+                                      "osmType": {
+                                        "type": "string",
+                                        "enum": [
+                                          "node",
+                                          "way",
+                                          "relation"
+                                        ]
+                                      },
+                                      "osmId": {
+                                        "type": "integer",
+                                        "minimum": -9007199254740991,
+                                        "maximum": 9007199254740991
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "osmType",
+                                      "osmId"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                ]
+                              },
+                              "name": {
+                                "nullable": true,
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "target",
+                              "name"
+                            ],
+                            "additionalProperties": false
                           },
-                          "target": {
-                            "oneOf": [
+                          {
+                            "anyOf": [
                               {
                                 "type": "object",
                                 "properties": {
-                                  "kind": {
+                                  "type": {
                                     "type": "string",
                                     "enum": [
-                                      "aksesbogor"
+                                      "tempat"
                                     ]
                                   },
-                                  "placeId": {
+                                  "target": {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": [
+                                          "aksesbogor"
+                                        ]
+                                      },
+                                      "placeId": {
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "placeId"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  },
+                                  "category": {
                                     "type": "string",
-                                    "format": "uuid",
-                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                    "enum": [
+                                      "kampus",
+                                      "masjid",
+                                      "halte",
+                                      "rumah_sakit"
+                                    ]
+                                  },
+                                  "district": {
+                                    "type": "object",
+                                    "properties": {
+                                      "slug": {
+                                        "type": "string"
+                                      },
+                                      "name": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "slug",
+                                      "name"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "status": {
+                                    "type": "string",
+                                    "enum": [
+                                      "aksesibel",
+                                      "sebagian",
+                                      "tidak_aksesibel",
+                                      "belum_diketahui"
+                                    ]
+                                  },
+                                  "lastVerifiedAt": {
+                                    "type": "string",
+                                    "format": "date-time",
+                                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                                  },
+                                  "verifiedBy": {
+                                    "type": "string",
+                                    "enum": [
+                                      "tim",
+                                      "admin"
+                                    ],
+                                    "description": "`admin`: diterbitkan langsung oleh admin, tanpa pemeriksaan orang kedua (ADR-0051)"
                                   }
                                 },
                                 "required": [
-                                  "kind",
-                                  "placeId"
+                                  "type",
+                                  "target",
+                                  "name",
+                                  "category",
+                                  "district",
+                                  "status",
+                                  "lastVerifiedAt",
+                                  "verifiedBy"
                                 ],
                                 "additionalProperties": false
                               },
                               {
                                 "type": "object",
                                 "properties": {
-                                  "kind": {
+                                  "type": {
                                     "type": "string",
                                     "enum": [
-                                      "osm"
+                                      "tempat"
                                     ]
                                   },
-                                  "osmType": {
+                                  "target": {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": [
+                                          "osm"
+                                        ]
+                                      },
+                                      "osmType": {
+                                        "type": "string",
+                                        "enum": [
+                                          "node",
+                                          "way",
+                                          "relation"
+                                        ]
+                                      },
+                                      "osmId": {
+                                        "type": "integer",
+                                        "minimum": -9007199254740991,
+                                        "maximum": 9007199254740991
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "osmType",
+                                      "osmId"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "name": {
+                                    "nullable": true,
+                                    "type": "string"
+                                  },
+                                  "category": {
                                     "type": "string",
                                     "enum": [
-                                      "node",
-                                      "way",
-                                      "relation"
+                                      "kampus",
+                                      "masjid",
+                                      "halte",
+                                      "rumah_sakit"
                                     ]
                                   },
-                                  "osmId": {
-                                    "type": "integer",
-                                    "minimum": -9007199254740991,
-                                    "maximum": 9007199254740991
+                                  "district": {
+                                    "type": "object",
+                                    "properties": {
+                                      "slug": {
+                                        "type": "string"
+                                      },
+                                      "name": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "slug",
+                                      "name"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "location": {
+                                    "type": "object",
+                                    "properties": {
+                                      "lat": {
+                                        "type": "number"
+                                      },
+                                      "lng": {
+                                        "type": "number"
+                                      }
+                                    },
+                                    "required": [
+                                      "lat",
+                                      "lng"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "osmUrl": {
+                                    "type": "string",
+                                    "format": "uri"
+                                  },
+                                  "attribution": {
+                                    "type": "string"
                                   }
                                 },
                                 "required": [
-                                  "kind",
-                                  "osmType",
-                                  "osmId"
+                                  "type",
+                                  "target",
+                                  "name",
+                                  "category",
+                                  "district",
+                                  "location",
+                                  "osmUrl",
+                                  "attribution"
                                 ],
                                 "additionalProperties": false
                               }
                             ]
                           },
-                          "name": {
-                            "nullable": true,
-                            "type": "string"
+                          {
+                            "type": "object",
+                            "properties": {
+                              "year": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Tahun terbaru di data Dinsos"
+                              },
+                              "yearTotals": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "year": {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    "registered": {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    }
+                                  },
+                                  "required": [
+                                    "year",
+                                    "registered"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "description": "Jumlah terdaftar per tahun, untuk menunjukkan lonjakan antartahun"
+                              },
+                              "districts": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "slug": {
+                                      "type": "string"
+                                    },
+                                    "name": {
+                                      "type": "string"
+                                    },
+                                    "registered": {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991,
+                                      "description": "Penyandang disabilitas terdaftar di Dinsos pada `year`, bukan jumlah seluruh penduduk"
+                                    },
+                                    "verifiedPlaces": {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991,
+                                      "description": "Lokasi AksesBogor yang sudah terbit"
+                                    },
+                                    "facilitiesWithoutData": {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991,
+                                      "description": "Kampus, masjid, halte, dan rumah sakit di OpenStreetMap yang belum punya data AksesBogor"
+                                    },
+                                    "score": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 100
+                                    },
+                                    "rank": {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 9007199254740991
+                                    },
+                                    "level": {
+                                      "type": "string",
+                                      "enum": [
+                                        "rendah",
+                                        "sedang",
+                                        "tinggi",
+                                        "sangat_tinggi"
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "slug",
+                                    "name",
+                                    "registered",
+                                    "verifiedPlaces",
+                                    "facilitiesWithoutData",
+                                    "score",
+                                    "rank",
+                                    "level"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "caveat": {
+                                "type": "string",
+                                "description": "Kalimat yang wajib ikut setiap angka disabilitas"
+                              },
+                              "formula": {
+                                "type": "string"
+                              },
+                              "source": {
+                                "type": "object",
+                                "properties": {
+                                  "title": {
+                                    "type": "string"
+                                  },
+                                  "url": {
+                                    "type": "string",
+                                    "format": "uri"
+                                  },
+                                  "publisher": {
+                                    "type": "string"
+                                  },
+                                  "retrievedAt": {
+                                    "type": "string",
+                                    "format": "date-time",
+                                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                                  },
+                                  "terms": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "title",
+                                  "url",
+                                  "publisher",
+                                  "retrievedAt",
+                                  "terms"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "facilitiesSource": {
+                                "type": "object",
+                                "properties": {
+                                  "retrievedAt": {
+                                    "nullable": true,
+                                    "type": "string",
+                                    "format": "date-time",
+                                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                                  },
+                                  "attribution": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "retrievedAt",
+                                  "attribution"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "prioritas"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "year",
+                              "yearTotals",
+                              "districts",
+                              "caveat",
+                              "formula",
+                              "source",
+                              "facilitiesSource",
+                              "type"
+                            ],
+                            "additionalProperties": false
                           }
-                        },
-                        "required": [
-                          "type",
-                          "target",
-                          "name"
-                        ],
-                        "additionalProperties": false
+                        ]
                       },
-                      "description": "Kartu rute jalan kaki untuk ditampilkan web; web menghitung rutenya dari titik awal pengunjung"
+                      "description": "Kartu untuk ditampilkan web: rute jalan kaki (web menghitung rutenya dari titik awal pengunjung), dan tempat atau prioritas kecamatan hanya bila alat kontributor dipakai. Isinya tidak dikirim ke model"
                     }
                   },
                   "required": [
