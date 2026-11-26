@@ -32,7 +32,16 @@ export const queueItem = z.object({
   worsens: z.boolean().describe("Laporan perubahan atau kekurangan yang membuat fasilitas Tersedia atau Tidak perlu menjadi Tidak tersedia; dahulukan"),
 });
 
-export const queue = z.object({ total: z.number().int(), items: z.array(queueItem) }).describe("Antrean verifikasi, paling banyak 100 laporan");
+export const queue = z
+  .object({
+    total: z.number().int(),
+    ownWaiting: z
+      .number()
+      .int()
+      .describe("Laporan milik verifikator ini dengan status yang sama. Tidak ikut antreannya karena diperiksa verifikator lain (FR-37)"),
+    items: z.array(queueItem),
+  })
+  .describe("Antrean verifikasi, paling banyak 100 laporan");
 
 export const facilityValue = z.object({
   facility: z.enum(facilityKind.enumValues),

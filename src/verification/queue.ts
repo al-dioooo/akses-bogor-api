@@ -39,10 +39,12 @@ const notOwnedBy = (viewerId: string) => or(isNull(reports.reporterId), ne(repor
 /**
  * Antrean terlama dulu (FR-30): `menunggu` untuk diperiksa, atau `klarifikasi` yang menunggu jawaban pelapor.
  * `worsens` menandai laporan yang membuat fasilitas Tersedia atau Tidak perlu menjadi Tidak tersedia (Panduan bagian 7).
+ * `ownWaiting` menghitung laporan milik verifikator itu sendiri dengan status yang sama: tidak ikut antreannya (FR-37),
+ * tetapi tetap disebut supaya antrean kosong tidak terbaca "semua sudah diperiksa".
  */
 export async function listQueue(db: Db, viewerId: string, status: "menunggu" | "klarifikasi") {
   const where = and(eq(reports.status, status), notOwnedBy(viewerId));
-  const [rows, [{ total } = { total: 0 }]] = await Promise.all([
+  const [rows, [{ total } = { total: 0 }], [{ ownWaiting } = { ownWaiting: 0 }]] = await Promise.all([
     db
       .select({
         id: reports.id,
@@ -65,6 +67,7 @@ export async function listQueue(db: Db, viewerId: string, status: "menunggu" | "
       .orderBy(asc(reports.submittedAt), asc(reports.id))
       .limit(100),
     db.select({ total: count() }).from(reports).where(where),
+    db.select({ ownWaiting: count() }).from(reports).where(and(eq(reports.status, status), eq(reports.reporterId, viewerId))),
   ]);
 
   const placeIds = [...new Set(rows.map((r) => r.placeId).filter((id): id is string => id !== null))];
@@ -79,6 +82,7 @@ export async function listQueue(db: Db, viewerId: string, status: "menunggu" | "
 
   return {
     total,
+    ownWaiting,
     items: rows.map((r) => {
       const submission = r.submission as Submission;
       return {

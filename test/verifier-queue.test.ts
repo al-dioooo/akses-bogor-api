@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { places, reports, users } from "../src/db/schema.js";
 import { facilities, verificationRig, type Rig } from "./helpers/verification.js";
 
@@ -57,10 +57,29 @@ describe("GET /verifier/reports (FR-30)", () => {
     expect(res.body).not.toContain("@contoh.id");
   });
 
-  it("never shows a verifier their own reports (FR-37)", async () => {
-    const body = (await queue(reportingVerifier.token)).json() as { total: number; items: { id: string }[] };
+  it("never shows a verifier their own reports (FR-37), but counts them in ownWaiting", async () => {
+    const body = (await queue(reportingVerifier.token)).json() as { total: number; ownWaiting: number; items: { id: string }[] };
     expect(body.items.map((i) => i.id)).toEqual([newReport, deficiency]);
     expect(body.total).toBe(2);
+    expect(body.ownWaiting).toBe(1);
+    expect(((await queue(verifier.token)).json() as { ownWaiting: number }).ownWaiting).toBe(0);
+    expect(((await queue(reportingVerifier.token, "klarifikasi")).json() as { ownWaiting: number }).ownWaiting).toBe(0);
+  });
+
+  it("still counts a verifier's own report when it is the only one waiting", async () => {
+    // Laporan orang lain sudah keluar dari antrean menunggu: antrean verifikator pelapor kosong, tetapi laporannya
+    // sendiri masih menunggu.
+    const others = [newReport, deficiency];
+    await rig.db
+      .update(reports)
+      .set({ status: "klarifikasi", clarificationQuestion: "Foto pintu masuk?", clarificationDueAt: new Date("2026-11-15T03:00:00.000Z") })
+      .where(inArray(reports.id, others));
+    try {
+      const body = (await queue(reportingVerifier.token)).json() as { total: number; ownWaiting: number; items: unknown[] };
+      expect(body).toMatchObject({ total: 0, ownWaiting: 1, items: [] });
+    } finally {
+      await rig.db.update(reports).set({ status: "menunggu", clarificationQuestion: null, clarificationDueAt: null }).where(inArray(reports.id, others));
+    }
   });
 
   it("lists reports waiting for a clarification answer separately", async () => {
