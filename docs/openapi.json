@@ -2823,6 +2823,277 @@
         }
       }
     },
+    "/districts/accessibility": {
+      "get": {
+        "summary": "Kecamatan paling aksesibel menurut keterangan pintu masuk",
+        "tags": [
+          "Lokasi"
+        ],
+        "description": "Per kecamatan: tempat (lokasi AksesBogor terbit dan kandidat OSM tanpa data AksesBogor) yang punya keterangan pintu masuk, berapa yang bisa dimasuki kursi roda, skor, peringkat, dan rincian per sumber (ADR-0053). Setiap tempat memakai sumber pertama yang punya keterangan: jawaban Ramp AksesBogor, tag `wheelchair` OSM, lalu salinan tersimpan OSM dan Google Maps (hanya selama `PROVIDER_HINTS_ENABLED` menyala). Keterangan selain AksesBogor belum diperiksa tim. Kecamatan dengan kurang dari `minimumPlaces` tempat ber-keterangan tidak diberi skor. Tidak disimpan browser atau Cloudflare, seperti petunjuk penyedia.",
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "minimumPlaces": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Kecamatan dengan tempat ber-keterangan kurang dari ini tidak diberi skor"
+                    },
+                    "formula": {
+                      "type": "string"
+                    },
+                    "caveat": {
+                      "type": "string",
+                      "description": "Kalimat yang wajib ikut skor: keterangan pihak ketiga belum diperiksa tim"
+                    },
+                    "districts": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "slug": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "places": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Lokasi AksesBogor terbit ditambah kandidat OSM tanpa data AksesBogor"
+                          },
+                          "withData": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Tempat yang punya keterangan pintu masuk dari salah satu sumber"
+                          },
+                          "accessible": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Pintu masuknya bisa dimasuki kursi roda"
+                          },
+                          "limited": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "OSM `wheelchair=limited`: ber-keterangan, tetapi tidak dihitung bisa dimasuki"
+                          },
+                          "notAccessible": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "score": {
+                            "nullable": true,
+                            "description": "null: data belum cukup",
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 100
+                          },
+                          "rank": {
+                            "nullable": true,
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "bySource": {
+                            "type": "object",
+                            "properties": {
+                              "aksesbogor": {
+                                "type": "object",
+                                "properties": {
+                                  "withData": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "accessible": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  }
+                                },
+                                "required": [
+                                  "withData",
+                                  "accessible"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "openstreetmap": {
+                                "type": "object",
+                                "properties": {
+                                  "withData": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "accessible": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  }
+                                },
+                                "required": [
+                                  "withData",
+                                  "accessible"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "google_maps": {
+                                "type": "object",
+                                "properties": {
+                                  "withData": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "accessible": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  }
+                                },
+                                "required": [
+                                  "withData",
+                                  "accessible"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "aksesbogor",
+                              "openstreetmap",
+                              "google_maps"
+                            ],
+                            "additionalProperties": false,
+                            "description": "Rincian per sumber. Hanya `aksesbogor` yang diperiksa tim; sisanya selalu ditampilkan sebagai belum diperiksa tim"
+                          }
+                        },
+                        "required": [
+                          "slug",
+                          "name",
+                          "places",
+                          "withData",
+                          "accessible",
+                          "limited",
+                          "notAccessible",
+                          "score",
+                          "rank",
+                          "bySource"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "sources": {
+                      "type": "object",
+                      "properties": {
+                        "aksesbogor": {
+                          "type": "object",
+                          "properties": {
+                            "checkedByTeam": {
+                              "type": "boolean",
+                              "enum": [
+                                true
+                              ]
+                            }
+                          },
+                          "required": [
+                            "checkedByTeam"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "openstreetmap": {
+                          "type": "object",
+                          "properties": {
+                            "checkedByTeam": {
+                              "type": "boolean",
+                              "enum": [
+                                false
+                              ]
+                            },
+                            "attribution": {
+                              "type": "string"
+                            },
+                            "url": {
+                              "type": "string",
+                              "format": "uri"
+                            },
+                            "retrievedAt": {
+                              "nullable": true,
+                              "type": "string",
+                              "format": "date-time",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                            }
+                          },
+                          "required": [
+                            "checkedByTeam",
+                            "attribution",
+                            "url",
+                            "retrievedAt"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "google_maps": {
+                          "nullable": true,
+                          "description": "null selama petunjuk mati: Google Maps tidak dihitung",
+                          "type": "object",
+                          "properties": {
+                            "checkedByTeam": {
+                              "type": "boolean",
+                              "enum": [
+                                false
+                              ]
+                            },
+                            "attribution": {
+                              "type": "string"
+                            },
+                            "retrievedAt": {
+                              "nullable": true,
+                              "description": "Tanggal (WIB) salinan terbaru yang dihitung",
+                              "type": "string",
+                              "format": "date",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                            }
+                          },
+                          "required": [
+                            "checkedByTeam",
+                            "attribution",
+                            "retrievedAt"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "aksesbogor",
+                        "openstreetmap",
+                        "google_maps"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "minimumPlaces",
+                    "formula",
+                    "caveat",
+                    "districts",
+                    "sources"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/auth/code": {
       "post": {
         "summary": "Kirim kode masuk",
