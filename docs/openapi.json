@@ -6639,13 +6639,14 @@
               "type": "string",
               "enum": [
                 "tim",
-                "admin"
+                "admin",
+                "street_view"
               ]
             },
             "in": "query",
             "name": "origin",
             "required": false,
-            "description": "`tim`: terakhir diterbitkan verifikator. `admin`: dibuat, diubah, atau diterbitkan langsung oleh admin"
+            "description": "`tim`: terakhir diterbitkan verifikator dari laporan. `admin`: dibuat, diubah, atau diterbitkan langsung oleh admin. `street_view`: diverifikasi dari bukti Street View (ADR-0057, ADR-0058)"
           },
           {
             "schema": {

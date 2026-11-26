@@ -19,7 +19,10 @@ function conditions(q: AdminPlaceQuery): SQL | undefined {
     q.category ? eq(places.category, q.category) : undefined,
     q.district ? eq(places.districtSlug, q.district) : undefined,
     q.status ? eq(places.status, q.status) : undefined,
-    q.origin === "admin" ? isNotNull(places.adminPublishedAt) : q.origin === "tim" ? isNull(places.adminPublishedAt) : undefined,
+    q.origin === "admin" ? isNotNull(places.adminPublishedAt) : undefined,
+    q.origin === "tim" ? and(isNull(places.adminPublishedAt), eq(places.verificationSource, "laporan")) : undefined,
+    // Tempat Street View tampil sebagai terverifikasi tim di publik (ADR-0058); asalnya tetap bisa disaring admin.
+    q.origin === "street_view" ? eq(places.verificationSource, "street_view") : undefined,
     q.published === "ya" ? isNull(places.unpublishedAt) : q.published === "tidak" ? isNotNull(places.unpublishedAt) : undefined,
   );
 }
