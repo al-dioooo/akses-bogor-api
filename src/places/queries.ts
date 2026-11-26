@@ -125,7 +125,7 @@ export async function mapPlaces(db: Db, f: PlaceFilters & { bbox?: [number, numb
 
 export async function getPlace(db: Db, id: string, now: Date, opts: ReadOptions = {}) {
   const [row] = await db
-    .select({ ...summaryColumns, landmark: places.landmark, description: places.description })
+    .select({ ...summaryColumns, landmark: places.landmark, description: places.description, updatedAt: places.updatedAt })
     .from(places)
     .innerJoin(districts, eq(districts.slug, places.districtSlug))
     .where(and(eq(places.id, id), published));
@@ -148,6 +148,7 @@ export async function getPlace(db: Db, id: string, now: Date, opts: ReadOptions 
     because: computeStatus(facilities).because.map(({ facility, answer, reason }) => ({ facility, answer, reason: reason ?? null })),
     photos: placePhotos.map((p) => toPhoto(p, opts.photoBaseUrl)),
     needsRecheck: row.lastVerifiedAt < recheckBefore,
+    version: row.updatedAt.toISOString(),
   };
 }
 
