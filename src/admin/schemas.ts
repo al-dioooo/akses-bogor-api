@@ -64,7 +64,9 @@ export const placeHistory = z.object({
   items: z.array(
     z.object({
       id: z.number().int(),
-      action: z.string().describe("Mis. dibuat, diubah, dibuat_admin, diubah_admin, diturunkan, ditayangkan_lagi, terbit_langsung"),
+      entity: z.enum(["lokasi", "foto"]).describe("`foto`: foto tayang tempat ini yang dihapus; `changes` berisi `tag` dan `alasan`"),
+      photoId: z.string().nullable().describe("Id foto untuk entri `foto`, kosong untuk entri lokasi"),
+      action: z.string().describe("Mis. dibuat, diubah, dibuat_admin, diubah_admin, diturunkan, ditayangkan_lagi; `dihapus` untuk entri foto"),
       actor: z.object({
         name: z.string().nullable().describe("Nama tampilan anggota tim; kosong untuk sistem, skrip, atau akun yang sudah dihapus"),
         label: z.enum(["sistem", "skrip"]).nullable(),

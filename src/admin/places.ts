@@ -1,6 +1,6 @@
 // Bacaan untuk halaman Kelola tempat (ADR-0051). Berbeda dengan query publik, di sini tempat yang diturunkan ikut terbaca,
 // dengan alasannya. Hanya dipanggil route `/admin/*` yang sudah memeriksa peran admin.
-import { and, asc, count, desc, eq, ilike, isNotNull, isNull, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, isNotNull, isNull, or, sql, type SQL } from "drizzle-orm";
 import { withoutAksesBogorData } from "../contribute/facilities.js";
 import type { Db } from "../db/client.js";
 import { auditLog, districts, placeFacilities, places, users } from "../db/schema.js";
@@ -119,20 +119,31 @@ export async function getAdminPlace(db: Db, id: string, opts: ReadOptions = {}) 
   };
 }
 
-/** Riwayat satu tempat dari log audit (ADR-0038), terbaru dulu. Nama yang tampil hanya nama tampilan anggota tim. */
+/**
+ * Riwayat satu tempat dari log audit (ADR-0038), terbaru dulu. Nama yang tampil hanya nama tampilan anggota tim. Selain
+ * entri tempat itu sendiri, foto tayang yang dihapus dari tempat ini (entri `foto` `dihapus` dengan `lokasi`) ikut tampil
+ * bersama alasannya; foto laporan yang disembunyikan sebelum terbit tidak pernah tayang, jadi tidak ikut.
+ */
 export async function placeHistory(db: Db, id: string) {
   const [exists] = await db.select({ id: places.id }).from(places).where(eq(places.id, id));
   if (!exists) throw placeNotFound();
   const rows = await db
-    .select({ id: auditLog.id, action: auditLog.action, name: users.displayName, label: auditLog.actorLabel, at: auditLog.createdAt, changes: auditLog.changes })
+    .select({ id: auditLog.id, entity: auditLog.entityType, entityId: auditLog.entityId, action: auditLog.action, name: users.displayName, label: auditLog.actorLabel, at: auditLog.createdAt, changes: auditLog.changes })
     .from(auditLog)
     .leftJoin(users, eq(users.id, auditLog.actorId))
-    .where(and(eq(auditLog.entityType, "lokasi"), eq(auditLog.entityId, id)))
+    .where(
+      or(
+        and(eq(auditLog.entityType, "lokasi"), eq(auditLog.entityId, id)),
+        and(eq(auditLog.entityType, "foto"), eq(auditLog.action, "dihapus"), sql`${auditLog.changes}->>'lokasi' = ${id}`),
+      ),
+    )
     .orderBy(desc(auditLog.createdAt), desc(auditLog.id))
     .limit(200);
   return {
     items: rows.map((r) => ({
       id: r.id,
+      entity: r.entity === "foto" ? ("foto" as const) : ("lokasi" as const),
+      photoId: r.entity === "foto" ? r.entityId : null,
       action: r.action,
       actor: { name: r.name ?? null, label: (r.label as "sistem" | "skrip" | null) ?? null },
       at: iso(r.at)!,
