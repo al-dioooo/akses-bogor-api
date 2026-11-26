@@ -1,13 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { and, eq, inArray } from "drizzle-orm";
-import { listCandidates } from "../src/contribute/facilities.js";
+import { and, eq, inArray, sql } from "drizzle-orm";
+import { listCandidates, SAME_PLACE_METERS } from "../src/contribute/facilities.js";
 import { auditLog, photos, places } from "../src/db/schema.js";
 import { getPlace } from "../src/places/queries.js";
 import { storedHints } from "../src/hints/stored.js";
 import { hideUnsettled, runRecords, type Handler, type RunOptions } from "../src/hints/street-view-apply.js";
 import { parseManifest, type Manifest } from "../src/hints/street-view-manifest.js";
 import { photoIdFor, prepareImages, settle, type PreparedImage } from "../src/hints/street-view-settle.js";
-import { imageDir, KESATUAN, kesatuanSettled, manifestOf, ref, SILOAM, siloamSettled, streetViewRig } from "./helpers/street-view.js";
+import { ATTAQWA, imageDir, KESATUAN, KESATUAN_B, KESATUAN_B_ELEMENT, kesatuanSettled, manifestOf, ref, SILOAM, siloamSettled, streetViewRig } from "./helpers/street-view.js";
 import { memoryStore } from "./helpers/verification.js";
 
 const NOW = new Date("2026-11-27T02:00:00.000Z");
@@ -16,8 +16,8 @@ let dir: string;
 const memory = memoryStore();
 
 beforeAll(async () => {
-  rig = await streetViewRig();
-  dir = await imageDir("02-wide.png", "02-close.png", "10-close.png", "admin.png");
+  rig = await streetViewRig([KESATUAN_B_ELEMENT]);
+  dir = await imageDir("02-wide.png", "02-close.png", "10-close.png", "admin.png", "14-close.png");
 }, 90_000);
 
 afterAll(async () => {
@@ -131,5 +131,54 @@ describe("applying settled records (ADR-0057)", () => {
     const record = siloamSettled({ record: "13", target: { osm: "way/782982224" }, place: { name: "RS PMI Bogor", category: "rumah_sakit", entrance: { lat: -6.5985866, lng: 106.8050248 } } });
     await expect(run([record], { store: undefined }, "r-tanpa-r2")).rejects.toThrow("penyimpanan foto belum diatur");
     expect(await placeAt("RS PMI Bogor")).toBeUndefined();
+  });
+
+  it("keeps two street view targets 32 m apart as two places, also when they run again", async () => {
+    const tower = (await placeAt("IBI Kesatuan"))!;
+    const towerRamp = (await getPlace(rig.db, tower.id, NOW))!.facilities.find((f) => f.facility === "ramp");
+    const gedungB = kesatuanSettled({
+      record: "14",
+      target: { osm: ref(KESATUAN_B) },
+      reason: "Pintu masuk Gedung B punya ramp landai di samping tangga.",
+      place: { name: "Kampus Kesatuan Gedung B", category: "kampus", entrance: { lat: -6.6059844, lng: 106.7994059 } },
+      facilities: { ramp: { answer: "tersedia" }, toilet_difabel: { answer: "belum_tahu" }, guiding_block: { answer: "belum_tahu" }, lift: { answer: "belum_tahu" } },
+      photos: [{ file: "14-close.png", kind: "close-up", pano_id: "GedungB", image_date: "2026-02", heading: 10 }],
+    });
+
+    const first = await run([gedungB], {}, "r-berdekatan");
+    expect(first.lines[0]).toBe(
+      'data 14 way/304211992: buat tempat "Kampus Kesatuan Gedung B" (kampus, Bogor Tengah): belum_diketahui; ramp=tersedia, toilet_difabel=belum_tahu, guiding_block=belum_tahu, lift=belum_tahu; gambar 2026-02',
+    );
+    const b = (await placeAt("Kampus Kesatuan Gedung B"))!;
+    expect(b.id).not.toBe(tower.id);
+    const distance = await rig.db.execute(sql`SELECT ST_Distance(a.location::geography, b.location::geography) AS m FROM places a, places b WHERE a.id = ${tower.id} AND b.id = ${b.id}`);
+    const m = (distance as unknown as { rows: { m: number }[] }).rows[0]!.m;
+    expect(m).toBeGreaterThan(30);
+    expect(m).toBeLessThan(SAME_PLACE_METERS);
+    expect(await placeAt("IBI Kesatuan")).toEqual(tower);
+    expect((await getPlace(rig.db, tower.id, NOW))!.facilities.find((f) => f.facility === "ramp")).toEqual(towerRamp);
+
+    const files = memory.files.size;
+    const again = await run([kesatuanSettled(), gedungB], {}, "r-berdekatan");
+    expect(again.lines).toEqual([
+      'data 10 way/158830244: lewati: "IBI Kesatuan" sudah diterapkan, tidak ada perubahan',
+      'data 14 way/304211992: lewati: "Kampus Kesatuan Gedung B" sudah diterapkan, tidak ada perubahan',
+    ]);
+    expect(memory.files.size).toBe(files);
+  });
+
+  it("still uses a place verified through a report near the candidate, and leaves it alone", async () => {
+    await rig.db.update(places).set({ location: { x: ATTAQWA.lng + 0.0002, y: ATTAQWA.lat } }).where(eq(places.id, rig.teamPlaceId));
+    const before = (await rig.db.select().from(places).where(eq(places.id, rig.teamPlaceId)))[0];
+    const attaqwa = siloamSettled({
+      record: "15",
+      target: { osm: ref(ATTAQWA) },
+      place: { name: "Masjid Attaqwa VBI", category: "masjid", entrance: { lat: ATTAQWA.lat, lng: ATTAQWA.lng } },
+      photos: [{ file: "admin.png", kind: "wide", pano_id: "attaqwa", image_date: "2026-01", heading: 0 }],
+    });
+    const result = await run([attaqwa], {}, "r-laporan-dekat");
+    expect(result.lines[0]).toBe(`data 15 ${ref(ATTAQWA)}: lewati: "Masjid contoh A" sudah diverifikasi lewat laporan, tidak diubah`);
+    expect(await placeAt("Masjid Attaqwa VBI")).toBeUndefined();
+    expect((await rig.db.select().from(places).where(eq(places.id, rig.teamPlaceId)))[0]).toEqual(before);
   });
 });
