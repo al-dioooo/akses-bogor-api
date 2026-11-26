@@ -1,6 +1,6 @@
 // Skema Zod untuk endpoint baca lokasi. Skema ini juga menjadi API spec (docs/openapi.json).
 import { z } from "zod";
-import { facilityAnswer, facilityKind, photoTag, placeCategory, placeStatus, unavailableReason } from "../db/schema.js";
+import { facilityAnswer, facilityKind, photoTag, placeCategory, placeStatus, unavailableReason, verificationSource } from "../db/schema.js";
 
 const category = z.enum(placeCategory.enumValues);
 const status = z.enum(placeStatus.enumValues);
@@ -88,6 +88,7 @@ export const photo = z.object({
   alt: z.string(),
   caption: z.string().nullable(),
   tag: z.enum(photoTag.enumValues),
+  source: z.enum(verificationSource.enumValues).describe("`street_view`: tangkapan Google Street View yang dipasang alat verifikasi (ADR-0057); keterangannya menyebut bulan gambarnya"),
 });
 
 export const placeSummary = z.object({
@@ -102,6 +103,14 @@ export const placeSummary = z.object({
   verifiedBy: z
     .enum(["tim", "admin"])
     .describe("`tim`: diterbitkan verifikator dari laporan. `admin`: dibuat, diubah, atau diterbitkan langsung oleh admin tanpa pemeriksaan orang kedua; web menulis \"Diterbitkan langsung oleh admin\", bukan \"Diverifikasi\" (ADR-0051)"),
+  verificationSource: z
+    .enum(verificationSource.enumValues)
+    .describe("`laporan`: dari laporan warga. `street_view`: dari bukti Street View; web menulis \"Diverifikasi dari Street View · gambar <bulan tahun>\", tidak pernah \"Diverifikasi\" saja (ADR-0057)"),
+  streetViewImageDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}$/)
+    .nullable()
+    .describe("Bulan gambar Street View yang menjadi bukti, `YYYY-MM`; terisi hanya untuk `street_view`. `lastVerifiedAt` tempat ini adalah awal bulan itu"),
   coverPhoto: photo.nullable().describe("Foto tayang pertama, mendahulukan tag pintu_masuk"),
 });
 

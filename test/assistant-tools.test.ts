@@ -3,6 +3,7 @@ import { askAgent, type AgentProfile } from "../src/agent/ask.js";
 import { loadFacilities, parseFacilities } from "../src/contribute/facilities.js";
 import { ASSISTANT_TOOLS } from "../src/agent/assistant-registry.js";
 import {
+  ADMIN_PUBLISHED_SOURCE,
   CANDIDATE_SOURCE,
   findPlaceForAssistant,
   nearbyPlaces,
@@ -10,7 +11,9 @@ import {
   placeAccessibilityForAssistant,
   roundDistance,
   showRoute,
+  streetViewSource,
   TEAM_CHECKED_SOURCE,
+  teamCheck,
 } from "../src/agent/assistant-tools.js";
 import type { AgentModel, AgentStep, AgentTurn } from "../src/agent/model.js";
 import { runTool, toolDefinitions } from "../src/agent/registry.js";
@@ -206,5 +209,14 @@ describe("OpenStreetMap candidates", () => {
     const result = await askAgent({ model, ctx: context(), profile }, { question: "Rute ke RSUD Uji?" });
     expect(result.cards).toEqual([{ type: "rute", target: { kind: "osm", osmType: "node", osmId: 31 }, name: "RSUD Uji Kota Bogor" }]);
     expect(result.sources).toEqual([expect.objectContaining({ type: "pengetahuan", citation: "© kontributor OpenStreetMap", license: "Open Database License (ODbL) 1.0" })]);
+  });
+});
+
+describe("street view places (ADR-0057)", () => {
+  it("names Street View and the image month as the source instead of a team check", () => {
+    expect(teamCheck({ verifiedBy: "tim", streetViewImageDate: "2026-01" })).toEqual({ checkedByTeam: true, verifiedBy: "tim", source: streetViewSource("2026-01") });
+    expect(streetViewSource("2026-01")).toMatch(/Street View, gambar 2026-01.*bukan pemeriksaan di lokasi/);
+    expect(teamCheck({ verifiedBy: "tim" }).source).toBe(TEAM_CHECKED_SOURCE);
+    expect(teamCheck({ verifiedBy: "admin", streetViewImageDate: null }).source).toBe(ADMIN_PUBLISHED_SOURCE);
   });
 });

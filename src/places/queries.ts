@@ -11,10 +11,10 @@ export interface ReadOptions {
   photoBaseUrl?: string;
 }
 
-type PhotoRow = { id: string; storageKey: string; altText: string; caption: string | null; tag: (typeof photos.tag.enumValues)[number] };
+type PhotoRow = { id: string; storageKey: string; altText: string; caption: string | null; tag: (typeof photos.tag.enumValues)[number]; source: (typeof photos.source.enumValues)[number] };
 
 export const photoUrl = (key: string, base?: string) => (base ? `${base.replace(/\/+$/, "")}/${key.split("/").map(encodeURIComponent).join("/")}` : null);
-export const toPhoto = (p: PhotoRow, base?: string) => ({ id: p.id, url: photoUrl(p.storageKey, base), alt: p.altText, caption: p.caption, tag: p.tag });
+export const toPhoto = (p: PhotoRow, base?: string) => ({ id: p.id, url: photoUrl(p.storageKey, base), alt: p.altText, caption: p.caption, tag: p.tag, source: p.source });
 const escapeLike = (value: string) => value.replace(/[\\%_]/g, (c) => `\\${c}`);
 
 /** Lokasi yang masih tayang. Dipakai setiap query publik; lokasi yang diturunkan admin hanya terlihat di route admin. */
@@ -22,6 +22,9 @@ export const published = isNull(places.unpublishedAt);
 
 /** Siapa yang terakhir menerbitkan data lokasi: verifikator lewat laporan, atau admin langsung (ADR-0051). */
 export const verifiedBy = (adminPublishedAt: Date | null) => (adminPublishedAt ? ("admin" as const) : ("tim" as const));
+
+/** Bulan gambar Street View sebagai `YYYY-MM`; Street View hanya memberi bulan dan tahun (ADR-0057). */
+export const imageMonth = (date: string | null) => (date ? date.slice(0, 7) : null);
 
 function filterConditions(f: PlaceFilters, bbox?: [number, number, number, number]): SQL | undefined {
   const conditions: (SQL | undefined)[] = [
@@ -56,8 +59,13 @@ const summaryColumns = {
   location: places.location,
   lastVerifiedAt: places.lastVerifiedAt,
   adminPublishedAt: places.adminPublishedAt,
+  verificationSource: places.verificationSource,
+  streetViewImageDate: places.streetViewImageDate,
 };
-type SummaryRow = Omit<{ [K in keyof typeof summaryColumns]: (typeof summaryColumns)[K]["_"]["data"] }, "adminPublishedAt"> & { adminPublishedAt: Date | null };
+type SummaryRow = Omit<{ [K in keyof typeof summaryColumns]: (typeof summaryColumns)[K]["_"]["data"] }, "adminPublishedAt" | "streetViewImageDate"> & {
+  adminPublishedAt: Date | null;
+  streetViewImageDate: string | null;
+};
 
 const toSummary = (r: SummaryRow) => ({
   id: r.id,
@@ -69,11 +77,13 @@ const toSummary = (r: SummaryRow) => ({
   location: { lat: r.location.y, lng: r.location.x },
   lastVerifiedAt: r.lastVerifiedAt.toISOString(),
   verifiedBy: verifiedBy(r.adminPublishedAt),
+  verificationSource: r.verificationSource,
+  streetViewImageDate: imageMonth(r.streetViewImageDate),
 });
 
 export const publishedPhotosOf = (db: Db, placeIds: string[]) =>
   db
-    .select({ placeId: photos.placeId, id: photos.id, storageKey: photos.storageKey, altText: photos.altText, caption: photos.caption, tag: photos.tag })
+    .select({ placeId: photos.placeId, id: photos.id, storageKey: photos.storageKey, altText: photos.altText, caption: photos.caption, tag: photos.tag, source: photos.source })
     .from(photos)
     .where(and(inArray(photos.placeId, placeIds), eq(photos.moderation, "tayang")))
     .orderBy(photos.placeId, asc(photos.tag), asc(photos.createdAt));
@@ -192,7 +202,7 @@ export async function placesNamed(db: Db, query: string, limit = 3) {
   const words = q.split(/\s+/).filter(Boolean);
   const allWords = and(...words.map((word) => sql`strpos(lower(${places.name}), ${word}) > 0`));
   const rows = await db
-    .select({ id: places.id, name: places.name, category: places.category, status: places.status, districtSlug: places.districtSlug, districtName: districts.name, location: places.location, adminPublishedAt: places.adminPublishedAt })
+    .select({ id: places.id, name: places.name, category: places.category, status: places.status, districtSlug: places.districtSlug, districtName: districts.name, location: places.location, adminPublishedAt: places.adminPublishedAt, streetViewImageDate: places.streetViewImageDate })
     .from(places)
     .innerJoin(districts, eq(districts.slug, places.districtSlug))
     .where(and(published, or(allWords, sql`${score} >= 0.5`)))
@@ -206,5 +216,6 @@ export async function placesNamed(db: Db, query: string, limit = 3) {
     district: { slug: r.districtSlug, name: r.districtName },
     location: { lat: r.location.y, lng: r.location.x },
     verifiedBy: verifiedBy(r.adminPublishedAt),
+    streetViewImageDate: imageMonth(r.streetViewImageDate),
   }));
 }

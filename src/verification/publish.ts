@@ -166,6 +166,9 @@ export async function publishInTransaction(tx: Db, store: PhotoStore | undefined
     // Diterbitkan verifikator: label "langsung oleh admin" tidak berlaku lagi; terbit langsung memasangnya (ADR-0051).
     adminPublishedAt: direct ? now : null,
     adminPublishedBy: direct ? viewerId : null,
+    // Data dari laporan menggantikan bukti Street View sebelumnya, jadi labelnya ikut kembali (ADR-0057).
+    verificationSource: "laporan" as const,
+    streetViewImageDate: null,
     updatedAt: now,
   };
   let before: Snapshot | null = null;
