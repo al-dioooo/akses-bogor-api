@@ -76,8 +76,8 @@ type DirectInput = Pick<AdminPlaceBody, "facilities" | "reason" | "osm"> & Parti
 /**
  * Laporan admin disimpan dan diterbitkan dalam **satu** transaksi (ADR-0051), jadi laporan berstatus menunggu tidak pernah
  * terlihat di antrean verifikasi dan tidak bisa diambil verifikator di tengah jalan. Bila terbit gagal, laporan dan
- * pemasangan fotonya ikut batal: foto kembali milik admin. `tags` menghitung foto tayang tempat itu yang tetap ada, dibaca
- * di dalam transaksi yang sama.
+ * pemasangan fotonya ikut batal: foto kembali milik admin. `keptTags` memberi tag foto tayang tempat itu yang tetap ada,
+ * dibaca di dalam transaksi yang sama.
  */
 async function submitAndPublish(
   db: Db,
@@ -111,7 +111,7 @@ async function submitAndPublish(
 
 const noTags = async () => [] as PhotoTag[];
 /** Foto yang sedang tayang di tempat ini. */
-const shownTags = (db: Db, placeId: string) => db.select({ id: photos.id, tag: photos.tag }).from(photos).where(and(eq(photos.placeId, placeId), eq(photos.moderation, "tayang")));
+const shownPhotos = (db: Db, placeId: string) => db.select({ id: photos.id, tag: photos.tag }).from(photos).where(and(eq(photos.placeId, placeId), eq(photos.moderation, "tayang")));
 
 /** Tempat baru yang langsung tayang sebagai tempat admin. */
 export async function createPlace(db: Db, store: PhotoStore | undefined, adminId: string, body: AdminPlaceBody, now: Date, log?: Log) {
@@ -132,13 +132,13 @@ export async function updatePlace(db: Db, store: PhotoStore | undefined, adminId
     throw new HttpError(409, "lokasi_berubah", "Data lokasi ini baru saja berubah. Muat ulang halaman dan periksa lagi dengan data terbaru.");
   }
   precheck(body, store);
-  const current = await shownTags(db, placeId);
+  const current = await shownPhotos(db, placeId);
   if (body.removePhotos.some((id) => !current.some((p) => p.id === id))) {
     throw new HttpError(400, "foto_tidak_ditemukan", "Foto yang akan dihapus bukan foto tayang lokasi ini. Muat ulang halaman.");
   }
   const { status, downgraded } = await submitAndPublish(db, store, adminId, reportOf(body, "perubahan", placeId), body, now, log, {
     version: async () => body.version,
-    keptTags: async (tx) => (await shownTags(tx, placeId)).filter((p) => !body.removePhotos.includes(p.id)).map((p) => p.tag),
+    keptTags: async (tx) => (await shownPhotos(tx, placeId)).filter((p) => !body.removePhotos.includes(p.id)).map((p) => p.tag),
     removePhotoIds: body.removePhotos,
   });
   return { placeId, status, downgraded };
@@ -173,7 +173,6 @@ export async function restorePlace(db: Db, adminId: string, placeId: string, rea
   });
 }
 
-
 /**
  * Laporan Laporkan milik admin yang diterbitkan langsung (`publishDirectly`, ADR-0051). Untuk Edit lokasi dan Laporkan
  * kekurangan, foto tayang tempat itu ikut menjadi bukti. Kirim ulang dengan kunci draf yang sama mengembalikan laporan
@@ -186,7 +185,7 @@ export async function publishSubmission(db: Db, store: PhotoStore | undefined, a
   const input = { name: body.name, category: body.category, location: body.location, landmark: body.landmark, description: body.description, facilities: body.facilities, reason };
   try {
     const { placeId, downgraded, report } = await submitAndPublish(db, store, adminId, body, input, now, log, {
-      keptTags: async (tx) => (body.placeId ? (await shownTags(tx, body.placeId)).map((p) => p.tag) : []),
+      keptTags: async (tx) => (body.placeId ? (await shownPhotos(tx, body.placeId)).map((p) => p.tag) : []),
       version: async (tx) => {
         if (!body.placeId) return undefined;
         const [place] = await tx.select({ updatedAt: places.updatedAt }).from(places).where(eq(places.id, body.placeId));
