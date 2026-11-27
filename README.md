@@ -58,6 +58,7 @@ pnpm dev               # http://localhost:8080/healthz
 | `pnpm hak-subjek:catat --jenis <jenis> [--akun <email\|id>] [--diterima "YYYY-MM-DD HH:MM"] --oleh <email admin>` | Mencatat permintaan hak subjek data yang masuk lewat email kontak dan mencetak nomor serta tenggat 3 × 24 jamnya. `--selesai <nomor>` atau `--tolak <nomor> --alasan "…"` menutupnya; `--daftar` menampilkan yang masih terbuka |
 | `pnpm hak-subjek:ekspor --akun <email\|id> --permintaan <nomor> --oleh <email admin> --keluar <berkas.json>` | Menulis salinan semua data akun ke berkas JSON baru bermode 600 (tidak menimpa), dengan `catatan` per bagian. Tanpa kunci sesi, hash kode masuk, catatan internal verifikator, dan identitas anggota tim lain. Untuk permintaan berjenis `salinan` |
 | `pnpm hak-subjek:ganti-email --akun <email lama\|id> --email-baru <email> --permintaan <nomor> --oleh <email admin>` | Mengganti email akun (permintaan `perbaikan`): cek unik tanpa membedakan huruf besar, tautan Google dilepas, semua sesi diakhiri, dan `emailVerified` kembali false sampai pemilik masuk dengan kode ke email baru. Setelah itu masuk dengan Google untuk email baru menaut lagi |
+| `pnpm hak-subjek:tahan --akun <email\|id> --permintaan <nomor> --oleh <email admin> --alasan "…"` | Menahan laporan akun yang belum diputuskan (permintaan `pembatasan`): tidak muncul di antrean, verifikator mendapat 404 `laporan_ditahan`, dan tidak ditolak otomatis karena tenggat klarifikasi. Laporan yang dikirim kemudian tidak ikut ditahan. `--lepas` mengembalikannya ke antrean dan memperpanjang tenggat klarifikasi selama masa tahan |
 
 ## Database
 
@@ -375,6 +376,7 @@ hak scripts/hak-subjek/catat.ts --jenis salinan --akun <email> --diterima "2026-
 hak scripts/hak-subjek/catat.ts --daftar
 hak scripts/hak-subjek/ekspor.ts --akun <email> --permintaan <nomor> --oleh <email admin> --keluar /tmp/ekspor-<nomor>.json
 hak scripts/hak-subjek/ganti-email.ts --akun <email lama> --email-baru <email baru> --permintaan <nomor> --oleh <email admin>
+hak scripts/hak-subjek/tahan.ts --akun <email> --permintaan <nomor> --oleh <email admin> --alasan "Pelapor meminta penundaan"
 hak scripts/hak-subjek/catat.ts --selesai <nomor> --oleh <email admin>
 hak scripts/hak-subjek/catat.ts --tolak <nomor> --alasan "Akan mengungkap data pribadi orang lain" --oleh <email admin>
 ```

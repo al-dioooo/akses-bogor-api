@@ -33,7 +33,8 @@
     "verifikasi:street-view": "tsx --env-file-if-exists=.env scripts/verifikasi/street-view.ts",
     "hak-subjek:catat": "tsx --env-file-if-exists=.env scripts/hak-subjek/catat.ts",
     "hak-subjek:ekspor": "tsx --env-file-if-exists=.env scripts/hak-subjek/ekspor.ts",
-    "hak-subjek:ganti-email": "tsx --env-file-if-exists=.env scripts/hak-subjek/ganti-email.ts"
+    "hak-subjek:ganti-email": "tsx --env-file-if-exists=.env scripts/hak-subjek/ganti-email.ts",
+    "hak-subjek:tahan": "tsx --env-file-if-exists=.env scripts/hak-subjek/tahan.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.12.0",
