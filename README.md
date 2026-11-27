@@ -285,10 +285,10 @@ Unit systemd dan skrip di `deploy/` dipasang dengan tangan, jadi perubahan pada 
 Sekali saja, sebagai admin, dari checkout repo ini:
 
 ```bash
-# PostgreSQL 17 + PostGIS dari PGDG, dan rclone untuk salinan cadangan ke R2
+# PostgreSQL 17 + PostGIS dari PGDG, rclone untuk salinan cadangan ke R2, dan age untuk mengenkripsinya
 sudo apt install -y postgresql-common
 sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
-sudo apt install -y postgresql-17 postgresql-17-postgis-3 rclone
+sudo apt install -y postgresql-17 postgresql-17-postgis-3 rclone age
 pg_lsclusters   # 17/main harus di port 5433; ubah dengan pg_conftool bila tidak
 
 # User sistem dan database. Role aksesbogor masuk lewat peer, tanpa password.
@@ -400,6 +400,7 @@ Seed mengosongkan data lokasi dan laporan. Jangan jalankan lagi setelah ada data
 
 - Tujuh dump terakhir ada di `/var/backups/akses-bogor/aksesbogor-<waktu UTC>.dump`, hanya bisa dibaca user `postgres`.
 - Salinan R2: buat bucket privat yang terpisah dari bucket foto, dengan lifecycle rule yang menghapus objek setelah 30 hari, dan token R2 khusus bucket itu. Salin [deploy/backup.env.example](deploy/backup.env.example) ke `/etc/akses-bogor/backup.env` (root, mode `0600`) dan isi kredensialnya.
+- Enkripsi salinan R2: isi `BACKUP_AGE_RECIPIENT` di `backup.env` dengan kunci publik `age` tim. Server butuh paket `age`. R2 lalu hanya menerima `<dump>.age`, sedangkan dump di server tetap polos. Kunci privatnya disimpan tim di `~/credentials/akses-bogor/age-cadangan.key`, tidak di `backup.env` dan tidak di Cloudflare. Bila `BACKUP_AGE_RECIPIENT` kosong, dump disalin tanpa enkripsi dan log menulis peringatan.
 - Menjalankan cadangan sekarang: `sudo systemctl start akses-bogor-backup`, lalu `journalctl -u akses-bogor-backup -n 20`.
 
 Memulihkan dump ke database baru:
@@ -411,6 +412,8 @@ sudo -u postgres createdb -p 5433 --owner aksesbogor aksesbogor
 sudo -u postgres pg_restore -p 5433 -d aksesbogor /var/backups/akses-bogor/<dump>
 sudo systemctl start akses-bogor-api akses-bogor-deploy.timer
 ```
+
+Dump dari R2 (`<dump>.age`) didekripsi dulu dengan kunci privat, lalu langsung diteruskan ke `pg_restore`, misalnya `age -d -i ~/credentials/akses-bogor/age-cadangan.key <dump>.age | sudo -u postgres pg_restore -p 5433 -d aksesbogor`. Langkah lengkapnya ada di runbook `operations/cadangan-database.md` di akses-bogor-docs.
 
 ## Kontribusi
 
