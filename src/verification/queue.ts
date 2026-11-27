@@ -43,7 +43,8 @@ const notOwnedBy = (viewerId: string) => or(isNull(reports.reporterId), ne(repor
  * tetapi tetap disebut supaya antrean kosong tidak terbaca "semua sudah diperiksa".
  */
 export async function listQueue(db: Db, viewerId: string, status: "menunggu" | "klarifikasi") {
-  const where = and(eq(reports.status, status), notOwnedBy(viewerId));
+  // Laporan yang ditahan atas permintaan pelapornya tidak masuk antrean (`pnpm hak-subjek:tahan`).
+  const where = and(eq(reports.status, status), notOwnedBy(viewerId), isNull(reports.heldAt));
   const [rows, [{ total } = { total: 0 }], [{ ownWaiting } = { ownWaiting: 0 }]] = await Promise.all([
     db
       .select({
@@ -67,7 +68,7 @@ export async function listQueue(db: Db, viewerId: string, status: "menunggu" | "
       .orderBy(asc(reports.submittedAt), asc(reports.id))
       .limit(100),
     db.select({ total: count() }).from(reports).where(where),
-    db.select({ ownWaiting: count() }).from(reports).where(and(eq(reports.status, status), eq(reports.reporterId, viewerId))),
+    db.select({ ownWaiting: count() }).from(reports).where(and(eq(reports.status, status), eq(reports.reporterId, viewerId), isNull(reports.heldAt))),
   ]);
 
   const placeIds = [...new Set(rows.map((r) => r.placeId).filter((id): id is string => id !== null))];
@@ -106,6 +107,8 @@ export async function listQueue(db: Db, viewerId: string, status: "menunggu" | "
 
 export const ownReport = () => new HttpError(403, "laporan_sendiri", "Anda tidak bisa memeriksa laporan Anda sendiri. Biarkan verifikator lain yang memeriksanya.");
 export const reportNotFound = () => new HttpError(404, "laporan_tidak_ditemukan", "Laporan ini tidak ditemukan. Mungkin pelapornya sudah menghapus akun.");
+/** Laporan yang ditahan diperlakukan seperti tidak ada di antrean, dengan kode sendiri supaya jelas sebabnya. */
+export const reportHeld = () => new HttpError(404, "laporan_ditahan", "Laporan ini sedang ditahan atas permintaan pelapornya, jadi belum bisa diperiksa.");
 
 /** Laporan lengkap untuk halaman pemeriksaan (FR-31), dengan data lokasi saat ini untuk dibandingkan. */
 export async function getReview(db: Db, viewerId: string, id: string, opts: ReadOptions = {}) {
@@ -125,6 +128,7 @@ export async function getReview(db: Db, viewerId: string, id: string, opts: Read
       decidedAt: reports.decidedAt,
       rejectionReason: reports.rejectionReason,
       reviewerNote: reports.reviewerNote,
+      heldAt: reports.heldAt,
     })
     .from(reports)
     .innerJoin(districts, eq(districts.slug, reports.districtSlug))
@@ -132,6 +136,7 @@ export async function getReview(db: Db, viewerId: string, id: string, opts: Read
     .where(eq(reports.id, id));
   if (!row) throw reportNotFound();
   if (row.reporterId === viewerId) throw ownReport();
+  if (row.heldAt) throw reportHeld();
 
   const submission = row.submission as Submission;
   const point = { lat: row.location!.y, lng: row.location!.x };

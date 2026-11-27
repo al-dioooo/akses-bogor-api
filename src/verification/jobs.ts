@@ -1,7 +1,7 @@
 // Tugas berkala verifikasi (ADR-0036, ADR-0039): laporan yang tidak dijawab sampai tenggat klarifikasi ditolak dengan
 // R6, lalu email status yang tertunda dikirim atau dicoba ulang.
 // Berjalan saat server mulai lalu setiap jam, seperti pembersihan akun dan foto.
-import { and, eq, lte } from "drizzle-orm";
+import { and, eq, isNull, lte } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import { reports } from "../db/schema.js";
 import type { PhotoStore } from "../photos/storage.js";
@@ -12,12 +12,12 @@ const HOUR_MS = 60 * 60 * 1000;
 
 type Log = { info: (obj: object, msg: string) => void; warn: (obj: object, msg: string) => void };
 
-/** Menolak laporan klarifikasi yang tenggatnya sudah lewat, satu transaksi per laporan. Mengembalikan jumlahnya. */
+/** Menolak laporan klarifikasi yang tenggatnya sudah lewat dan tidak ditahan, satu transaksi per laporan. Mengembalikan jumlahnya. */
 export async function expireClarifications(db: Db, store: PhotoStore | undefined, now: Date, log?: Log) {
   const due = await db
     .select({ id: reports.id })
     .from(reports)
-    .where(and(eq(reports.status, "klarifikasi"), lte(reports.clarificationDueAt, now)));
+    .where(and(eq(reports.status, "klarifikasi"), lte(reports.clarificationDueAt, now), isNull(reports.heldAt)));
   let expired = 0;
   for (const { id } of due) {
     const removed = await db.transaction(async (tx) => {

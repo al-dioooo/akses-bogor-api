@@ -5,7 +5,7 @@ import { audit } from "../audit/log.js";
 import type { Db } from "../db/client.js";
 import { photos, reports, type BlurRegion } from "../db/schema.js";
 import { HttpError } from "../http/errors.js";
-import { ownReport, reportNotFound } from "./queue.js";
+import { ownReport, reportHeld, reportNotFound } from "./queue.js";
 
 export const photoNotFound = () => new HttpError(404, "foto_tidak_ditemukan", "Foto ini tidak ditemukan atau sudah terbit.");
 export const alreadyDecided = () => new HttpError(409, "sudah_diputuskan", "Laporan ini sudah diputuskan. Muat ulang halaman untuk melihat hasilnya.");
@@ -17,12 +17,13 @@ export const isReviewable = (status: string) => (REVIEWABLE as readonly string[]
 /** Foto laporan yang belum terbit, untuk dibuka verifikator. */
 export async function photoForReview(db: Db, viewerId: string, photoId: string) {
   const [row] = await db
-    .select({ storageKey: photos.storageKey, blur: photos.blurRegions, moderation: photos.moderation, reporterId: reports.reporterId })
+    .select({ storageKey: photos.storageKey, blur: photos.blurRegions, moderation: photos.moderation, reporterId: reports.reporterId, heldAt: reports.heldAt })
     .from(photos)
     .innerJoin(reports, eq(reports.id, photos.reportId))
     .where(eq(photos.id, photoId));
   if (!row || row.moderation === "tayang" || !row.storageKey.startsWith("laporan/")) throw photoNotFound();
   if (row.reporterId === viewerId) throw ownReport();
+  if (row.heldAt) throw reportHeld();
   return { storageKey: row.storageKey, blur: row.blur ?? [] };
 }
 
@@ -36,10 +37,11 @@ export type ModerationPatch = {
 /** Menyimpan moderasi satu foto sebelum keputusan laporan, dan mencatatnya di log audit (ADR-0038). */
 export async function moderatePhoto(db: Db, viewerId: string, reportId: string, photoId: string, patch: ModerationPatch, now: Date) {
   return db.transaction(async (tx) => {
-    const [report] = await tx.select({ status: reports.status, reporterId: reports.reporterId }).from(reports).where(eq(reports.id, reportId)).for("update");
+    const [report] = await tx.select({ status: reports.status, reporterId: reports.reporterId, heldAt: reports.heldAt }).from(reports).where(eq(reports.id, reportId)).for("update");
     if (!report) throw reportNotFound();
     if (report.reporterId === viewerId) throw ownReport();
     if (!isReviewable(report.status)) throw alreadyDecided();
+    if (report.heldAt) throw reportHeld();
     const [photo] = await tx
       .select({ tag: photos.tag, caption: photos.caption, moderation: photos.moderation, blur: photos.blurRegions })
       .from(photos)
