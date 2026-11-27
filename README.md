@@ -55,6 +55,7 @@ pnpm dev               # http://localhost:8080/healthz
 | `pnpm verifikasi:street-view <manifest.json> [--dry-run] [--batalkan] [--sembunyikan-kandidat]` | Menerapkan manifest verifikasi Street View dalam satu transaksi (ADR-0057): data terjawab menjadi tempat bersumber `street_view` dengan fotonya, data tidak terjawab disembunyikan tanpa dihapus. Aman dijalankan ulang; `--batalkan` mengembalikan yang dibuat manifest itu. Tidak pernah menulis `reports` |
 | `pnpm agen:evaluasi [--asisten] [K01 …]` | Menjalankan pertanyaan uji agen kontributor (`scripts/agen/pertanyaan-uji.json`), atau dengan `--asisten` pertanyaan asisten rute publik (`scripts/agen/pertanyaan-uji-asisten.json`, dengan titik awal yang hanya dipakai server), sekali ke penyedia di `AGENT_PROVIDER`; untuk Claude mencetak token dan perkiraan biaya per pertanyaan. Butuh API key penyedianya di environment lokal dan memakai saldo atau kuota, jadi jalankan seperlunya. Berhenti setelah `EVALUASI_MAKS_BERHASIL` permintaan berhasil (bawaan 40 untuk Claude, 14 untuk OpenRouter) |
 | `pnpm peran --email <email> --peran <admin\|verifikator\|pengguna>` | Mengganti peran akun yang sudah dilengkapi, mis. membuat admin pertama; dicatat di log audit sebagai `skrip` (ADR-0035) |
+| `pnpm hak-subjek:catat --jenis <jenis> [--akun <email\|id>] [--diterima "YYYY-MM-DD HH:MM"] --oleh <email admin>` | Mencatat permintaan hak subjek data yang masuk lewat email kontak dan mencetak nomor serta tenggat 3 × 24 jamnya. `--selesai <nomor>` atau `--tolak <nomor> --alasan "…"` menutupnya; `--daftar` menampilkan yang masih terbuka |
 
 ## Database
 
@@ -359,6 +360,19 @@ api() { sudo -u aksesbogor -H sh -c "cd /srv/akses-bogor/current && COREPACK_ENA
 api scripts/verifikasi/daftar.ts > ~/verifikasi-daftar.csv
 api scripts/verifikasi/street-view.ts /srv/akses-bogor/data/street-view/<putaran>/manifest.json --dry-run
 api scripts/verifikasi/street-view.ts /srv/akses-bogor/data/street-view/<putaran>/manifest.json
+```
+
+### Permintaan Hak Subjek Data
+
+Permintaan salinan data, perbaikan, dan pembatasan pemrosesan dari Kebijakan Privasi bagian "Hak Anda" dijalankan dengan skrip `scripts/hak-subjek/` paling lambat 3 × 24 jam setelah emailnya diterima. Setiap permintaan dicatat dulu di tabel `data_subject_requests`; skrip lain wajib menyebut nomornya, harus dijalankan untuk akun yang sama, dan mencatat admin yang menjalankannya (`--oleh`) di log audit. Langkah lengkap, cara memeriksa pengirim, dan templat balasan ada di runbook `operations/permintaan-subjek-data.md` di akses-bogor-docs. Di server produksi (fatir-mitya):
+
+```bash
+# Argumen diteruskan apa adanya, jadi alasan yang berisi spasi cukup diberi tanda kutip biasa.
+hak() { sudo -u aksesbogor -H env COREPACK_ENABLE_DOWNLOAD_PROMPT=0 sh -c 'cd /srv/akses-bogor/current && exec corepack pnpm exec tsx --env-file=/etc/akses-bogor/api.env "$@"' hak "$@"; }
+hak scripts/hak-subjek/catat.ts --jenis salinan --akun <email> --diterima "2026-11-27 09:15" --oleh <email admin>
+hak scripts/hak-subjek/catat.ts --daftar
+hak scripts/hak-subjek/catat.ts --selesai <nomor> --oleh <email admin>
+hak scripts/hak-subjek/catat.ts --tolak <nomor> --alasan "Akan mengungkap data pribadi orang lain" --oleh <email admin>
 ```
 
 ### Data Preview
