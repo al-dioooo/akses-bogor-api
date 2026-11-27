@@ -32,6 +32,9 @@ export const photoModeration = pgEnum("photo_moderation", ["menunggu", "tayang",
 export const verificationSource = pgEnum("verification_source", ["laporan", "street_view"]);
 // ADR-0039
 export const reportEmailKind = pgEnum("report_email_kind", ["diterbitkan", "ditolak", "klarifikasi"]);
+// Jenis permintaan hak subjek data, sesuai bagian "Hak Anda" di Kebijakan Privasi (UU No. 27/2022)
+export const dataSubjectRequestKind = pgEnum("data_subject_request_kind", ["salinan", "perbaikan", "pembatasan", "penghapusan", "keberatan", "pertanyaan"]);
+export const dataSubjectRequestOutcome = pgEnum("data_subject_request_outcome", ["selesai", "ditolak"]);
 
 const timestamps = {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -142,6 +145,8 @@ export const users = pgTable(
     privacyConsentAt: timestamp("privacy_consent_at", { withTimezone: true }),
     /** Versi Kebijakan Privasi yang disetujui, mis. "2026-11-07". */
     privacyPolicyVersion: varchar("privacy_policy_version", { length: 20 }),
+    /** Terisi bila pemilik akun meminta email status laporan dihentikan (`pnpm hak-subjek:email`). Kode masuk tetap dikirim. */
+    reportEmailsOffAt: timestamp("report_emails_off_at", { withTimezone: true }),
     ...timestamps,
   },
   (t) => [uniqueIndex("users_email_idx").on(sql`lower(${t.email})`)],
@@ -231,8 +236,15 @@ export const reports = pgTable(
     reviewerNote: varchar("reviewer_note", { length: 1000 }),
     submittedAt: timestamp("submitted_at", { withTimezone: true }).notNull().defaultNow(),
     decidedAt: timestamp("decided_at", { withTimezone: true }),
+    /**
+     * Terisi bila pelapor meminta pemrosesan ditunda (`pnpm hak-subjek:tahan`): laporan tidak muncul di antrean, tidak
+     * bisa diputuskan, dan tidak ditolak otomatis. Alasannya hanya untuk tim dan tidak boleh berisi data pribadi.
+     */
+    heldAt: timestamp("held_at", { withTimezone: true }),
+    holdReason: varchar("hold_reason", { length: 500 }),
   },
   (t) => [
+    check("reports_hold_with_reason", sql`(${t.heldAt} IS NULL) = (${t.holdReason} IS NULL)`),
     index("reports_queue_idx").on(t.status, t.submittedAt),
     index("reports_reporter_idx").on(t.reporterId),
     index("reports_place_idx").on(t.placeId),
@@ -353,6 +365,34 @@ export const reportEmails = pgTable(
     nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("report_emails_report_kind_idx").on(t.reportId, t.kind), index("report_emails_next_idx").on(t.nextAttemptAt)],
+);
+
+/**
+ * Permintaan hak subjek data yang masuk lewat email kontak: salinan data, perbaikan, pembatasan, penghapusan, keberatan,
+ * atau pertanyaan. Dijawab paling lambat 3 × 24 jam sejak `receivedAt`. Tanpa email, nama, atau isi permintaan. `userId`
+ * sengaja tanpa foreign key supaya catatan tetap utuh setelah akunnya dihapus, sama seperti `audit_log.entity_id`.
+ */
+export const dataSubjectRequests = pgTable(
+  "data_subject_requests",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    kind: dataSubjectRequestKind("kind").notNull(),
+    /** Akun yang dimaksud; kosong bila tidak ada akun dengan email pengirim. */
+    userId: uuid("user_id"),
+    receivedAt: timestamp("received_at", { withTimezone: true }).notNull(),
+    /** Admin yang mencatat dan menangani permintaan. */
+    handledBy: uuid("handled_by").references(() => users.id, { onDelete: "set null" }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    outcome: dataSubjectRequestOutcome("outcome"),
+    /** Alasan penolakan (wajib bila ditolak) atau catatan singkat, tanpa data pribadi. */
+    note: varchar("note", { length: 500 }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("data_subject_requests_user_idx").on(t.userId),
+    check("data_subject_requests_outcome_with_time", sql`(${t.completedAt} IS NULL) = (${t.outcome} IS NULL)`),
+    check("data_subject_requests_refusal_reason", sql`${t.outcome} IS DISTINCT FROM 'ditolak' OR ${t.note} IS NOT NULL`),
+  ],
 );
 
 // Basis pengetahuan agen rute (ADR-0042). Diisi skrip di `scripts/pengetahuan/`, tidak pernah dari permintaan pengguna.
