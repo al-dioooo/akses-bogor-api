@@ -23,7 +23,9 @@ export async function runScript(main: (db: Db, now: Date) => Promise<void>) {
   try {
     await main(db, new Date());
   } catch (error) {
-    console.error(error instanceof HttpError ? error.message : error);
+    // Galat kueri Drizzle memuat parameternya, mis. email; yang dicetak hanya pesan dari PostgreSQL atau jaringan.
+    const cause = error instanceof Error && error.cause instanceof Error ? error.cause : error;
+    console.error(error instanceof HttpError ? error.message : `Gagal: ${cause instanceof Error ? cause.message : String(cause)}`);
     process.exitCode = 1;
   } finally {
     await pool.end();

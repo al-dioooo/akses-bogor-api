@@ -32,6 +32,11 @@ const { values } = parseArgs({
   },
 });
 
+const closing = values.selesai ?? values.tolak;
+const id = closing === undefined ? undefined : requestNumber(closing, USAGE);
+const kind = KINDS.find((k) => k === values.jenis) as RequestKind | undefined;
+if (!values.daftar && (!values.oleh || (id === undefined && !kind))) usage(USAGE);
+
 await runScript(async (db, now) => {
   if (values.daftar) {
     const open = await listOpenRequests(db);
@@ -43,21 +48,17 @@ await runScript(async (db, now) => {
     }
     return;
   }
-  if (!values.oleh) usage(USAGE);
-  const handler = await findHandler(db, values.oleh);
+  const handler = await findHandler(db, values.oleh!);
 
-  if (values.selesai || values.tolak) {
-    const id = requestNumber(values.selesai ?? values.tolak, USAGE);
+  if (id !== undefined) {
     const outcome = values.selesai ? "selesai" : "ditolak";
-    const { kind, late } = await closeRequest(db, id, { outcome, note: values.alasan ?? null, handler, now });
-    console.log(`Permintaan #${id} (${kind}) ${outcome}.${late ? " Melewati tenggat 3 × 24 jam." : ""}`);
+    const { kind: closed, late } = await closeRequest(db, id, { outcome, note: values.alasan ?? null, handler, now });
+    console.log(`Permintaan #${id} (${closed}) ${outcome}.${late ? " Melewati tenggat 3 × 24 jam." : ""}`);
     return;
   }
 
-  const kind = KINDS.find((k) => k === values.jenis) as RequestKind | undefined;
-  if (!kind) usage(USAGE);
   const account = values.akun ? await findAccount(db, values.akun) : null;
   const receivedAt = values.diterima ? parseReceivedAt(values.diterima, now) : now;
-  const { id, dueAt } = await recordRequest(db, { kind, userId: account?.id ?? null, receivedAt, handler, now });
-  console.log(`Permintaan #${id} (${kind}) dicatat${account ? ` untuk akun ${account.id}` : " tanpa akun"}. Tenggat: ${formatDeadline(dueAt)}.`);
+  const recorded = await recordRequest(db, { kind: kind!, userId: account?.id ?? null, receivedAt, handler, now });
+  console.log(`Permintaan #${recorded.id} (${kind}) dicatat${account ? ` untuk akun ${account.id}` : " tanpa akun"}. Tenggat: ${formatDeadline(recorded.dueAt)}.`);
 });
