@@ -56,6 +56,7 @@ pnpm dev               # http://localhost:8080/healthz
 | `pnpm agen:evaluasi [--asisten] [K01 …]` | Menjalankan pertanyaan uji agen kontributor (`scripts/agen/pertanyaan-uji.json`), atau dengan `--asisten` pertanyaan asisten rute publik (`scripts/agen/pertanyaan-uji-asisten.json`, dengan titik awal yang hanya dipakai server), sekali ke penyedia di `AGENT_PROVIDER`; untuk Claude mencetak token dan perkiraan biaya per pertanyaan. Butuh API key penyedianya di environment lokal dan memakai saldo atau kuota, jadi jalankan seperlunya. Berhenti setelah `EVALUASI_MAKS_BERHASIL` permintaan berhasil (bawaan 40 untuk Claude, 14 untuk OpenRouter) |
 | `pnpm peran --email <email> --peran <admin\|verifikator\|pengguna>` | Mengganti peran akun yang sudah dilengkapi, mis. membuat admin pertama; dicatat di log audit sebagai `skrip` (ADR-0035) |
 | `pnpm hak-subjek:catat --jenis <jenis> [--akun <email\|id>] [--diterima "YYYY-MM-DD HH:MM"] --oleh <email admin>` | Mencatat permintaan hak subjek data yang masuk lewat email kontak dan mencetak nomor serta tenggat 3 × 24 jamnya. `--selesai <nomor>` atau `--tolak <nomor> --alasan "…"` menutupnya; `--daftar` menampilkan yang masih terbuka |
+| `pnpm hak-subjek:ekspor --akun <email\|id> --permintaan <nomor> --oleh <email admin> --keluar <berkas.json>` | Menulis salinan semua data akun ke berkas JSON baru bermode 600 (tidak menimpa), dengan `catatan` per bagian. Tanpa kunci sesi, hash kode masuk, catatan internal verifikator, dan identitas anggota tim lain. Untuk permintaan berjenis `salinan` |
 
 ## Database
 
@@ -371,6 +372,7 @@ Permintaan salinan data, perbaikan, dan pembatasan pemrosesan dari Kebijakan Pri
 hak() { sudo -u aksesbogor -H env COREPACK_ENABLE_DOWNLOAD_PROMPT=0 sh -c 'cd /srv/akses-bogor/current && exec corepack pnpm exec tsx --env-file=/etc/akses-bogor/api.env "$@"' hak "$@"; }
 hak scripts/hak-subjek/catat.ts --jenis salinan --akun <email> --diterima "2026-11-27 09:15" --oleh <email admin>
 hak scripts/hak-subjek/catat.ts --daftar
+hak scripts/hak-subjek/ekspor.ts --akun <email> --permintaan <nomor> --oleh <email admin> --keluar /tmp/ekspor-<nomor>.json
 hak scripts/hak-subjek/catat.ts --selesai <nomor> --oleh <email admin>
 hak scripts/hak-subjek/catat.ts --tolak <nomor> --alasan "Akan mengungkap data pribadi orang lain" --oleh <email admin>
 ```
