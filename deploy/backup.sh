@@ -17,8 +17,9 @@ ls -1t "$dir/$db"-*.dump | tail -n +$((keep + 1)) | xargs -r rm -f --
 
 # Masa simpan 30 hari di R2 diatur lifecycle rule bucket, bukan skrip ini.
 if [[ -n ${BACKUP_R2_REMOTE:-} ]]; then
-  rclone copyto --s3-no-check-bucket "$file" "$BACKUP_R2_REMOTE/$(basename "$file")"
-  echo "disalin ke $BACKUP_R2_REMOTE"
+  object=$BACKUP_R2_REMOTE/$(basename "$file")
+  rclone copyto --s3-no-check-bucket "$file" "$object"
+  echo "disalin ke $object"
 else
   echo "BACKUP_R2_REMOTE kosong; salinan R2 dilewati"
 fi
