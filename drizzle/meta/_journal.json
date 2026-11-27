@@ -85,6 +85,13 @@
       "when": 1795715767830,
       "tag": "0011_street_view",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1795789692455,
+      "tag": "0012_hak_subjek",
+      "breakpoints": true
     }
   ]
 }

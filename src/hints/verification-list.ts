@@ -80,10 +80,10 @@ async function adminPlaces(db: Db): Promise<ListRow[]> {
   return rows.map((r) => ({ jenis: "tempat_admin", id: r.id, status: r.status, nama: r.name, kategori: r.category, kecamatan: r.district, lat: Number(r.lat), lng: Number(r.lng), klaim: r.answers, tayangDiPeta: null }));
 }
 
-/** Hanya id, jenis laporan, dan status: tanpa pelapor, nama tempat, titik, atau isian teks. */
+/** Hanya id, jenis laporan, dan status: tanpa pelapor, nama tempat, titik, atau isian teks. Laporan yang ditahan tidak ikut. */
 async function pendingReports(db: Db): Promise<ListRow[]> {
   const rows = rowsOf<{ id: string; kind: string; status: string }>(
-    await db.execute(sql`SELECT id, kind, status FROM reports WHERE status IN ('menunggu', 'klarifikasi') ORDER BY submitted_at, id`),
+    await db.execute(sql`SELECT id, kind, status FROM reports WHERE status IN ('menunggu', 'klarifikasi') AND held_at IS NULL ORDER BY submitted_at, id`),
   );
   return rows.map((r) => ({ jenis: "laporan", id: r.id, status: r.status, nama: null, kategori: null, kecamatan: null, lat: null, lng: null, klaim: r.kind, tayangDiPeta: null }));
 }
