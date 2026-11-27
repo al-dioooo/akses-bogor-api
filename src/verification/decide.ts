@@ -8,7 +8,7 @@ import { photoDeletions, photos, reportClarifications, reportEmails, reports, ty
 import { HttpError } from "../http/errors.js";
 import type { PhotoStore } from "../photos/storage.js";
 import { alreadyDecided, isReviewable } from "./photos.js";
-import { ownReport, reportNotFound } from "./queue.js";
+import { ownReport, reportHeld, reportNotFound } from "./queue.js";
 
 /** Tenggat jawaban klarifikasi (ADR-0019, ADR-0036). */
 export const CLARIFICATION_DAYS = 7;
@@ -18,16 +18,17 @@ export type RejectionReason = (typeof rejectionReason.enumValues)[number];
 /** Alasan yang boleh dipilih verifikator; R6 hanya dipakai sistem. */
 export const VERIFIER_REASONS = ["di_luar_kota_bogor", "duplikat", "bukti_tidak_cukup", "bukan_fasilitas_publik", "konten_tidak_pantas"] as const satisfies readonly RejectionReason[];
 
-/** Mengunci laporan yang masih bisa diputuskan. `viewerId` kosong untuk tindakan sistem. */
+/** Mengunci laporan yang masih bisa diputuskan dan tidak ditahan. `viewerId` kosong untuk tindakan sistem. */
 export async function lockReport(tx: Db, id: string, viewerId: string | null) {
   const [report] = await tx
-    .select({ id: reports.id, kind: reports.kind, status: reports.status, reporterId: reports.reporterId, placeId: reports.placeId, submission: reports.submission, location: reports.location, reviewerNote: reports.reviewerNote })
+    .select({ id: reports.id, kind: reports.kind, status: reports.status, reporterId: reports.reporterId, placeId: reports.placeId, submission: reports.submission, location: reports.location, reviewerNote: reports.reviewerNote, heldAt: reports.heldAt })
     .from(reports)
     .where(eq(reports.id, id))
     .for("update");
   if (!report) throw reportNotFound();
   if (viewerId !== null && report.reporterId === viewerId) throw ownReport();
   if (!isReviewable(report.status)) throw alreadyDecided();
+  if (report.heldAt) throw reportHeld();
   return report;
 }
 
