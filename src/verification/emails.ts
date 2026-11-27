@@ -1,6 +1,6 @@
 // Pengiriman email status laporan dari antrean `report_emails` (ADR-0039). Alamat dan isi dibaca saat mengirim; email
-// tidak dikirim bila akun pelapor sudah dihapus atau status laporan sudah berubah. Yang gagal dicoba lagi setiap jam
-// selama 3 hari.
+// tidak dikirim bila akun pelapor sudah dihapus, pelapor meminta email status laporan dihentikan
+// (`pnpm hak-subjek:email`), atau status laporan sudah berubah. Yang gagal dicoba lagi setiap jam selama 3 hari.
 import { and, asc, eq, lte } from "drizzle-orm";
 import type { Db } from "../db/client.js";
 import { places, reportEmails, reports, users } from "../db/schema.js";
@@ -31,6 +31,7 @@ export async function sendReportEmails(db: Db, { mailer, webUrl }: EmailOptions,
       submission: reports.submission,
       placeName: places.name,
       to: users.email,
+      emailsOffAt: users.reportEmailsOffAt,
     })
     .from(reportEmails)
     .innerJoin(reports, eq(reports.id, reportEmails.reportId))
@@ -45,7 +46,7 @@ export async function sendReportEmails(db: Db, { mailer, webUrl }: EmailOptions,
   for (const row of rows) {
     const placeName = row.placeName ?? (row.submission as { name: string }).name;
     const message =
-      !row.to
+      !row.to || row.emailsOffAt
         ? null
         : row.kind === "diterbitkan" && row.status === "diterbitkan" && row.placeId
           ? reportPublishedEmail(row.to, { placeName, placeId: row.placeId, webUrl })
