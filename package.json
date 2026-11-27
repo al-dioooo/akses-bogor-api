@@ -35,7 +35,8 @@
     "hak-subjek:ekspor": "tsx --env-file-if-exists=.env scripts/hak-subjek/ekspor.ts",
     "hak-subjek:ganti-email": "tsx --env-file-if-exists=.env scripts/hak-subjek/ganti-email.ts",
     "hak-subjek:tahan": "tsx --env-file-if-exists=.env scripts/hak-subjek/tahan.ts",
-    "hak-subjek:email": "tsx --env-file-if-exists=.env scripts/hak-subjek/email.ts"
+    "hak-subjek:email": "tsx --env-file-if-exists=.env scripts/hak-subjek/email.ts",
+    "hak-subjek:hapus": "tsx --env-file-if-exists=.env scripts/hak-subjek/hapus.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.12.0",

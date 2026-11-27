@@ -60,6 +60,7 @@ pnpm dev               # http://localhost:8080/healthz
 | `pnpm hak-subjek:ganti-email --akun <email lama\|id> --email-baru <email> --permintaan <nomor> --oleh <email admin>` | Mengganti email akun (permintaan `perbaikan`): cek unik tanpa membedakan huruf besar, tautan Google dilepas, semua sesi diakhiri, dan `emailVerified` kembali false sampai pemilik masuk dengan kode ke email baru. Setelah itu masuk dengan Google untuk email baru menaut lagi |
 | `pnpm hak-subjek:tahan --akun <email\|id> --permintaan <nomor> --oleh <email admin> --alasan "…"` | Menahan laporan akun yang belum diputuskan (permintaan `pembatasan`): tidak muncul di antrean, verifikator mendapat 404 `laporan_ditahan`, dan tidak ditolak otomatis karena tenggat klarifikasi. Laporan yang dikirim kemudian tidak ikut ditahan. `--lepas` mengembalikannya ke antrean dan memperpanjang tenggat klarifikasi selama masa tahan |
 | `pnpm hak-subjek:email --akun <email\|id> --permintaan <nomor> --oleh <email admin> (--mati\|--nyala)` | Mematikan atau menyalakan email status laporan (terbit, ditolak, klarifikasi) untuk akun (permintaan `pembatasan`). Saat dimatikan, email yang antre dibuang dan pengirim melewati akun itu. Kode masuk tetap dikirim |
+| `pnpm hak-subjek:hapus --akun <email\|id> --permintaan <nomor> --oleh <email admin>` | Menghapus akun atas permintaan `penghapusan` lewat email kontak, sama dengan Hapus akun di Akun Saya (ADR-0024), tanpa email konfirmasi otomatis. Akun admin harus diturunkan dulu dengan `pnpm peran` |
 
 ## Database
 
@@ -368,7 +369,7 @@ api scripts/verifikasi/street-view.ts /srv/akses-bogor/data/street-view/<putaran
 
 ### Permintaan Hak Subjek Data
 
-Permintaan salinan data, perbaikan, dan pembatasan pemrosesan dari Kebijakan Privasi bagian "Hak Anda" dijalankan dengan skrip `scripts/hak-subjek/` paling lambat 3 × 24 jam setelah emailnya diterima. Setiap permintaan dicatat dulu di tabel `data_subject_requests`; skrip lain wajib menyebut nomornya, harus dijalankan untuk akun yang sama, dan mencatat admin yang menjalankannya (`--oleh`) di log audit. Langkah lengkap, cara memeriksa pengirim, dan templat balasan ada di runbook `operations/permintaan-subjek-data.md` di akses-bogor-docs. Di server produksi (fatir-mitya):
+Permintaan salinan data, perbaikan, pembatasan pemrosesan, dan penghapusan dari Kebijakan Privasi bagian "Hak Anda" dijalankan dengan skrip `scripts/hak-subjek/` paling lambat 3 × 24 jam setelah emailnya diterima. Setiap permintaan dicatat dulu di tabel `data_subject_requests`; skrip lain wajib menyebut nomornya, harus dijalankan untuk akun yang sama, dan mencatat admin yang menjalankannya (`--oleh`) di log audit. Langkah lengkap, cara memeriksa pengirim, dan templat balasan ada di runbook `operations/permintaan-subjek-data.md` di akses-bogor-docs. Di server produksi (fatir-mitya):
 
 ```bash
 # Argumen diteruskan apa adanya, jadi alasan yang berisi spasi cukup diberi tanda kutip biasa.
@@ -379,6 +380,7 @@ hak scripts/hak-subjek/ekspor.ts --akun <email> --permintaan <nomor> --oleh <ema
 hak scripts/hak-subjek/ganti-email.ts --akun <email lama> --email-baru <email baru> --permintaan <nomor> --oleh <email admin>
 hak scripts/hak-subjek/tahan.ts --akun <email> --permintaan <nomor> --oleh <email admin> --alasan "Pelapor meminta penundaan"
 hak scripts/hak-subjek/email.ts --akun <email> --permintaan <nomor> --oleh <email admin> --mati
+hak scripts/hak-subjek/hapus.ts --akun <id akun> --permintaan <nomor> --oleh <email admin>
 hak scripts/hak-subjek/catat.ts --selesai <nomor> --oleh <email admin>
 hak scripts/hak-subjek/catat.ts --tolak <nomor> --alasan "Akan mengungkap data pribadi orang lain" --oleh <email admin>
 ```
