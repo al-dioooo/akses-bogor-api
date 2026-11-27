@@ -364,7 +364,7 @@ api scripts/verifikasi/street-view.ts /srv/akses-bogor/data/street-view/<putaran
 
 ### Permintaan Hak Subjek Data
 
-Permintaan salinan data, perbaikan, dan pembatasan pemrosesan dari Kebijakan Privasi bagian "Hak Anda" dijalankan dengan skrip `scripts/hak-subjek/` paling lambat 3 × 24 jam setelah emailnya diterima. Setiap permintaan dicatat dulu di tabel `data_subject_requests`; skrip lain wajib menyebut nomornya, harus dijalankan untuk akun yang sama, dan mencatat admin yang menjalankannya (`--oleh`) di log audit. Langkah lengkap, cara memeriksa pengirim, dan templat balasan ada di runbook `operations/permintaan-subjek-data.md` di akses-bogor-docs. Di Evergarden:
+Permintaan salinan data, perbaikan, dan pembatasan pemrosesan dari Kebijakan Privasi bagian "Hak Anda" dijalankan dengan skrip `scripts/hak-subjek/` paling lambat 3 × 24 jam setelah emailnya diterima. Setiap permintaan dicatat dulu di tabel `data_subject_requests`; skrip lain wajib menyebut nomornya, harus dijalankan untuk akun yang sama, dan mencatat admin yang menjalankannya (`--oleh`) di log audit. Langkah lengkap, cara memeriksa pengirim, dan templat balasan ada di runbook `operations/permintaan-subjek-data.md` di akses-bogor-docs. Di server produksi (fatir-mitya):
 
 ```bash
 # Argumen diteruskan apa adanya, jadi alasan yang berisi spasi cukup diberi tanda kutip biasa.
