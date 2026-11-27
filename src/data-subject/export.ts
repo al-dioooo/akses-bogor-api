@@ -25,7 +25,8 @@ export const EXPORT_NOTES = {
 };
 
 const iso = (value: Date | null) => (value ? new Date(value).toISOString() : null);
-const OTP_PREFIXES = ["sign-in-otp-", "email-verification-otp-", "forget-password-otp-"];
+/** Identifier baris kode email Better Auth untuk satu alamat; AksesBogor hanya memakai yang pertama. */
+export const codeIdentifiers = (email: string) => ["sign-in-otp-", "email-verification-otp-", "forget-password-otp-"].map((prefix) => `${prefix}${email}`);
 const none = [crypto.randomUUID()];
 
 /**
@@ -92,7 +93,7 @@ export async function exportAccount(db: Db, input: { userId: string; requestId: 
         tx
           .select({ createdAt: verifications.createdAt, expiresAt: verifications.expiresAt })
           .from(verifications)
-          .where(inArray(verifications.identifier, OTP_PREFIXES.map((p) => `${p}${user.email}`))),
+          .where(inArray(verifications.identifier, codeIdentifiers(user.email))),
         tx.select({ reportId: reportEmails.reportId, kind: reportEmails.kind, attempts: reportEmails.attempts, createdAt: reportEmails.createdAt, nextAttemptAt: reportEmails.nextAttemptAt }).from(reportEmails).where(inArray(reportEmails.reportId, reportIds)),
         tx
           .select({ id: dataSubjectRequests.id, kind: dataSubjectRequests.kind, receivedAt: dataSubjectRequests.receivedAt, completedAt: dataSubjectRequests.completedAt, outcome: dataSubjectRequests.outcome, note: dataSubjectRequests.note })
